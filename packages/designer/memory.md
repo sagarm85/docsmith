@@ -535,6 +535,55 @@ fixed before landing — margins don't actually inset anything in the HTML box
 model here, only in the print/PDF engine's `@page` handling).
 `[status: locked]`
 
+### D-029 — Per-band `arrangement: 'free' | 'stack'`; stack rows via each element's `row`, width always a row percentage; never offered for pageHeader/pageFooter
+**Decision:** A new optional `FreeBand.arrangement?: 'free' | 'stack'`
+(absent = `'free'`, fully backward-compatible) lets a band auto-flow its
+elements top-to-bottom in array order instead of absolute x/y — a
+MailerLite-editor-style stack, offered **per band** (not a whole-template
+setting, unlike `layoutUnit`). Elements sharing a `FreeElement.row` number
+render side by side, in array order; an element with no `row` is its own
+row. Width in a `'stack'` band is **always** a plain percentage of the row —
+never `layoutUnit`-dependent — since the entire point of stacking is to
+never need a unit choice for that band. The toggle is only ever exposed
+(`BandProps.svelte`'s `onArrangementChange`, wired only in
+`Properties.svelte` for `reportHeader`/`totals`) for the two **in-flow**
+bands; `pageHeader`/`pageFooter` never get it, and `core.renderFreeBand`
+defensively ignores `arrangement: 'stack'` for those two types even if a
+hand-edited template sets it.
+**Why:** The user showed a MailerLite popup-builder screenshot as reference
+UX (stack blocks, drag-handle reorder, hover duplicate/delete) and — when
+asked — wanted (a) elements able to share a row, not strictly single-column,
+and (b) the choice per-band, not template-wide (a free-form letterhead next
+to a stacked totals block should be expressible in one template).
+`pageHeader`/`pageFooter` are excluded because `core.renderToHtml` reserves
+`.doc-flow` padding equal to `pageHeader.height`/`pageFooter.height` for
+their `position:fixed` placement — a `'stack'` band's height is intrinsic/
+auto (the whole point), which can't be known ahead of the browser actually
+laying out the content, so a running band that outgrew its stated `height`
+would silently overlap the flowing document. Reusing `FreeElement` (adding
+just one optional `row` field) rather than a parallel `StackRow[]` structure
+keeps one element type and one array to reorder/undo/select against, at the
+cost of `x`/`y` sitting unused on stack elements (harmless — never read by
+`renderStackBand` or `StackBand.svelte`).
+**New designer component:** `StackBand.svelte` (parallel to `Band.svelte`,
+swapped in by `Canvas.svelte` when `band.arrangement === 'stack'`) owns row
+grouping/rendering, drag-handle row reordering (`application/x-stack-row-index`,
+same native-HTML5-DnD pattern as `DetailTable.svelte`'s column reorder),
+merge-into-row on drop, and hover/focus/selected-reveal duplicate/delete
+actions. `ElementProps.svelte` hides X/Y (no coordinates in stack mode) and
+z-order (bring-forward/send-back have no meaning without overlap to
+resolve — reordering is the drag-handle) when the selected element's band is
+`'stack'`.
+**Rejected:** a whole-template arrangement setting (offered as an option,
+not chosen — the user specifically wanted per-band mixing); strictly
+single-column stacking, i.e. no shared rows (offered, not chosen — the user
+wanted side-by-side pairs like "Invoice # | Issued at" to remain expressible
+in stack mode); a parallel `rows: FreeElement[][]` field on `FreeBand`
+instead of reusing `FreeElement[]` + `row` (would need a second array to
+keep in sync with selection/undo/duplicate/delete, for no real benefit over
+one flat array plus a grouping key).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

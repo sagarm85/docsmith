@@ -5,11 +5,13 @@ import type {
   Band,
   DatasetMeta,
   DetailBand,
+  FreeBand,
   PrintSetup,
   Template,
   TemplateDataset,
 } from './types.js';
 import { isDetailBand } from './types.js';
+import { groupIntoRows } from './render.js';
 
 const DEFAULT_PRINT_SETUP: PrintSetup = {
   pageSize: 'A4',
@@ -164,4 +166,68 @@ export function convertLayoutUnit(
       };
     }),
   };
+}
+
+const STACK_ROW_GAP = 8; // px, between stacked rows once converted back to 'free'
+const STACK_FALLBACK_ROW_HEIGHT = 20; // px, when an element's own h isn't a useful row-height hint
+
+/**
+ * Convert one band between 'free' (absolute x/y/w/h) and 'stack' (auto-flow
+ * rows, memory.md D-029). Best-effort, not lossless in either direction —
+ * matches `convertLayoutUnit`'s spirit: a reasonable default the user can
+ * then adjust, not a promise of pixel-perfect round-tripping.
+ *
+ * 'free' -> 'stack': elements are sorted top-to-bottom by their current y
+ * and each becomes its own single-element row (never guesses which elements
+ * were "meant" to share a row — that's a manual merge afterward, dragging
+ * one element onto another's row). Widths convert to a plain percentage
+ * (of `contentWidthPx`, using `currentLayoutUnit` to know what the stored
+ * w already means).
+ *
+ * 'stack' -> 'free': rows (grouped the same way the renderer groups them)
+ * are laid out top-to-bottom with a fixed gap; each row's elements are
+ * placed left-to-right, x offsets computed by accumulating the row's own
+ * width percentages. Width converts back to px or % per `currentLayoutUnit`.
+ */
+export function convertBandArrangement(
+  band: FreeBand,
+  target: 'free' | 'stack',
+  contentWidthPx: number,
+  currentLayoutUnit: 'px' | '%',
+): FreeBand {
+  const current = band.arrangement ?? 'free';
+  if (current === target) return band;
+
+  if (target === 'stack') {
+    const ordered = [...band.elements].sort((a, b) => a.y - b.y);
+    return {
+      ...band,
+      arrangement: 'stack',
+      elements: ordered.map((el, i) => ({
+        ...el,
+        row: i,
+        w: currentLayoutUnit === '%' ? el.w : (contentWidthPx > 0 ? (el.w / contentWidthPx) * 100 : 0),
+      })),
+    };
+  }
+
+  // 'stack' -> 'free'
+  const rows = groupIntoRows(band.elements);
+  let y = 0;
+  const elements = rows.flatMap((row) => {
+    const rowHeightPx = Math.max(STACK_FALLBACK_ROW_HEIGHT, ...row.map((el) => el.h || 0));
+    let xPercent = 0;
+    const placed = row.map((el) => {
+      const x = currentLayoutUnit === '%' ? xPercent : (xPercent / 100) * contentWidthPx;
+      const w = currentLayoutUnit === '%' ? el.w : (el.w / 100) * contentWidthPx;
+      xPercent += el.w;
+      const { row: _row, ...rest } = el;
+      void _row;
+      return { ...rest, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, w: Math.round(w * 100) / 100 };
+    });
+    y += rowHeightPx + STACK_ROW_GAP;
+    return placed;
+  });
+
+  return { ...band, arrangement: 'free', elements };
 }

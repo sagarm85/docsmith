@@ -18,6 +18,7 @@
   let {
     element,
     unit = 'px',
+    arrangement = 'free',
     onChange,
     onDelete,
     onDuplicate,
@@ -30,6 +31,13 @@
      * already in this unit (DocDesigner converts the whole template up front
      * when the unit toggles, so this component never converts anything). */
     unit?: 'px' | '%';
+    /** The containing band's arrangement (memory.md D-029). 'stack' hides
+     * X/Y (position is row order, not coordinates) and z-order (reordering
+     * is the drag-handle in StackBand.svelte, not bring-forward/send-back —
+     * "forward/back" doesn't have a stack-mode meaning since there's no
+     * overlap to resolve). Width is always a row percentage in 'stack',
+     * regardless of `unit`. */
+    arrangement?: 'free' | 'stack';
     onChange: (patch: Partial<FreeElement>) => void;
     onDelete: () => void;
     onDuplicate: () => void;
@@ -60,21 +68,35 @@
 <div class="dd-element-props">
   <h3 class="dd-props-title"><Icon name={ELEMENT_ICON[element.kind]} size={13} />{element.kind} element</h3>
 
-  <fieldset class="dd-props-grid">
-    <legend>Position ({unit})</legend>
-    <Field label="X" fieldId="dd-el-x">
-      <NumberInput id="dd-el-x" ariaLabel="X position" min={0} max={posMax} step={posStep} value={element.x} onchange={(v) => onChange({ x: v })} />
-    </Field>
-    <Field label="Y" fieldId="dd-el-y">
-      <NumberInput id="dd-el-y" ariaLabel="Y position" min={0} max={posMax} step={posStep} value={element.y} onchange={(v) => onChange({ y: v })} />
-    </Field>
-    <Field label="Width" fieldId="dd-el-w">
-      <NumberInput id="dd-el-w" ariaLabel="Width" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.w} onchange={(v) => onChange({ w: v })} />
-    </Field>
-    <Field label="Height" fieldId="dd-el-h">
-      <NumberInput id="dd-el-h" ariaLabel="Height" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.h} onchange={(v) => onChange({ h: v })} />
-    </Field>
-  </fieldset>
+  {#if arrangement === 'stack'}
+    <fieldset class="dd-props-grid">
+      <legend>Row width (%)</legend>
+      <Field label="Width" fieldId="dd-el-w">
+        <NumberInput id="dd-el-w" ariaLabel="Width" min={5} max={100} step={5} value={element.w} onchange={(v) => onChange({ w: v })} />
+      </Field>
+      {#if element.kind !== 'text' && element.kind !== 'field'}
+        <Field label="Height (px)" fieldId="dd-el-h">
+          <NumberInput id="dd-el-h" ariaLabel="Height" min={1} value={element.h} onchange={(v) => onChange({ h: v })} />
+        </Field>
+      {/if}
+    </fieldset>
+  {:else}
+    <fieldset class="dd-props-grid">
+      <legend>Position ({unit})</legend>
+      <Field label="X" fieldId="dd-el-x">
+        <NumberInput id="dd-el-x" ariaLabel="X position" min={0} max={posMax} step={posStep} value={element.x} onchange={(v) => onChange({ x: v })} />
+      </Field>
+      <Field label="Y" fieldId="dd-el-y">
+        <NumberInput id="dd-el-y" ariaLabel="Y position" min={0} max={posMax} step={posStep} value={element.y} onchange={(v) => onChange({ y: v })} />
+      </Field>
+      <Field label="Width" fieldId="dd-el-w">
+        <NumberInput id="dd-el-w" ariaLabel="Width" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.w} onchange={(v) => onChange({ w: v })} />
+      </Field>
+      <Field label="Height" fieldId="dd-el-h">
+        <NumberInput id="dd-el-h" ariaLabel="Height" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.h} onchange={(v) => onChange({ h: v })} />
+      </Field>
+    </fieldset>
+  {/if}
 
   {#if element.kind === 'text' || element.kind === 'field'}
     <fieldset class="dd-props-grid">
@@ -178,10 +200,12 @@
     </Field>
   {/if}
 
-  <div class="dd-props-actions">
-    <Button variant="secondary" onclick={onSendBack}>Send Back [</Button>
-    <Button variant="secondary" onclick={onBringForward}>Bring Forward ]</Button>
-  </div>
+  {#if arrangement === 'free'}
+    <div class="dd-props-actions">
+      <Button variant="secondary" onclick={onSendBack}>Send Back [</Button>
+      <Button variant="secondary" onclick={onBringForward}>Bring Forward ]</Button>
+    </div>
+  {/if}
   <div class="dd-props-actions">
     <Button variant="secondary" onclick={onDuplicate}>Duplicate ⌘D</Button>
     <Button variant="destructive" onclick={onDelete}>Delete</Button>

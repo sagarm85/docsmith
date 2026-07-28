@@ -6,6 +6,7 @@
     canUndo,
     commit,
     commitFrom,
+    convertBandArrangement,
     convertLayoutUnit,
     defaultFormatForType,
     initHistory,
@@ -31,7 +32,15 @@
     loadTemplateFromLocalStorage,
     saveTemplateToLocalStorage,
   } from './persistence.js';
-  import { createFieldElement, createDetailColumn, createBlockElement, type BlockKind } from './template-edits.js';
+  import {
+    createFieldElement,
+    createDetailColumn,
+    createBlockElement,
+    createStackFieldElement,
+    createStackBlockElement,
+    nextStackRow,
+    type BlockKind,
+  } from './template-edits.js';
   import { pageDimensionsPx } from './geometry.js';
   import ErrorInline from './ui/ErrorInline.svelte';
   import Toast from './ui/Toast.svelte';
@@ -128,6 +137,13 @@
     commitTemplate(updateBandElements(bandId, (els) => [...els, element]));
   }
 
+  // Stack-arrangement bands (memory.md D-029) replace their whole `elements`
+  // array per edit — add/reorder/merge-into-row are all expressed this way
+  // by StackBand.svelte, same "whole collection" pattern as handleUpdateColumns.
+  function handleUpdateElements(bandId: string, elements: FreeElement[]) {
+    commitTemplate(updateBandElements(bandId, () => elements));
+  }
+
   function handleAddColumn(column: DetailColumn) {
     commitTemplate({
       ...template,
@@ -155,6 +171,23 @@
   function handleLayoutUnitChange(nextUnit: 'px' | '%') {
     const contentWidthPx = pageDimensionsPx(template.printSetup).width;
     commitTemplate(convertLayoutUnit(template, nextUnit, contentWidthPx));
+  }
+
+  // Band arrangement (memory.md D-029): toggling free<->stack migrates that
+  // one band's elements via core.convertBandArrangement in the same commit.
+  // Only ever called for reportHeader/totals (Properties.svelte only wires
+  // onArrangementChange for those two types).
+  function handleBandArrangementChange(bandId: string, arrangement: 'free' | 'stack') {
+    const contentWidthPx = pageDimensionsPx(template.printSetup).width;
+    const layoutUnit = template.layoutUnit ?? 'px';
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) =>
+        b.id === bandId && !isDetailBand(b)
+          ? convertBandArrangement(b, arrangement, contentWidthPx, layoutUnit)
+          : b,
+      ),
+    });
   }
 
   function handleKeepRowTogetherChange(next: boolean) {
@@ -209,6 +242,14 @@
       return;
     }
     const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
+    if (reportHeader?.arrangement === 'stack') {
+      handleAddElement(
+        'reportHeader',
+        createStackFieldElement('header', field, nextStackRow(reportHeader.elements)),
+      );
+      void datasetId;
+      return;
+    }
     handleAddElement('reportHeader', createFieldElement('header', field, reportHeader?.elements ?? []));
     void datasetId;
   }
@@ -220,6 +261,10 @@
   // place it elsewhere.
   function handlePaletteAddBlock(kind: BlockKind) {
     const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
+    if (reportHeader?.arrangement === 'stack') {
+      handleAddElement('reportHeader', createStackBlockElement(kind, nextStackRow(reportHeader.elements)));
+      return;
+    }
     handleAddElement('reportHeader', createBlockElement(kind, reportHeader?.elements ?? []));
   }
 
@@ -257,15 +302,23 @@
         break;
       case 'header': {
         const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+        const fieldMeta = { name: picked.column, label: picked.label, type: picked.type };
         handleAddElement(
           bandId,
-          createFieldElement('header', { name: picked.column, label: picked.label, type: picked.type }, band?.elements ?? []),
+          band?.arrangement === 'stack'
+            ? createStackFieldElement('header', fieldMeta, nextStackRow(band.elements))
+            : createFieldElement('header', fieldMeta, band?.elements ?? []),
         );
         break;
       }
       case 'block': {
         const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
-        handleAddElement(bandId, createBlockElement(picked.kind, band?.elements ?? []));
+        handleAddElement(
+          bandId,
+          band?.arrangement === 'stack'
+            ? createStackBlockElement(picked.kind, nextStackRow(band.elements))
+            : createBlockElement(picked.kind, band?.elements ?? []),
+        );
         break;
       }
     }
@@ -581,6 +634,7 @@
             {adapter}
             {selection}
             onAddElement={handleAddElement}
+            onUpdateElements={handleUpdateElements}
             onAddColumn={handleAddColumn}
             onUpdateColumns={handleUpdateColumns}
             onSelectElement={handleSelectElement}
@@ -611,6 +665,7 @@
               onColumnChange={handleColumnChange}
               onColumnAggregateChange={handleColumnAggregateChange}
               onBandChange={handleBandChange}
+              onBandArrangementChange={handleBandArrangementChange}
               printSetup={template.printSetup}
               onPrintSetupChange={handlePrintSetupChange}
               {keepRowTogether}

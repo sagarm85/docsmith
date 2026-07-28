@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { renderToHtml } from './render.js';
-import { newTemplate, convertLayoutUnit } from './schema.js';
+import { newTemplate, convertLayoutUnit, convertBandArrangement } from './schema.js';
 import { formatValue } from './format.js';
-import type { DocumentData, FreeBand, Template } from './types.js';
+import type { DocumentData, FreeBand, FreeElement, Template } from './types.js';
 
 function invoiceTemplate(): Template {
   const t = newTemplate('invoice', 'invoice');
@@ -144,6 +144,102 @@ describe('convertLayoutUnit', () => {
     const next = convertLayoutUnit(t, '%', 800);
     const detail = next.bands.find((b) => b.id === 'detail');
     expect(detail).toStrictEqual(t.bands.find((b) => b.id === 'detail'));
+  });
+});
+
+describe('renderToHtml — "stack" arrangement (memory.md D-029)', () => {
+  it('renders elements as flex rows in array order, not absolute position', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            arrangement: 'stack' as const,
+            elements: [
+              { id: 'a', kind: 'text', x: 0, y: 0, w: 50, h: 20, text: 'Left', row: 0 },
+              { id: 'b', kind: 'text', x: 0, y: 0, w: 50, h: 20, text: 'Right', row: 0 },
+              { id: 'c', kind: 'text', x: 0, y: 0, w: 100, h: 20, text: 'Below' },
+            ] as FreeElement[],
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('class="band band-reportHeader band-stack');
+    // Row grouping: "Left"/"Right" share row 0, "Below" is its own row —
+    // exactly 2 <div class="stack-row"> groups.
+    expect((out.html.match(/class="stack-row"/g) ?? []).length).toBe(2);
+    // No absolute positioning on stack elements.
+    expect(out.html).not.toContain('el-text" style="position:absolute');
+    expect(out.html).toContain('flex:0 0 50%');
+  });
+
+  it('never stacks pageHeader/pageFooter even if arrangement is set (they need a known height for the fixed-position reservation)', () => {
+    const t = invoiceTemplate();
+    t.bands = [
+      ...t.bands,
+      {
+        id: 'pageHeader',
+        type: 'pageHeader',
+        height: 40,
+        enabled: true,
+        arrangement: 'stack',
+        elements: [{ id: 'ph1', kind: 'text', x: 0, y: 0, w: 100, h: 18, text: 'Running' }],
+      },
+    ];
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('position:absolute');
+    expect(out.html).not.toContain('band-pageHeader band-stack');
+  });
+});
+
+describe('convertBandArrangement', () => {
+  function band(): FreeBand {
+    return {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 120,
+      elements: [
+        { id: 'e1', kind: 'text', x: 12, y: 40, w: 200, h: 20, text: 'Second' },
+        { id: 'e2', kind: 'text', x: 12, y: 8, w: 200, h: 20, text: 'First' },
+      ],
+    };
+  }
+
+  it('is a no-op (same reference) when already in the target arrangement', () => {
+    const b = band();
+    expect(convertBandArrangement(b, 'free', 800, 'px')).toBe(b);
+  });
+
+  it('free -> stack sorts by y, gives each element its own row, and converts width to a plain percentage', () => {
+    const next = convertBandArrangement(band(), 'stack', 800, 'px');
+    expect(next.arrangement).toBe('stack');
+    // Sorted by y: "First" (y:8) then "Second" (y:40).
+    expect(next.elements.map((e) => e.text)).toStrictEqual(['First', 'Second']);
+    expect(next.elements[0]?.row).toBe(0);
+    expect(next.elements[1]?.row).toBe(1);
+    expect(next.elements[0]?.w).toBe(25); // 200/800*100
+  });
+
+  it('stack -> free lays rows out top-to-bottom and side-by-side within a row', () => {
+    const stacked: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 120,
+      arrangement: 'stack',
+      elements: [
+        { id: 'a', kind: 'text', x: 0, y: 0, w: 50, h: 20, text: 'Left', row: 0 },
+        { id: 'b', kind: 'text', x: 0, y: 0, w: 50, h: 20, text: 'Right', row: 0 },
+        { id: 'c', kind: 'text', x: 0, y: 0, w: 100, h: 20, text: 'Below' },
+      ],
+    };
+    const next = convertBandArrangement(stacked, 'free', 800, 'px');
+    expect(next.arrangement).toBe('free');
+    const [left, right, below] = next.elements;
+    expect(left?.x).toBe(0);
+    expect(right?.x).toBe(400); // 50% of 800px
+    expect(left?.y).toBe(right?.y); // same row -> same y
+    expect(below?.y).toBeGreaterThan(left!.y); // next row is lower
+    expect(next.elements.every((e) => e.row === undefined)).toBe(true);
   });
 });
 

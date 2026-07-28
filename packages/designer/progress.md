@@ -187,6 +187,43 @@
   confirming a template converted to `%` renders pixel-identical to its `px`
   original. 22 core tests pass (was 16); 113 designer tests pass (was 106);
   lint/typecheck/build all green (`dist/doc-designer.js` ~287KB / ~70KB gzip).
+- **Now — stacked/auto-flow arrangement, MailerLite-editor style (D-029).**
+  User referenced MailerLite's popup builder (blocks stack top-to-bottom in
+  document order, drag-handle reorder, hover duplicate/delete) as UX
+  inspiration; asked for elements to be able to share a row (not strictly
+  single-column) and for the choice to be per-band (not whole-template, so a
+  free-form letterhead can coexist with a stacked totals block). New
+  `FreeBand.arrangement?: 'free' | 'stack'` (absent = 'free', backward-
+  compatible) and `FreeElement.row?: number` (elements sharing a row number
+  render side by side, in array order). `core.renderToHtml` gets a real
+  second render path for `'stack'` bands (flex rows, intrinsic/auto height,
+  width always a row percentage regardless of `layoutUnit`) — still one
+  `renderToHtml`, not a second renderer, same as the `detail` band already
+  being a second branch. New `core.convertBandArrangement()` migrates a
+  band's elements on toggle (free→stack sorts by y, one element per row;
+  stack→free lays rows out top-to-bottom with a fixed gap). New
+  `StackBand.svelte` designer component (swapped in by `Canvas.svelte`)
+  owns row rendering, native-HTML5-DnD row reordering, merge-into-row on
+  drop, and hover/focus/selected-reveal duplicate/delete. `BandProps.svelte`
+  gained the arrangement toggle, offered only for `reportHeader`/`totals` —
+  never `pageHeader`/`pageFooter`, which need a *known* height for their
+  `position:fixed` padding reservation, incompatible with a stack band's
+  intrinsic height. `ElementProps.svelte` hides X/Y and z-order controls for
+  elements in a stack band (no coordinates, no overlap to resolve — see
+  D-029 for the full reasoning, including why `FreeElement` gained one field
+  instead of a parallel rows structure). Also fixed a real gap caught while
+  wiring this: the palette "+" click-to-add and keyboard drag-alternative
+  paths built free-form elements unconditionally, which would have produced
+  a broken 240%-wide element if used on a stack band — both now check the
+  target band's arrangement and route through the new
+  `createStackFieldElement`/`createStackBlockElement` constructors. Verified
+  with core unit tests (stack rendering, row grouping, arrangement
+  migration), a dedicated `StackBand.test.ts` (10 tests: empty state, row
+  grouping, select, duplicate/delete, text-edit, add-as-new-row,
+  merge-into-row, dataset-field rejection, block drop, row reorder), a full
+  DocDesigner integration test, and a real-browser screenshot. 27 core tests
+  pass (was 22); 124 designer tests pass (was 113); lint/typecheck/build all
+  green (`dist/doc-designer.js` ~316KB / ~75KB gzip).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -391,6 +428,25 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Stacked/auto-flow arrangement (D-029).** New
+  `FreeBand.arrangement?: 'free' | 'stack'` (per-band, absent = 'free') and
+  `FreeElement.row?: number` (shared row numbers render side by side).
+  `core.renderToHtml` gets a second render path for `'stack'` bands (flex
+  rows, intrinsic height, width always a row %) — still one renderer, not a
+  second one, same as `detail`'s existing special-cased branch. New
+  `core.convertBandArrangement()` migrates a band's elements on toggle. New
+  `StackBand.svelte` (row rendering, drag-handle reorder, merge-into-row on
+  drop, hover/focus/selected duplicate/delete) swapped in by `Canvas.svelte`.
+  `BandProps.svelte` gained the toggle, offered only for reportHeader/totals
+  (pageHeader/pageFooter need a *known* height for their fixed-position
+  padding reservation, incompatible with intrinsic stack height).
+  `ElementProps.svelte` hides X/Y and z-order for stack elements. Also fixed
+  a real gap: the palette "+" and keyboard drag-alternative paths built
+  free-form elements unconditionally, which would have produced a broken
+  240%-wide element on a stack band — both now check the target band's
+  arrangement. 27 core tests pass (was 22); 124 designer tests pass (was
+  113); lint/typecheck/build all green. Verified with a real-browser
+  screenshot showing rows correctly stacked and grouped.
 - **2026-07-28 — Percentage-based layout (D-028).** New `Template.layoutUnit?:
   'px' | '%'` (absent = 'px', backward-compatible); `core.renderToHtml` emits
   the matching CSS unit; new `core.convertLayoutUnit(template, targetUnit,

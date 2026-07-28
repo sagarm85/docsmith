@@ -717,6 +717,52 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('switching reportHeader to "stack" arrangement (memory.md D-029) migrates elements and routes new "+" adds into a row', async () => {
+    const el = await mountWithEntitySelected();
+
+    // Select the reportHeader band (its tab) to reach BandProps.
+    const reportHeaderTab = Array.from(el.shadowRoot!.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Report Header',
+    );
+    reportHeaderTab?.click();
+    await nextTick();
+
+    const arrangementSelect = el.shadowRoot!.querySelector<HTMLSelectElement>(
+      '[aria-label="Band arrangement"]',
+    );
+    expect(arrangementSelect?.value).toBe('free');
+    arrangementSelect!.value = 'stack';
+    arrangementSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    const reportHeader = () =>
+      el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+        arrangement?: string;
+        elements: Array<{ row?: number; w: number; x: number }>;
+      };
+    expect(reportHeader().arrangement).toBe('stack');
+    expect(el.shadowRoot?.textContent).toContain('Stacked');
+
+    // The palette "+" now routes through the stack constructor: row assigned,
+    // width a plain percentage (100, not a leftover px value like 240).
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Invoice # to report header"]')!
+      .click();
+    await nextTick();
+    expect(reportHeader().elements).toHaveLength(1);
+    expect(reportHeader().elements[0]?.row).toBe(0);
+    expect(reportHeader().elements[0]?.w).toBe(100);
+
+    // Switching back to 'free' migrates it back to real x/y (row cleared).
+    arrangementSelect!.value = 'free';
+    arrangementSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    expect(reportHeader().arrangement).toBe('free');
+    expect(reportHeader().elements[0]?.row).toBeUndefined();
+
+    el.remove();
+  });
+
   it('calls config.onChange (debounced) after an edit, not on every keystroke', async () => {
     vi.useFakeTimers();
     try {

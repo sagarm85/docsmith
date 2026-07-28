@@ -104,6 +104,16 @@ export type FreeElement = {
   y: number;
   w: number;
   h: number;
+  /** Row index within its band's stacked flow (memory.md D-029). Only read
+   * when the containing FreeBand's `arrangement === 'stack'`; ignored
+   * (x/y/w/h in their normal free-form meaning) in the default 'free'
+   * arrangement. Elements sharing a row number render side by side, in
+   * array order; row numbers need not be contiguous or start at 0 — rows
+   * are ordered by each row number's first occurrence in `elements`, top to
+   * bottom. Absent `row` behaves as if every such element had its own
+   * unique row (a single-column line), so authoring never *requires*
+   * setting it. */
+  row?: number;
   style?: ElementStyle;
   text?: string; // kind:'text'
   label?: string; // kind:'field' — shown as {label} token in the designer
@@ -136,10 +146,19 @@ export type BandType =
 export type FreeBand = {
   id: string;
   type: Exclude<BandType, 'detail'>;
-  height: number; // px
+  height: number; // px — ignored (band height is intrinsic/auto) when arrangement === 'stack'
   elements: FreeElement[];
   style?: ElementStyle;
   enabled?: boolean; // optional bands (pageHeader/pageFooter) can be off
+  /** Per-band arrangement (memory.md D-029): 'free' (default, absent means
+   * 'free' — fully backward-compatible) is today's absolute x/y positioning.
+   * 'stack' auto-flows `elements` top-to-bottom in array order (grouped into
+   * rows via each element's `row`), MailerLite-editor style — no x/y, width
+   * is always a percentage of the row (regardless of the template's
+   * `layoutUnit`, since a fixed px width in a stack could overflow a
+   * narrower page — the entire point of stacking is to never need that
+   * unit choice for this band). */
+  arrangement?: 'free' | 'stack';
 };
 
 export type DetailBand = {

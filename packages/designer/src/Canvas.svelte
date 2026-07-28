@@ -2,6 +2,7 @@
   import { isDetailBand, type DataSourceAdapter, type DetailBand, type DetailColumn, type FreeBand, type FreeElement, type Template } from '@docsmith/core';
   import type { PickedUp, Selection } from './types.js';
   import Band from './Band.svelte';
+  import StackBand from './StackBand.svelte';
   import DetailTable from './DetailTable.svelte';
   import Toast from './ui/Toast.svelte';
   import { pageDimensionsPx, marginsPx } from './geometry.js';
@@ -11,6 +12,7 @@
     adapter,
     selection,
     onAddElement,
+    onUpdateElements,
     onAddColumn,
     onUpdateColumns,
     onSelectElement,
@@ -33,6 +35,9 @@
     adapter: DataSourceAdapter;
     selection: Selection;
     onAddElement: (bandId: string, element: FreeElement) => void;
+    /** Stack-arrangement bands replace their whole `elements` array per edit
+     * (memory.md D-029), same "whole collection" pattern as `onUpdateColumns`. */
+    onUpdateElements: (bandId: string, elements: FreeElement[]) => void;
     onAddColumn: (column: DetailColumn) => void;
     onUpdateColumns: (columns: DetailColumn[]) => void;
     onSelectElement: (bandId: string, elementId: string) => void;
@@ -193,26 +198,42 @@
         </div>
       {/if}
       {#if reportHeader}
-        <Band
-          band={reportHeader}
-          unit={layoutUnit}
-          {contentWidthPx}
-          selectedElementId={selection?.kind === 'element' && selection.bandId === 'reportHeader' ? selection.elementId : undefined}
-          bandSelected={selection?.kind === 'band' && selection.bandId === 'reportHeader'}
-          onAddElement={(el) => onAddElement('reportHeader', el)}
-          onInvalidDrop={handleInvalidDrop}
-          onSelectElement={(id) => onSelectElement('reportHeader', id)}
-          onSelectBand={() => onSelectBand('reportHeader')}
-          {onDeselect}
-          onElementLiveChange={(id, patch) => onElementLiveChange('reportHeader', id, patch)}
-          {onElementDragStart}
-          {onElementDragEnd}
-          onElementDelete={(id) => onElementDelete('reportHeader', id)}
-          onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
-          onElementBringForward={(id) => onElementBringForward('reportHeader', id)}
-          onElementSendBack={(id) => onElementSendBack('reportHeader', id)}
-          onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
-        />
+        {#if reportHeader.arrangement === 'stack'}
+          <StackBand
+            band={reportHeader}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'reportHeader' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'reportHeader'}
+            onUpdateElements={(els) => onUpdateElements('reportHeader', els)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('reportHeader', id)}
+            onSelectBand={() => onSelectBand('reportHeader')}
+            {onDeselect}
+            onElementDelete={(id) => onElementDelete('reportHeader', id)}
+            onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
+            onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
+          />
+        {:else}
+          <Band
+            band={reportHeader}
+            unit={layoutUnit}
+            {contentWidthPx}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'reportHeader' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'reportHeader'}
+            onAddElement={(el) => onAddElement('reportHeader', el)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('reportHeader', id)}
+            onSelectBand={() => onSelectBand('reportHeader')}
+            {onDeselect}
+            onElementLiveChange={(id, patch) => onElementLiveChange('reportHeader', id, patch)}
+            {onElementDragStart}
+            {onElementDragEnd}
+            onElementDelete={(id) => onElementDelete('reportHeader', id)}
+            onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
+            onElementBringForward={(id) => onElementBringForward('reportHeader', id)}
+            onElementSendBack={(id) => onElementSendBack('reportHeader', id)}
+            onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
+          />
+        {/if}
       {/if}
       {#if detail}
         <DetailTable
@@ -229,26 +250,42 @@
         />
       {/if}
       {#if totals}
-        <Band
-          band={totals}
-          unit={layoutUnit}
-          {contentWidthPx}
-          selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
-          bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}
-          onAddElement={(el) => onAddElement('totals', el)}
-          onInvalidDrop={handleInvalidDrop}
-          onSelectElement={(id) => onSelectElement('totals', id)}
-          onSelectBand={() => onSelectBand('totals')}
-          {onDeselect}
-          onElementLiveChange={(id, patch) => onElementLiveChange('totals', id, patch)}
-          {onElementDragStart}
-          {onElementDragEnd}
-          onElementDelete={(id) => onElementDelete('totals', id)}
-          onElementDuplicate={(id) => onElementDuplicate('totals', id)}
-          onElementBringForward={(id) => onElementBringForward('totals', id)}
-          onElementSendBack={(id) => onElementSendBack('totals', id)}
-          onElementEditText={(id, text) => onElementEditText('totals', id, text)}
-        />
+        {#if totals.arrangement === 'stack'}
+          <StackBand
+            band={totals}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}
+            onUpdateElements={(els) => onUpdateElements('totals', els)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('totals', id)}
+            onSelectBand={() => onSelectBand('totals')}
+            {onDeselect}
+            onElementDelete={(id) => onElementDelete('totals', id)}
+            onElementDuplicate={(id) => onElementDuplicate('totals', id)}
+            onElementEditText={(id, text) => onElementEditText('totals', id, text)}
+          />
+        {:else}
+          <Band
+            band={totals}
+            unit={layoutUnit}
+            {contentWidthPx}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}
+            onAddElement={(el) => onAddElement('totals', el)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('totals', id)}
+            onSelectBand={() => onSelectBand('totals')}
+            {onDeselect}
+            onElementLiveChange={(id, patch) => onElementLiveChange('totals', id, patch)}
+            {onElementDragStart}
+            {onElementDragEnd}
+            onElementDelete={(id) => onElementDelete('totals', id)}
+            onElementDuplicate={(id) => onElementDuplicate('totals', id)}
+            onElementBringForward={(id) => onElementBringForward('totals', id)}
+            onElementSendBack={(id) => onElementSendBack('totals', id)}
+            onElementEditText={(id, text) => onElementEditText('totals', id, text)}
+          />
+        {/if}
       {/if}
       {#if pageFooter}
         <div class="dd-optional-band" class:dd-optional-band--disabled={pageFooter.enabled === false}>

@@ -107,6 +107,77 @@ function renderFreeElement(
   }
 }
 
+// ── stacked/auto-flow elements (memory.md D-029) ─────────────────────────────
+// A "stack" band renders its elements top-to-bottom in array order (grouped
+// into side-by-side rows via each element's `row`) instead of absolute
+// x/y positioning — no unit choice needed, width is always a row percentage.
+function renderStackElement(el: FreeElement, data: DocumentData, fmtOpts: FormatOptions): string {
+  const st = styleToCss(el.style);
+  const flexBasis = `flex:0 0 ${el.w}%;max-width:${el.w}%`;
+
+  switch (el.kind) {
+    case 'text':
+      return `<div class="el el-text el-stack" style="${flexBasis};${st}">${esc(el.text ?? '')}</div>`;
+    case 'field': {
+      const v = resolveElementValue(el, data, fmtOpts);
+      return `<div class="el el-field el-stack" style="${flexBasis};${st}">${esc(v)}</div>`;
+    }
+    case 'image': {
+      const src = el.src?.value ?? '';
+      const style = `${flexBasis};height:${el.h}px;${st}`;
+      if (!src) return `<div class="el el-image el-image-empty el-stack" style="${style}"></div>`;
+      return `<div class="el el-image el-stack" style="${style}"><img src="${esc(src)}" alt="" style="width:100%;height:100%;object-fit:contain"/></div>`;
+    }
+    case 'line':
+      return `<div class="el el-line el-stack" style="${flexBasis};border-top:${el.style?.border ?? '1px solid #333'}"></div>`;
+    case 'box':
+      return `<div class="el el-box el-stack" style="${flexBasis};height:${el.h}px;${st}"></div>`;
+    default:
+      return '';
+  }
+}
+
+// Groups elements into rows: elements sharing a `row` number render side by
+// side (in array order); an element with no `row` is its own single-element
+// row. Rows are ordered by each row key's first occurrence — never re-sorted
+// by the row *number* itself, so authoring never has to pick contiguous or
+// ordered row numbers. Exported for schema.ts's free<->stack arrangement
+// migration, which needs the identical grouping the renderer uses.
+export function groupIntoRows(elements: FreeElement[]): FreeElement[][] {
+  const rows: FreeElement[][] = [];
+  const rowIndexByKey = new Map<string, number>();
+  let syntheticCounter = 0;
+  for (const el of elements) {
+    const key = el.row !== undefined ? `r:${el.row}` : `solo:${syntheticCounter++}`;
+    let idx = rowIndexByKey.get(key);
+    if (idx === undefined) {
+      idx = rows.length;
+      rowIndexByKey.set(key, idx);
+      rows.push([]);
+    }
+    rows[idx]!.push(el);
+  }
+  return rows;
+}
+
+function renderStackBand(
+  band: FreeBand,
+  data: DocumentData,
+  fmtOpts: FormatOptions,
+  extraClass = '',
+): string {
+  if (band.enabled === false) return '';
+  const rowsHtml = groupIntoRows(band.elements)
+    .map((row) => `<div class="stack-row">${row.map((el) => renderStackElement(el, data, fmtOpts)).join('')}</div>`)
+    .join('');
+  const st = styleToCss(band.style);
+  // No explicit height — intrinsic/auto, driven by content (the entire point
+  // of stacking). Never used for pageHeader/pageFooter (see renderBand and
+  // the running-band call site below), which need a *known* height to
+  // reserve `.doc-flow` padding for their `position:fixed` placement.
+  return `<div class="band band-${band.type} band-stack ${extraClass}" data-band="${band.type}" style="${st}">${rowsHtml}</div>`;
+}
+
 function renderFreeBand(
   band: FreeBand,
   data: DocumentData,
@@ -115,6 +186,9 @@ function renderFreeBand(
   extraClass = '',
 ): string {
   if (band.enabled === false) return '';
+  if (band.arrangement === 'stack' && band.type !== 'pageHeader' && band.type !== 'pageFooter') {
+    return renderStackBand(band, data, fmtOpts, extraClass);
+  }
   const els = band.elements.map((e) => renderFreeElement(e, data, fmtOpts, layoutUnit)).join('');
   const st = styleToCss(band.style);
   // Band height always stays px (design.md: it's the outer box for its own
@@ -198,6 +272,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helve
 .band { position: relative; }
 .el { position: absolute; }
 .el-field, .el-text { white-space: pre-wrap; }
+.band-stack { display: flex; flex-direction: column; gap: 4px; }
+.stack-row { display: flex; gap: 8px; align-items: flex-start; }
+.el-stack { position: static; white-space: pre-wrap; }
 table.detail { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.detail th, table.detail td { padding: 6px 8px; border-bottom: 1px solid #e2e5e9; vertical-align: top; word-wrap: break-word; }
 table.detail thead th { border-bottom: 1.5px solid #333; font-weight: 700; background: #f6f7f9; }

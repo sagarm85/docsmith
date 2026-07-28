@@ -2,16 +2,30 @@
   import { isDetailBand, type Band, type DetailBand, type FreeBand } from '@docsmith/core';
   import Field from './ui/Field.svelte';
   import NumberInput from './ui/NumberInput.svelte';
+  import Select from './ui/Select.svelte';
   import Icon from './ui/Icon.svelte';
   import type { IconName } from './ui/icons.js';
 
   let {
     band,
     onChange,
+    onArrangementChange,
   }: {
     band: Band;
     onChange: (patch: Partial<FreeBand>) => void;
+    /** Free<->stack migration (memory.md D-029) — DocDesigner performs the
+     * actual layout conversion via core.convertBandArrangement before
+     * committing, same pattern as onLayoutUnitChange. Only offered for
+     * reportHeader/totals: pageHeader/pageFooter need a *known* height to
+     * reserve `.doc-flow` padding for their fixed position, which a
+     * 'stack' band's intrinsic/auto height can't guarantee. */
+    onArrangementChange?: (arrangement: 'free' | 'stack') => void;
   } = $props();
+
+  const ARRANGEMENT_OPTIONS = [
+    { value: 'free', label: 'Free-form' },
+    { value: 'stack', label: 'Stacked' },
+  ];
 
   const BAND_LABEL: Record<Band['type'], string> = {
     reportHeader: 'Report Header',
@@ -47,16 +61,36 @@
     </p>
   {:else}
     {@const free = band as FreeBand}
-    <Field label="Height (px)" fieldId="dd-band-height">
-      <NumberInput
-        id="dd-band-height"
-        ariaLabel="Band height"
-        min={20}
-        max={2000}
-        value={free.height}
-        onchange={(v) => onChange({ height: v })}
-      />
-    </Field>
+    {#if onArrangementChange}
+      <Field label="Arrangement" fieldId="dd-band-arrangement">
+        <Select
+          id="dd-band-arrangement"
+          ariaLabel="Band arrangement"
+          value={free.arrangement ?? 'free'}
+          options={ARRANGEMENT_OPTIONS}
+          onchange={(v) => onArrangementChange?.(v as 'free' | 'stack')}
+        />
+      </Field>
+      {#if free.arrangement === 'stack'}
+        <p class="dd-props-hint">
+          Elements flow top-to-bottom automatically; height is intrinsic. Drag
+          the row handle to reorder.
+        </p>
+      {/if}
+    {/if}
+
+    {#if (free.arrangement ?? 'free') === 'free'}
+      <Field label="Height (px)" fieldId="dd-band-height">
+        <NumberInput
+          id="dd-band-height"
+          ariaLabel="Band height"
+          min={20}
+          max={2000}
+          value={free.height}
+          onchange={(v) => onChange({ height: v })}
+        />
+      </Field>
+    {/if}
 
     <Field label="Background" fieldId="dd-band-bg">
       <input

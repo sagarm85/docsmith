@@ -27,6 +27,7 @@
     onColumnChange,
     onColumnAggregateChange,
     onBandChange,
+    onBandArrangementChange,
     printSetup,
     onPrintSetupChange,
     keepRowTogether,
@@ -47,6 +48,9 @@
     onColumnChange: (columnIndex: number, patch: Partial<DetailColumn>) => void;
     onColumnAggregateChange: (columnIndex: number, fn: Aggregate['fn'] | null) => void;
     onBandChange: (bandId: string, patch: Partial<FreeBand>) => void;
+    /** Free<->stack migration (memory.md D-029), offered only for
+     * reportHeader/totals — see BandProps.svelte's onArrangementChange doc. */
+    onBandArrangementChange: (bandId: string, arrangement: 'free' | 'stack') => void;
     printSetup: PrintSetupType;
     onPrintSetupChange: (next: PrintSetupType) => void;
     keepRowTogether: boolean;
@@ -74,6 +78,13 @@
     const band = template.bands.find((b) => b.id === selection.bandId);
     if (!band || isDetailBand(band)) return null;
     return band.elements.find((e) => e.id === selection.elementId) ?? null;
+  });
+
+  const selectedElementArrangement = $derived.by(() => {
+    if (selection?.kind !== 'element') return 'free' as const;
+    const band = template.bands.find((b) => b.id === selection.bandId);
+    if (!band || isDetailBand(band)) return 'free' as const;
+    return band.arrangement ?? 'free';
   });
 
   const selectedColumn = $derived.by(() => {
@@ -130,6 +141,7 @@
         <ElementProps
           element={selectedElement}
           unit={template.layoutUnit ?? 'px'}
+          arrangement={selectedElementArrangement}
           onChange={(patch) => onElementChange(bandId, elementId, patch)}
           onDelete={() => onElementDelete(bandId, elementId)}
           onDuplicate={() => onElementDuplicate(bandId, elementId)}
@@ -146,7 +158,13 @@
         />
       {:else if selection?.kind === 'band' && selectedBand}
         {@const bandId = selection.bandId}
-        <BandProps band={selectedBand} onChange={(patch) => onBandChange(bandId, patch)} />
+        <BandProps
+          band={selectedBand}
+          onChange={(patch) => onBandChange(bandId, patch)}
+          onArrangementChange={selectedBand.type === 'reportHeader' || selectedBand.type === 'totals'
+            ? (arrangement) => onBandArrangementChange(bandId, arrangement)
+            : undefined}
+        />
       {:else}
         <p class="dd-empty-hint">
           Select an element, column, or band on the canvas to edit its properties.

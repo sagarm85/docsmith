@@ -345,6 +345,27 @@ existing element's coordinates in one undo step via
 (`left:{x}%` vs `left:{x}px`) — both the canvas and the real
 preview/PDF output honor whichever unit the template is in.
 
+**Arrangement — free-form vs. stacked (memory.md D-029).** `FreeBand.arrangement`
+is a **per-band** toggle (`'free'` default; `'stack'` opt-in, offered in
+Properties → Selection → Band only for `reportHeader`/`totals` — never
+`pageHeader`/`pageFooter`, which need a *known* height to reserve `.doc-flow`
+padding for their `position:fixed` placement, something a `'stack'` band's
+intrinsic/auto height can't guarantee). `'stack'` auto-flows a band's
+elements top-to-bottom in array order — no x/y — MailerLite-editor style:
+elements sharing a `row` number render side by side (in array order); width
+is always a plain percentage of the row, regardless of `layoutUnit`. A
+drag-handle on each row reorders it; hover/focus/selection reveals inline
+duplicate/delete on each element (no resize handles — width is set in
+Properties, height is intrinsic for text/field elements). Adding a new
+element (palette "+"/drag, or the keyboard drag-alternative) into a stack
+band appends it as its own new full-width row; dropping directly onto an
+existing row merges it into that row instead. Toggling a band's arrangement
+migrates its elements via `core.convertBandArrangement()` in the same undo
+step — best-effort, not lossless in either direction (free→stack sorts by y
+and gives each element its own row; stack→free lays rows out top-to-bottom
+with a fixed gap) — same spirit as the `layoutUnit` migration: a reasonable
+default, not a promise of pixel-perfect round-tripping.
+
 ### 8.4 Drop handling
 - Palette chip dragover a **valid** band → band highlights, insertion ghost shown.
 - Drop on valid target → create element (header field) or append column (dataset field)
