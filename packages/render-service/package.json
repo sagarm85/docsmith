@@ -1,0 +1,24 @@
+{
+  "name": "@docsmith/render-service",
+  "version": "0.0.0",
+  "description": "Stateless Node + Fastify + Puppeteer service: template + data → PDF (with real Page X of Y).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/server.js",
+    "dev": "node --loader ts-node/esm src/server.ts"
+  },
+  "dependencies": {
+    "@docsmith/core": "workspace:*",
+    "@docsmith/adapters": "workspace:*",
+    "fastify": "^5.0.0",
+    "puppeteer": "^23.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2"
+  }
+}

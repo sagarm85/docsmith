@@ -1,0 +1,18 @@
+{
+  "name": "docsmith",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DocSmith — a standalone, data-agnostic document & report template designer: drag-and-drop authoring web component + pull-adapter data contract + Puppeteer PDF render service. ERP is one use case; any data source works.",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter @docsmith/core build && pnpm --filter @docsmith/adapters build && pnpm --filter @docsmith/sdk build && pnpm --filter @docsmith/render-service build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "demo": "pnpm --filter @docsmith/core build && pnpm --filter @docsmith/adapters build && node examples/invoice-demo/demo.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "packageManager": "pnpm@9.12.0"
+}

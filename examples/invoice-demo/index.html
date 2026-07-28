@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ERP Doc Designer — embed example</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; }
+      header { padding: 12px 20px; border-bottom: 1px solid #e2e5e9; }
+      #host { height: calc(100vh - 54px); }
+      .note { padding: 20px; color: #555; max-width: 720px; line-height: 1.5; }
+      code { background: #f2f3f5; padding: 1px 5px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <header><strong>Host ERP</strong> — embedding <code>&lt;doc-designer&gt;</code></header>
+    <div id="host"></div>
+
+    <!--
+      This is how an ERP embeds the designer once the `designer` package (built in
+      Antigravity IDE) is compiled to a custom element and bundled with the SDK.
+
+      Until the designer bundle exists, this page shows the wiring only; the backend
+      (core + adapters + render-service) is already runnable via `pnpm demo`.
+    -->
+    <script type="module">
+      // In a real build these come from the published bundles:
+      //   import '@docsmith/designer';               // registers <doc-designer>
+      //   import { DocDesigner } from '@docsmith/sdk';
+      //   import { StaticAdapter } from '@docsmith/adapters';
+      //
+      // import { invoiceEntity } from './fixtures.mjs';
+      //
+      // const adapter = new StaticAdapter({ entities: [invoiceEntity(60)] });
+      // DocDesigner.mount(document.getElementById('host'), {
+      //   adapter,
+      //   renderServiceUrl: 'http://localhost:8090',
+      //   onSave(template) { /* persist template JSON in your ERP */ },
+      // });
+
+      const host = document.getElementById('host');
+      host.innerHTML =
+        '<div class="note">The <code>&lt;doc-designer&gt;</code> element is built in the ' +
+        '<code>packages/designer</code> project (Antigravity IDE). Once compiled, ' +
+        'uncomment the imports above to mount it here.<br><br>' +
+        'The backend is ready now: run <code>pnpm demo</code> at the repo root to render a ' +
+        '60-line invoice to <code>out.html</code> (print-preview shows the repeating header), ' +
+        'and start the render service for a real PDF with “Page X of Y”.</div>';
+    </script>
+  </body>
+</html>

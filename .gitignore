@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+examples/invoice-demo/out.html
+examples/invoice-demo/out.pdf
+.env
+.env.local
