@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DataSourceAdapter, FieldMeta } from '@docsmith/core';
+  import type { PickedUp } from './types.js';
   import Collapsible from './ui/Collapsible.svelte';
   import Skeleton from './ui/Skeleton.svelte';
   import ErrorInline from './ui/ErrorInline.svelte';
@@ -13,6 +14,8 @@
     datasetId,
     filter = '',
     onAddField,
+    pickedUp = null,
+    onPickUp,
   }: {
     title: string;
     cls: 'header' | 'dataset';
@@ -23,7 +26,18 @@
     /** Palette-wide search term; matches on field label/name (case-insensitive). */
     filter?: string;
     onAddField?: (field: FieldMeta) => void;
+    /** Keyboard drag-alternative (design.md §12) state, lifted to DocDesigner. */
+    pickedUp?: PickedUp;
+    onPickUp?: (field: FieldMeta) => void;
   } = $props();
+
+  function isPicked(field: FieldMeta): boolean {
+    return (
+      pickedUp?.cls === cls &&
+      pickedUp.column === field.name &&
+      pickedUp.datasetId === (datasetId ?? null)
+    );
+  }
 
   type AsyncState<T> =
     | { status: 'loading' }
@@ -95,19 +109,19 @@
       <div class="dd-subgroup">
         <h4 class="dd-subgroup-title">System</h4>
         {#each system as field (field.name)}
-          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} />
+          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} picked={isPicked(field)} onPickUp={onPickUp && (() => onPickUp(field))} />
         {/each}
       </div>
       <div class="dd-subgroup">
         <h4 class="dd-subgroup-title">Custom</h4>
         {#each custom as field (field.name)}
-          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} />
+          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} picked={isPicked(field)} onPickUp={onPickUp && (() => onPickUp(field))} />
         {/each}
       </div>
     {:else}
       <div class="dd-subgroup">
         {#each filtered as field (field.name)}
-          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} />
+          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} picked={isPicked(field)} onPickUp={onPickUp && (() => onPickUp(field))} />
         {/each}
       </div>
     {/if}

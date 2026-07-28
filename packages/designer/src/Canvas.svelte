@@ -1,6 +1,6 @@
 <script lang="ts">
   import { isDetailBand, type DataSourceAdapter, type DetailBand, type DetailColumn, type FreeBand, type FreeElement, type Template } from '@docsmith/core';
-  import type { Selection } from './types.js';
+  import type { PickedUp, Selection } from './types.js';
   import Band from './Band.svelte';
   import DetailTable from './DetailTable.svelte';
   import Toast from './ui/Toast.svelte';
@@ -25,6 +25,9 @@
     onElementBringForward,
     onElementSendBack,
     onElementEditText,
+    pickedUp = null,
+    onKeyboardDrop,
+    onCancelPickup,
   }: {
     template: Template;
     adapter: DataSourceAdapter;
@@ -44,6 +47,13 @@
     onElementBringForward: (bandId: string, elementId: string) => void;
     onElementSendBack: (bandId: string, elementId: string) => void;
     onElementEditText: (bandId: string, elementId: string, text: string) => void;
+    /** Keyboard drag-alternative (design.md §12: "select a chip, press Enter to
+     * pick up, [Tab to] a band, Enter to drop"). Tab already moves focus between
+     * band tab buttons natively (each is a real, individually focusable
+     * <button> in DOM order) — no custom roving-focus code needed. */
+    pickedUp?: PickedUp;
+    onKeyboardDrop: (bandId: string) => void;
+    onCancelPickup: () => void;
   } = $props();
 
   let dropError = $state<string | null>(null);
@@ -56,10 +66,51 @@
     if (e.target === e.currentTarget) onDeselect();
   }
 
-  // Escape is the keyboard equivalent of "click empty canvas to deselect".
+  // Escape is the keyboard equivalent of "click empty canvas to deselect" —
+  // and, when a chip is picked up, cancels the pickup instead (takes priority,
+  // since it's the more specific/recent action).
   function handleWindowKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onDeselect();
+    if (e.key !== 'Escape') return;
+    if (pickedUp) onCancelPickup();
+    else onDeselect();
   }
+
+  // Enter, while a band tab button has focus and something is picked up,
+  // completes the drop — the actual "Enter to drop" half of design.md §12.
+  // Validation mirrors Band.svelte/DetailTable.svelte's mouse-drop handlers
+  // (same rejection messages) since Canvas already has the band/dataset
+  // context needed to judge a target; onKeyboardDrop only ever fires for a
+  // drop already known to be valid, so DocDesigner can construct+commit
+  // without re-checking.
+  function handlePageKeydown(e: KeyboardEvent) {
+    if (!pickedUp || e.key !== 'Enter') return;
+    const bandId = (e.target as HTMLElement).dataset?.bandId;
+    if (!bandId) return;
+    e.preventDefault();
+
+    const isDetailTarget = detail !== undefined && bandId === detail.id;
+    if (pickedUp.cls === 'dataset') {
+      if (!isDetailTarget) {
+        handleInvalidDrop('Line-item fields can only go in the items table.');
+        return;
+      }
+      if (pickedUp.datasetId !== detail?.datasetId) {
+        handleInvalidDrop('That field belongs to a different dataset than this table.');
+        return;
+      }
+    } else if (pickedUp.cls === 'header' && isDetailTarget) {
+      handleInvalidDrop('Header fields can’t become table columns — drop them on a header or totals band instead.');
+      return;
+    } else if (pickedUp.cls === 'block' && isDetailTarget) {
+      handleInvalidDrop('Blocks (text/image/line/box) can only go on a header, totals, or page band.');
+      return;
+    }
+    onKeyboardDrop(bandId);
+  }
+
+  const pickedUpLabel = $derived(
+    pickedUp ? (pickedUp.cls === 'block' ? `${pickedUp.kind} block` : `${pickedUp.label} field`) : '',
+  );
 
   const page = $derived(pageDimensionsPx(template.printSetup));
   const margins = $derived(marginsPx(template.printSetup));
@@ -82,6 +133,12 @@
 <svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="dd-canvas">
+  <div class="dd-visually-hidden" aria-live="polite">
+    {#if pickedUp}
+      {pickedUpLabel} picked up. Tab to a band, Enter to drop, Escape to cancel.
+    {/if}
+  </div>
+
   {#if dropError}
     <div class="dd-canvas-toast">
       <Toast variant="error" message={dropError} onDismiss={() => (dropError = null)} />
@@ -91,7 +148,12 @@
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="dd-desk" onclick={handleDeskClick}>
-    <div class="dd-page" style="width:{page.width}px;height:{page.height}px">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="dd-page"
+      style="width:{page.width}px;height:{page.height}px"
+      onkeydown={handlePageKeydown}
+    >
       <div
         class="dd-margins"
         style="top:{margins.top}px;right:{margins.right}px;bottom:{margins.bottom}px;left:{margins.left}px"
@@ -210,6 +272,15 @@
 
   .dd-canvas-toast {
     padding: 8px 12px 0;
+  }
+
+  .dd-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .dd-desk {

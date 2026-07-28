@@ -55,4 +55,27 @@ describe('Palette — Blocks group', () => {
     fireEvent.dragStart(chip, { dataTransfer: { setData, effectAllowed: '' } as unknown as DataTransfer });
     expect(setData).toHaveBeenCalledWith('application/x-doc-block', JSON.stringify({ kind: 'line' }));
   });
+
+  it('pressing Enter on a block chip calls onPickUpBlock with its kind (design.md §12)', async () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    const onPickUpBlock = vi.fn();
+    render(Palette, {
+      props: { adapter, dataSource: emptyDataSource(), onDataSourceChange: vi.fn(), onPickUpBlock },
+    });
+    await fireEvent.keyDown(screen.getByRole('group', { name: 'Box block' }), { key: 'Enter' });
+    expect(onPickUpBlock).toHaveBeenCalledWith('box');
+  });
+
+  it('marks the picked-up block chip via aria-label, matching pickedUp state', () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    render(Palette, {
+      props: {
+        adapter,
+        dataSource: emptyDataSource(),
+        onDataSourceChange: vi.fn(),
+        pickedUp: { cls: 'block', kind: 'box' },
+      },
+    });
+    expect(screen.getByRole('group', { name: 'Box block (picked up)' })).toBeTruthy();
+  });
 });

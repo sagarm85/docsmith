@@ -118,4 +118,49 @@ describe('FieldGroup', () => {
     const btn = screen.getByRole('button', { name: 'Add Invoice # to report header' });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('pressing Enter on a chip calls onPickUp with that field (design.md §12)', async () => {
+    const adapter = makeAdapter([
+      { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
+    ]);
+    const onPickUp = vi.fn();
+    render(FieldGroup, {
+      props: { title: 'Header fields', cls: 'header', adapter, entity: 'invoice', onPickUp },
+    });
+
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Invoice # field' })).toBeTruthy());
+    await fireEvent.keyDown(screen.getByRole('group', { name: 'Invoice # field' }), { key: 'Enter' });
+    expect(onPickUp).toHaveBeenCalledWith({
+      name: 'invoice_number',
+      label: 'Invoice #',
+      type: 'text',
+      kind: 'system',
+    });
+  });
+
+  it('marks the picked-up chip via aria-label and a picked class, matching pickedUp state', async () => {
+    const adapter = makeAdapter([
+      { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
+    ]);
+    render(FieldGroup, {
+      props: {
+        title: 'Header fields',
+        cls: 'header',
+        adapter,
+        entity: 'invoice',
+        pickedUp: {
+          cls: 'header',
+          datasetId: null,
+          column: 'invoice_number',
+          type: 'text',
+          label: 'Invoice #',
+          format: 'text',
+        },
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Invoice # field (picked up)' })).toBeTruthy(),
+    );
+  });
 });

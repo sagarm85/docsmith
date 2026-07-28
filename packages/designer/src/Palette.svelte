@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { DataSource, DataSourceAdapter, FieldMeta } from '@docsmith/core';
   import type { BlockKind } from './template-edits.js';
+  import type { PickedUp } from './types.js';
   import SourceConfig from './SourceConfig.svelte';
   import FieldGroup from './FieldGroup.svelte';
   import Collapsible from './ui/Collapsible.svelte';
@@ -11,6 +12,9 @@
     onDataSourceChange,
     onAddField,
     onAddBlock,
+    pickedUp = null,
+    onPickUpField,
+    onPickUpBlock,
   }: {
     adapter: DataSourceAdapter;
     dataSource: DataSource;
@@ -22,6 +26,10 @@
      */
     onAddField?: (field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) => void;
     onAddBlock?: (kind: BlockKind) => void;
+    /** Keyboard drag-alternative (design.md §12), lifted to DocDesigner. */
+    pickedUp?: PickedUp;
+    onPickUpField?: (field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) => void;
+    onPickUpBlock?: (kind: BlockKind) => void;
   } = $props();
 
   let search = $state('');
@@ -37,6 +45,17 @@
     e.dataTransfer?.setData('application/x-doc-block', JSON.stringify({ kind }));
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
   }
+
+  function handleBlockKeydown(e: KeyboardEvent, kind: BlockKind) {
+    if ((e.key === 'Enter' || e.key === ' ') && onPickUpBlock) {
+      e.preventDefault();
+      onPickUpBlock(kind);
+    }
+  }
+
+  function isBlockPicked(kind: BlockKind): boolean {
+    return pickedUp?.cls === 'block' && pickedUp.kind === kind;
+  }
 </script>
 
 <aside class="dd-palette" aria-label="Field palette">
@@ -45,7 +64,21 @@
   <div class="dd-blocks">
     <Collapsible title="Blocks">
       {#each BLOCKS as block (block.kind)}
-        <div class="dd-chip" role="group" aria-label={`${block.label} block`} draggable="true" ondragstart={(e) => handleBlockDragStart(e, block.kind)}>
+        <!-- Same intentional pattern as FieldChip.svelte: role="group" is
+             accurate, and the chip is ALSO the keyboard pickup target per
+             design.md §12. -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div
+          class="dd-chip"
+          class:dd-chip--picked={isBlockPicked(block.kind)}
+          role="group"
+          aria-label={`${block.label} block${isBlockPicked(block.kind) ? ' (picked up)' : ''}`}
+          tabindex={onPickUpBlock ? 0 : -1}
+          draggable="true"
+          ondragstart={(e) => handleBlockDragStart(e, block.kind)}
+          onkeydown={(e) => handleBlockKeydown(e, block.kind)}
+        >
           <span class="dd-chip-glyph" aria-hidden="true">{block.glyph}</span>
           <span class="dd-chip-label">{block.label}</span>
           <button
@@ -81,6 +114,8 @@
       entity={dataSource.entity}
       filter={search}
       onAddField={onAddField && ((field) => onAddField(field, 'header'))}
+      {pickedUp}
+      onPickUp={onPickUpField && ((field) => onPickUpField(field, 'header'))}
     />
 
     {#each dataSource.datasets as ds (ds.id)}
@@ -92,6 +127,8 @@
         datasetId={ds.id}
         filter={search}
         onAddField={onAddField && ((field) => onAddField(field, 'dataset', ds.id))}
+        {pickedUp}
+        onPickUp={onPickUpField && ((field) => onPickUpField(field, 'dataset', ds.id))}
       />
     {/each}
   {/if}
@@ -158,6 +195,17 @@
 
   .dd-chip:active {
     cursor: grabbing;
+  }
+
+  .dd-chip:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+  }
+
+  .dd-chip--picked {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+    background: var(--dd-accent-weak);
   }
 
   .dd-chip-glyph {

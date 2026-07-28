@@ -77,13 +77,37 @@
   retargeted. Recorded as D-022 in `memory.md` — applies to any future
   dropdown/popover in this codebase. 89 tests pass (was 74); lint/typecheck/
   build green (`dist/doc-designer.js` ~256KB / ~63KB gzip).
-- **Next:** the keyboard drag-alternative (pick up chip → arrow to band →
-  drop — the "+" button already covers the keyboard-parity *requirement*, per
-  D-018, so this closes the gap to the *literal* interaction design.md §12
-  describes). Also still carried forward: wiring `doc-save`/`doc-change`
+- **Now (5):** The keyboard drag-alternative (design.md §12: "select a chip,
+  press Enter to pick up, [Tab to] a band, Enter to drop") is wired end-to-end
+  — **Phase 2 is fully done.** `FieldChip`/the Blocks chips in `Palette` are
+  keyboard-focusable (`tabindex=0` when a pick-up handler is supplied) and
+  respond to Enter/Space by calling `onPickUp`; `types.ts` gained a `PickedUp`
+  discriminated union (`header`/`dataset` field or `block`), threaded down
+  through `FieldGroup`/`Palette` and lifted to `DocDesigner.svelte` as
+  `pickedUp` state. `Band.svelte`/`DetailTable.svelte`'s tab `<button>`s got
+  `data-band-id` so a focused tab can be identified on Enter. Validation of
+  the drop target lives in `Canvas.svelte`'s `handlePageKeydown` — deliberately
+  mirroring (and reusing the exact same rejection strings as)
+  `Band.svelte`/`DetailTable.svelte`'s existing mouse-drop validation, so
+  keyboard and mouse drops are indistinguishable in outcome; `onKeyboardDrop`
+  only ever fires for an already-valid target, so `DocDesigner.handleKeyboardDrop`
+  just constructs+commits via the same `template-edits.ts` helpers
+  `handlePaletteAddField`/`handlePaletteAddBlock` already use. Escape cancels
+  an active pick-up (takes priority over its existing "deselect" role); an
+  `aria-live="polite"` region announces "{label} picked up. Tab to a band,
+  Enter to drop, Escape to cancel." Deliberately did **not** build custom
+  arrow-key roving-focus between band tabs — native Tab/Shift+Tab already
+  moves focus between them (each is a real, individually focusable `<button>`
+  in DOM order), so `design.md`'s "[Tab to] a band" is satisfied for free.
+  96 tests pass (was 89); lint/typecheck/build all green
+  (`dist/doc-designer.js` ~263KB / ~64KB gzip).
+- **Next (Phase 3):** not yet started — see the Phase 3 checklist below.
+  Also still carried forward from Phase 1/2: wiring `doc-save`/`doc-change`
   `CustomEvent` dispatch (see Phase 1 notes below — `onChange` now has a
   real callback-based path via `config.onChange`, but the DOM `CustomEvent`
-  variant for host frameworks that prefer events isn't wired yet).
+  variant for host frameworks that prefer events isn't wired yet); asset
+  upload for the Image element (memory.md O-1, still open — URL-based images
+  work today).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -242,7 +266,9 @@
 - [x] Undo/redo command stack (≥50 steps, `core.DEFAULT_MAX_HISTORY`) wired
       through all mutations
 - [x] Template list / rename / delete; `onChange` autosave (debounced)
-- [ ] Keyboard drag-alternative (pick up chip → arrow to band → drop)
+- [x] Keyboard drag-alternative (pick up chip → Tab to band → Enter to drop)
+
+**Phase 2 is DONE (2026-07-28).**
 
 ## Phase 3 — ERP-grade
 
@@ -276,6 +302,35 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Keyboard drag-alternative — Phase 2 DONE.** Implemented
+  design.md §12's "select a chip, press Enter to pick up, [Tab to] a band,
+  Enter to drop" for both field chips and the Blocks group. New `PickedUp`
+  union in `types.ts`; `FieldChip.svelte`/`Palette.svelte`'s block chips gain
+  keyboard focus + Enter/Space pick-up (`picked`/`onPickUp` props, an
+  `aria-label` suffix and `.dd-chip--picked` style while held);
+  `FieldGroup.svelte` threads `pickedUp`/`onPickUp` down via an `isPicked()`
+  helper. `Band.svelte`/`DetailTable.svelte` tab buttons gained
+  `data-band-id` so `Canvas.svelte` can read which band tab has focus on
+  Enter. All pick-up/drop state (`pickedUp`) is owned by `DocDesigner.svelte`;
+  `Canvas.svelte`'s `handlePageKeydown` validates the target band before ever
+  calling `onKeyboardDrop`, reusing the identical rejection strings
+  `Band`/`DetailTable`'s mouse-drop handlers already use ("Line-item fields
+  can only go in the items table.", "That field belongs to a different
+  dataset than this table.", "Header fields can't become table columns…",
+  "Blocks…can only go on a header, totals, or page band.") — so keyboard and
+  mouse drops reject identically, and `DocDesigner.handleKeyboardDrop` never
+  re-validates, just constructs+commits via the same `template-edits.ts`
+  helpers used everywhere else. Escape cancels an active pick-up (now takes
+  priority over Escape's pre-existing "deselect" role); an `aria-live` status
+  region announces the pick-up and its instructions. Deliberately relied on
+  native Tab/Shift+Tab between band tab `<button>`s instead of building
+  custom arrow-key roving focus — every tab is already a real, individually
+  focusable element in DOM order. 7 new tests (2 in `Palette.test.ts`, 2 in
+  `FieldGroup.test.ts`, 3 end-to-end in `DocDesigner.test.ts` covering a
+  successful drop, Escape-cancel, and a rejected-then-retried drop). 96 tests
+  pass (was 89); lint/typecheck/build all green
+  (`dist/doc-designer.js` ~263KB / ~64KB gzip). **This closes out Phase 2 —
+  every Phase 2 checklist item is now checked off.**
 - **2026-07-28 — Template list/rename/delete + debounced `onChange` autosave.**
   New `TemplateList.svelte`: the "[Template name ▾]" dropdown from `design.md`
   §4, listing `erpdoc.templates.*` (standalone-mode only — disabled when the

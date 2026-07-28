@@ -504,6 +504,132 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  function adapterWithHeaderAndDatasetFields() {
+    return new StaticAdapter({
+      entities: [
+        {
+          meta: { name: 'invoice', label: 'Invoice' },
+          headerFields: [
+            { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
+          ],
+          datasets: [
+            {
+              meta: { id: 'invoice_items', label: 'Line items' },
+              fields: [{ name: 'description', label: 'Description', type: 'text', kind: 'system' }],
+            },
+          ],
+          documents: {},
+        },
+      ],
+    });
+  }
+
+  async function mountWithEntityAndDataset(): Promise<DocDesignerEl> {
+    const el = document.createElement('doc-designer') as DocDesignerEl;
+    el.config = { adapter: adapterWithHeaderAndDatasetFields() };
+    document.body.appendChild(el);
+    await nextTick();
+
+    const t = el.getTemplate!();
+    el.setTemplate!({
+      ...t,
+      dataSource: {
+        ...t.dataSource,
+        entity: 'invoice',
+        datasets: [
+          {
+            id: 'invoice_items',
+            label: 'Line items',
+            kind: 'fk',
+            ref: { table: 'invoice_items', fkColumn: 'invoice_id' },
+          },
+        ],
+      },
+      bands: t.bands.map((b) => (b.id === 'detail' ? { ...b, datasetId: 'invoice_items' } : b)),
+    });
+    for (let i = 0; i < 5; i++) await nextTick();
+    return el;
+  }
+
+  function bandTab(el: DocDesignerEl, bandId: string): HTMLButtonElement {
+    return el.shadowRoot!.querySelector<HTMLButtonElement>(`[data-band-id="${bandId}"]`)!;
+  }
+
+  it('keyboard drag-alternative: pick up a header chip, Tab to a band, Enter drops it (design.md §12)', async () => {
+    const el = await mountWithEntityAndDataset();
+
+    const chip = el.shadowRoot!.querySelector<HTMLElement>('[aria-label="Invoice # field"]');
+    expect(chip).toBeTruthy();
+    chip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+    await nextTick();
+
+    expect(el.shadowRoot?.textContent).toContain('Invoice # field picked up.');
+    expect(el.shadowRoot!.querySelector('[aria-label="Invoice # field (picked up)"]')).toBeTruthy();
+
+    const reportHeaderTab = bandTab(el, 'reportHeader');
+    reportHeaderTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+    await nextTick();
+
+    const reportHeader = el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+      elements: Array<{ binding?: { column: string } }>;
+    };
+    expect(reportHeader.elements).toHaveLength(1);
+    expect(reportHeader.elements[0]?.binding?.column).toBe('invoice_number');
+    // Pickup state clears after a successful drop.
+    expect(el.shadowRoot!.querySelector('[aria-label="Invoice # field (picked up)"]')).toBeNull();
+
+    el.remove();
+  });
+
+  it('keyboard drag-alternative: Escape cancels the pickup without adding anything', async () => {
+    const el = await mountWithEntityAndDataset();
+
+    const chip = el.shadowRoot!.querySelector<HTMLElement>('[aria-label="Invoice # field"]');
+    chip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+    await nextTick();
+    expect(el.shadowRoot!.querySelector('[aria-label="Invoice # field (picked up)"]')).toBeTruthy();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await nextTick();
+
+    expect(el.shadowRoot!.querySelector('[aria-label="Invoice # field (picked up)"]')).toBeNull();
+    const reportHeader = el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as { elements: unknown[] };
+    expect(reportHeader.elements).toHaveLength(0);
+
+    el.remove();
+  });
+
+  it('keyboard drag-alternative: dropping a dataset field on a free band is rejected with the same message as mouse drag-drop', async () => {
+    const el = await mountWithEntityAndDataset();
+
+    const chip = el.shadowRoot!.querySelector<HTMLElement>('[aria-label="Description field"]');
+    expect(chip).toBeTruthy();
+    chip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+    await nextTick();
+
+    const reportHeaderTab = bandTab(el, 'reportHeader');
+    reportHeaderTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+    await nextTick();
+
+    expect(el.shadowRoot?.textContent).toContain('Line-item fields can only go in the items table.');
+    const reportHeader = el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as { elements: unknown[] };
+    expect(reportHeader.elements).toHaveLength(0);
+    // The rejected drop leaves the pickup active — the user can retry on a valid band.
+    expect(el.shadowRoot!.querySelector('[aria-label="Description field (picked up)"]')).toBeTruthy();
+
+    const detailTab = bandTab(el, 'detail');
+    detailTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+    await nextTick();
+
+    const detail = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      columns: Array<{ column: string }>;
+    };
+    expect(detail.columns).toHaveLength(1);
+    expect(detail.columns[0]?.column).toBe('description');
+
+    el.remove();
+  });
+
   it('calls config.onChange (debounced) after an edit, not on every keystroke', async () => {
     vi.useFakeTimers();
     try {

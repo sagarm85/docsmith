@@ -111,7 +111,13 @@
 </script>
 
 <div class="dd-band" class:dd-band--dragover={dragOver}>
-  <button type="button" class="dd-band-tab" class:dd-band-tab--selected={bandSelected} onclick={onSelectBand}>
+  <button
+    type="button"
+    class="dd-band-tab"
+    class:dd-band-tab--selected={bandSelected}
+    data-band-id={band.id}
+    onclick={onSelectBand}
+  >
     {bandLabel[band.type]}
   </button>
   <!-- Clicking empty band space to deselect is a mouse convenience; Escape

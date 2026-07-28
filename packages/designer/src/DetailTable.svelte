@@ -171,6 +171,7 @@
     type="button"
     class="dd-band-tab"
     class:dd-band-tab--selected={bandSelected}
+    data-band-id={band.id}
     onclick={onSelectBand}
   >
     Detail (line items)

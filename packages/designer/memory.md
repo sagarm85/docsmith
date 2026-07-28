@@ -327,6 +327,41 @@ is the standard fix cited in web-components accessibility guides, and doesn't
 require plumbing the root node through).
 `[status: locked]`
 
+### D-023 — Keyboard-drop target validation lives in `Canvas.svelte`, not `DocDesigner.svelte`
+**Decision:** For the keyboard drag-alternative (design.md §12), the check of
+whether a picked-up chip is legal to drop on a given band lives in
+`Canvas.svelte`'s `handlePageKeydown`, which rejects an invalid target (via
+its existing `dropError`/Toast state) and only calls the `onKeyboardDrop(bandId)`
+prop — owned by `DocDesigner.svelte` — once the target is already known-valid.
+`DocDesigner.handleKeyboardDrop` therefore never re-validates; it just
+constructs the element/column and commits it, mirroring
+`handlePaletteAddField`/`handlePaletteAddBlock`.
+**Why:** `Band.svelte`/`DetailTable.svelte` already self-validate *mouse*
+drops this same way (check the payload against the band, call `onInvalidDrop`
+on rejection, `onAddElement`/`onAddColumn` only on success) using rejection
+strings owned by Canvas's `dropError` Toast. Keyboard drops needed the exact
+same three rejection cases (dataset field on a free band; dataset field for
+the wrong dataset; header/block on the detail band) — putting validation in
+`Canvas.svelte` let it reuse the *identical* strings and the *identical*
+`dropError` display mechanism already wired there, so keyboard and mouse
+drops are indistinguishable in outcome and there's exactly one place that
+knows what's droppable where. The alternative (validating in `DocDesigner`)
+would have needed either a second, DocDesigner-owned Toast for this one case,
+or a new prop just to shuttle a rejection reason back down into Canvas's
+existing Toast — both add a seam for no benefit, since Canvas already has
+every fact it needs (`detail`'s `datasetId`, which band is the detail band)
+via its own `$derived`s.
+**Rejected:** validating inside `DocDesigner.handleKeyboardDrop` and passing
+a rejection reason back down to Canvas through a new prop (works, but
+duplicates logic/strings that already exist in `Band.svelte`/`DetailTable.svelte`
+and would need a second display path); validating in `Band.svelte`/
+`DetailTable.svelte` themselves via a shared `onKeyboardDrop` reaching all
+the way down there (works, but they don't currently know about `pickedUp` at
+all, and plumbing it that deep just to duplicate the one check `Canvas`
+already needed anyway would spread the same rule across three files instead
+of one).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

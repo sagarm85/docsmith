@@ -6,11 +6,17 @@
     cls,
     datasetId,
     onAdd,
+    picked = false,
+    onPickUp,
   }: {
     field: FieldMeta;
     cls: 'header' | 'dataset';
     datasetId?: string;
     onAdd?: () => void;
+    /** True while this exact chip is the "held" one in the keyboard
+     * drag-alternative (design.md §12). */
+    picked?: boolean;
+    onPickUp?: () => void;
   } = $props();
 
   const format = $derived(defaultFormatForType(field.type));
@@ -38,14 +44,30 @@
     e.dataTransfer?.setData('application/x-doc-field', JSON.stringify(payload));
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if ((e.key === 'Enter' || e.key === ' ') && onPickUp) {
+      e.preventDefault();
+      onPickUp();
+    }
+  }
 </script>
 
+<!-- role="group" is the accurate semantic (a label + a nested "+" button) —
+     the chip itself is ALSO the keyboard pickup target per design.md §12
+     ("select a chip, press Enter to pick up"), an intentional widget pattern,
+     not a plain static element. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   class="dd-chip"
+  class:dd-chip--picked={picked}
   role="group"
-  aria-label={`${field.label} field`}
+  aria-label={`${field.label} field${picked ? ' (picked up)' : ''}`}
+  tabindex={onPickUp ? 0 : -1}
   draggable="true"
   ondragstart={handleDragStart}
+  onkeydown={handleKeydown}
 >
   <span class="dd-chip-glyph" aria-hidden="true">{typeGlyph}</span>
   <span class="dd-chip-label">{field.label}</span>
@@ -61,6 +83,17 @@
 </div>
 
 <style>
+  .dd-chip:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+  }
+
+  .dd-chip--picked {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+    background: var(--dd-accent-weak);
+  }
+
   .dd-chip {
     display: flex;
     align-items: center;

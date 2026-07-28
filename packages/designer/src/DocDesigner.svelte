@@ -6,6 +6,7 @@
     canUndo,
     commit,
     commitFrom,
+    defaultFormatForType,
     initHistory,
     isDetailBand,
     newTemplate,
@@ -21,7 +22,7 @@
     type PrintSetup as PrintSetupType,
     type Template,
   } from '@docsmith/core';
-  import type { DocDesignerConfig, Selection } from './types.js';
+  import type { DocDesignerConfig, PickedUp, Selection } from './types.js';
   import {
     deleteTemplateFromLocalStorage,
     listTemplatesFromLocalStorage,
@@ -206,6 +207,55 @@
   function handlePaletteAddBlock(kind: BlockKind) {
     const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
     handleAddElement('reportHeader', createBlockElement(kind, reportHeader?.elements ?? []));
+  }
+
+  // ── Keyboard drag-alternative (design.md §12) ───────────────────────────────
+  // Canvas.handlePageKeydown already rejects an invalid target band before ever
+  // calling onKeyboardDrop, so construction here mirrors handlePaletteAddField/
+  // handlePaletteAddBlock without re-validating the target.
+  let pickedUp = $state<PickedUp>(null);
+
+  function handlePickUpField(field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) {
+    pickedUp = {
+      cls,
+      datasetId: datasetId ?? null,
+      column: field.name,
+      type: field.type,
+      label: field.label,
+      format: defaultFormatForType(field.type),
+    };
+  }
+
+  function handlePickUpBlock(kind: BlockKind) {
+    pickedUp = { cls: 'block', kind };
+  }
+
+  function handleCancelPickup() {
+    pickedUp = null;
+  }
+
+  function handleKeyboardDrop(bandId: string) {
+    if (!pickedUp) return;
+    const picked = pickedUp;
+    switch (picked.cls) {
+      case 'dataset':
+        handleAddColumn(createDetailColumn({ name: picked.column, label: picked.label, type: picked.type }));
+        break;
+      case 'header': {
+        const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+        handleAddElement(
+          bandId,
+          createFieldElement('header', { name: picked.column, label: picked.label, type: picked.type }, band?.elements ?? []),
+        );
+        break;
+      }
+      case 'block': {
+        const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+        handleAddElement(bandId, createBlockElement(picked.kind, band?.elements ?? []));
+        break;
+      }
+    }
+    pickedUp = null;
   }
 
   // ── Free-form element selection + move/resize/duplicate/delete/z-order ──────
@@ -492,6 +542,9 @@
             onDataSourceChange={handleDataSourceChange}
             onAddField={handlePaletteAddField}
             onAddBlock={handlePaletteAddBlock}
+            {pickedUp}
+            onPickUpField={handlePickUpField}
+            onPickUpBlock={handlePickUpBlock}
           />
           <Canvas
             {template}
@@ -512,6 +565,9 @@
             onElementBringForward={handleElementBringForward}
             onElementSendBack={handleElementSendBack}
             onElementEditText={handleElementEditText}
+            {pickedUp}
+            onKeyboardDrop={handleKeyboardDrop}
+            onCancelPickup={handleCancelPickup}
           />
           <aside class="dd-properties" aria-label="Properties">
             <Properties
