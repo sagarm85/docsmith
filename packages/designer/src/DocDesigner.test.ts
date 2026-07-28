@@ -50,7 +50,7 @@ describe('<doc-designer>', () => {
 
     const shadowText = el.shadowRoot?.textContent ?? '';
     expect(shadowText).not.toContain('No data adapter configured');
-    expect(shadowText).toContain('Canvas lands next in Phase 1.');
+    expect(shadowText).toContain('Report Header');
     expect(shadowText).toContain('Entity');
     el.remove();
   });
@@ -72,7 +72,7 @@ describe('<doc-designer>', () => {
   it('toggles Design/Preview mode via the toolbar', async () => {
     const el = mountWithAdapter();
     await nextTick();
-    expect(el.shadowRoot?.textContent).toContain('Canvas lands next in Phase 1.');
+    expect(el.shadowRoot?.textContent).toContain('Report Header');
     expect(el.shadowRoot?.textContent).toContain('Entity');
 
     const previewBtn = Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).find(

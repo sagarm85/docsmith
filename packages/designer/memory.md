@@ -197,6 +197,28 @@ one). If a real render/query path ever starts consuming `ref`, this decision mus
 revisited — it currently holds only because `ref` is inert.
 `[status: locked]`
 
+### D-018 — Click-to-add target: header fields default to `reportHeader`
+**Decision:** `FieldChip`'s keyboard "+" affordance has no "selected band" concept
+in Phase 1 (free-form selection is Phase 2). A dataset field's "+" has only one
+legal destination (the `detail` band) so there's no ambiguity. A header field's
+"+" always appends to `reportHeader`. Dragging the same chip directly onto the
+`totals` band (native HTML5 DnD, implemented in `Band.svelte`) is the only way to
+place a header field there in Phase 1.
+**Why:** `design.md` §12 offers "select a chip, press Enter to pick up, arrow to a
+band, Enter to drop" **or** "a `+ Add to band` affordance" as alternatives for the
+same requirement (a keyboard path to every drag-drop outcome) — but the full
+pick-up/arrow/drop flow is explicitly Phase 2 (`progress.md` Phase 2 checklist).
+Given only two free-form bands exist in Phase 1 (`reportHeader`, `totals`), and no
+per-band "make this the add target" UI exists yet, defaulting the button to the
+band most fields belong on (letterhead/header data) while leaving drag available
+for the other case is a reasonable, implementable interpretation of an
+underspecified case, per `claude.md` §9.
+**Rejected:** a band-picker dropdown next to each chip (adds UI complexity for a
+two-band edge case that Phase 2's real selection model will supersede anyway);
+making "+" a no-op until Phase 2 (regresses the mandatory keyboard-alternative gate
+in `design.md` §12 for the one case that already has a sensible default).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

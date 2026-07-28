@@ -1,13 +1,24 @@
 <svelte:options customElement={{ tag: 'doc-designer', shadow: 'open' }} />
 
 <script lang="ts">
-  import { newTemplate, type DataSource, type Template } from '@docsmith/core';
+  import {
+    isDetailBand,
+    newTemplate,
+    type DataSource,
+    type DetailColumn,
+    type FieldMeta,
+    type FreeBand,
+    type FreeElement,
+    type Template,
+  } from '@docsmith/core';
   import type { DocDesignerConfig } from './types.js';
   import { saveTemplateToLocalStorage } from './persistence.js';
+  import { createFieldElement, createDetailColumn } from './template-edits.js';
   import ErrorInline from './ui/ErrorInline.svelte';
   import Toast from './ui/Toast.svelte';
   import Toolbar from './Toolbar.svelte';
   import Palette from './Palette.svelte';
+  import Canvas from './Canvas.svelte';
 
   let { config }: { config?: DocDesignerConfig } = $props();
 
@@ -41,6 +52,44 @@
 
   function handleDataSourceChange(next: DataSource) {
     template = { ...template, dataSource: next };
+  }
+
+  function handleAddElement(bandId: string, element: FreeElement) {
+    template = {
+      ...template,
+      bands: template.bands.map((b) =>
+        b.id === bandId && !isDetailBand(b) ? { ...b, elements: [...b.elements, element] } : b,
+      ),
+    };
+  }
+
+  function handleAddColumn(column: DetailColumn) {
+    template = {
+      ...template,
+      bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, columns: [...b.columns, column] } : b)),
+    };
+  }
+
+  function handleUpdateColumns(columns: DetailColumn[]) {
+    template = {
+      ...template,
+      bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, columns } : b)),
+    };
+  }
+
+  // The click-to-add "+" on a FieldChip has no "selected band" concept in Phase 1
+  // (no free-form selection yet — that's Phase 2). Header fields default to
+  // reportHeader; dataset fields have only one legal destination, the detail
+  // band. Dragging a chip directly onto the totals band remains possible and
+  // gives the other placement.
+  function handlePaletteAddField(field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) {
+    if (cls === 'dataset') {
+      handleAddColumn(createDetailColumn(field));
+      return;
+    }
+    const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
+    handleAddElement('reportHeader', createFieldElement('header', field, reportHeader?.elements ?? []));
+    void datasetId;
   }
 
   async function handleSave() {
@@ -108,10 +157,15 @@
             {adapter}
             dataSource={template.dataSource}
             onDataSourceChange={handleDataSourceChange}
+            onAddField={handlePaletteAddField}
           />
-          <div class="dd-canvas-placeholder">
-            <p>Canvas lands next in Phase 1.</p>
-          </div>
+          <Canvas
+            {template}
+            {adapter}
+            onAddElement={handleAddElement}
+            onAddColumn={handleAddColumn}
+            onUpdateColumns={handleUpdateColumns}
+          />
         {:else}
           <div class="dd-canvas-placeholder">
             <p>Preview lands later in Phase 1.</p>

@@ -8,26 +8,49 @@
 
 ## Now / Next / Notes
 
-- **Now:** Phase 0 scaffold through `FieldGroup.svelte`/`FieldChip.svelte` are done
-  and green — the full Palette side is now live. `FieldGroup` self-fetches its own
-  field list (`getFields` for the header group, `getDatasetFields` per dataset
-  group), splits System/Custom sub-groups only when both kinds are actually
-  present (D-013), applies the Palette-wide search filter, and has the same
-  loading/empty/error+Retry triad as `SourceConfig`. `FieldChip` renders the native
-  HTML5 DnD drag source (`application/x-doc-field` payload, format defaulted via
-  `core.defaultFormatForType`) plus a keyboard "+" affordance that's honestly
-  disabled until Canvas/Band/DetailTable exist to receive an add (`Palette`'s new
-  `onAddField` prop is threaded through but not yet wired from `DocDesigner`).
-  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
-  (`dist/doc-designer.js` ~141KB / ~39KB gzip; 21 tests).
-- **Next:** `Canvas.svelte` (page geometry from `printSetup`, fixed bands
-  stacked top-to-bottom) and `Band.svelte` (report/totals bands accept header
-  fields via an add-list; this is also where `Palette`'s `onAddField` and each
-  chip's drag payload finally get a real drop target). Build in the `design.md`
-  §14 order; Phase 1 is done only when the pagination gate (`claude.md` §8) passes.
+- **Now:** `Canvas.svelte` + `Band.svelte` + `DetailTable.svelte` are done and
+  green — Phase 1's core authoring loop is now real end-to-end: drag a field chip
+  (or click its "+") from the Palette and it lands in the template. `Canvas`
+  draws the page at real px dimensions from `printSetup` (`src/geometry.ts`,
+  design-time-only mm→px conversion — never used by `core.renderToHtml`, which
+  stays in real `mm`) with a margins guide, and stacks `reportHeader` → `detail`
+  → `totals` in fixed order. `Band` accepts native-DnD header-field drops
+  (rejects dataset fields with a toast, per `design.md` §8.4) and renders
+  existing elements as `{label}` tokens, stacked automatically. `DetailTable`
+  accepts dataset-field drops scoped to its own `datasetId` (rejects header
+  fields and other datasets' fields), renders real add/remove/reorder(drag
+  column headers)/format+align+width controls, and shows real sample rows via
+  `listSampleIds`→`fetchDocument` (honest hints when the adapter can't or the
+  sample set is empty). `DocDesigner`'s `handlePaletteAddField` finally wires
+  `Palette`'s `onAddField` for real (D-018: header-field "+" defaults to
+  `reportHeader`; dataset-field "+" always targets `detail`, its only legal
+  destination). Shared, tested pure helpers in `src/template-edits.ts`
+  (`createFieldElement`/`createDetailColumn`) keep the click-add and drag-drop
+  paths consistent. `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all
+  green (`dist/doc-designer.js` ~164KB / ~44KB gzip; 33 tests).
+- **Next:** `PrintSetup.svelte` (page size/orientation/margins + repeat/keep
+  toggles bound to `template.printSetup`, live-updating `Canvas`'s geometry), then
+  `Preview.svelte` (doc-id control + iframe via `core.renderToHtml`) and wiring
+  Export PDF for real (POST `{template, entity, id}` to `renderServiceUrl`/render
+  per `claude.md` §10 — plain `fetch`, NOT importing `@docsmith/sdk`, which isn't
+  on the designer's approved dependency list). Phase 1 is done only when the
+  pagination gate (`claude.md` §8) passes against a ≥40-row document.
 - **Notes / open questions:**
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
+  - jsdom has no `DataTransfer`/`DragEvent` data channel implementation, so
+    `Band.test.ts`/`DetailTable.test.ts` use `fireEvent.drop(el, { dataTransfer:
+    { getData: () => json } })` — a plain fake object, not a real
+    `DataTransfer` — which is the standard way to test HTML5 DnD under jsdom.
+  - Deferred, tracked niceties (none block Phase 1's DoD): the mm ruler along the
+    canvas edges (`design.md` §8.1); dragover-time valid/invalid highlighting
+    before drop (would need a second, class-specific MIME type per chip class to
+    inspect during `dragover`, since `dataTransfer.getData` is only readable on
+    `drop`); zoom/pan (§8.6, naturally pairs with Phase 2's free-form move/resize,
+    since "guides must be zoom-correct" only matters once move/resize exist);
+    band-height resize handles; column-width drag-handles (Phase 1 uses a
+    `NumberInput` instead — still meets "resize columns," just not via a drag
+    handle).
   - The static "Blocks" palette group (Text/Image/Line/Box, per `design.md` §5/§14
     mockup) is deliberately **not built yet** — it only makes sense once
     `FreeElement.svelte` exists to receive a block drop, and that's explicitly
@@ -104,9 +127,9 @@
       add/remove datasets from `getRelatedDatasets`
 - [x] `FieldGroup.svelte` + `FieldChip.svelte` — System/Custom/dataset groups from
       `getFields`/`getDatasetFields`; loading/empty/error states
-- [ ] `Canvas.svelte` — page geometry from `printSetup`; **fixed bands** rendered
-- [ ] `Band.svelte` — report/totals bands accept header fields via add-list (drag optional in P1)
-- [ ] `DetailTable.svelte` — add/reorder/resize/format columns from dataset fields;
+- [x] `Canvas.svelte` — page geometry from `printSetup`; **fixed bands** rendered
+- [x] `Band.svelte` — report/totals bands accept header fields via add-list (drag optional in P1)
+- [x] `DetailTable.svelte` — add/reorder/resize/format columns from dataset fields;
       real sample rows via `listSampleIds`→`fetchDocument`
 - [ ] `PrintSetup.svelte` — page size/orientation/margins + repeat/keep toggles → `printSetup`
 - [ ] `Preview.svelte` — doc-id control; iframe renders `core.renderToHtml(template,data)`
@@ -156,6 +179,23 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — `Canvas.svelte` + `Band.svelte` + `DetailTable.svelte`.** The
+  authoring loop is now real: drag a chip (or click its "+") and it becomes a
+  template element/column. Added `src/geometry.ts` (page-size mm→px, design-time
+  canvas geometry only — `core.renderToHtml` keeps using real `mm`) and
+  `src/template-edits.ts` (`createFieldElement`/`createDetailColumn`, shared pure
+  helpers so the click-add and native-DnD paths build identical structures).
+  `Band.svelte` renders `reportHeader`/`totals`, accepts header-field drops
+  (rejects dataset fields with a toast), shows elements as `{label}` tokens
+  stacked automatically. `DetailTable.svelte` accepts dataset-field drops scoped
+  to its own dataset (rejects header fields and other datasets), full column
+  add/remove/reorder(drag)/format+align+width, and real sample rows via
+  `listSampleIds`→`fetchDocument`. `DocDesigner.handlePaletteAddField` wires
+  `Palette.onAddField` for real; recorded D-018 in `memory.md` (header-field "+"
+  defaults to `reportHeader`, dataset-field "+" always targets `detail` — its
+  only legal destination). Discovered jsdom has no `DataTransfer` — tests fake
+  just the `getData()` surface via `fireEvent.drop`. 33 tests pass (was 21);
+  lint/typecheck/build green (`dist/doc-designer.js` ~164KB / ~44KB gzip).
 - **2026-07-28 — `FieldGroup.svelte` + `FieldChip.svelte`.** `FieldGroup` is
   self-contained: it fetches its own field list (`getFields` for the header group,
   `getDatasetFields(entity, datasetId)` per dataset group — decided by its `cls`
