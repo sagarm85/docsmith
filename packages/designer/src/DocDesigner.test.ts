@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import { StaticAdapter } from '@docsmith/adapters';
+import type { Template } from '@docsmith/core';
 import './DocDesigner.svelte'; // side effect: registers <doc-designer>
 
 // Svelte's custom-element wrapper defers instantiation by one microtask on
@@ -12,11 +13,23 @@ function nextTick(): Promise<void> {
 
 type DocDesignerEl = HTMLElement & {
   config?: unknown;
-  getTemplate?: () => unknown;
-  setTemplate?: (t: unknown) => void;
+  getTemplate?: () => Template;
+  setTemplate?: (t: Template) => void;
 };
 
+function mountWithAdapter(): DocDesignerEl {
+  const adapter = new StaticAdapter({ entities: [] });
+  const el = document.createElement('doc-designer') as DocDesignerEl;
+  el.config = { adapter };
+  document.body.appendChild(el);
+  return el;
+}
+
 describe('<doc-designer>', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('registers the custom element tag', () => {
     expect(customElements.get('doc-designer')).toBeDefined();
   });
@@ -31,41 +44,94 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
-  it('renders against a real adapter with no fabricated data', async () => {
-    const adapter = new StaticAdapter({
-      entities: [
-        {
-          meta: { name: 'invoice', label: 'Invoice' },
-          headerFields: [],
-          datasets: [],
-          documents: {},
-        },
-      ],
-    });
-    const el = document.createElement('doc-designer') as DocDesignerEl;
-    el.config = { adapter };
-    document.body.appendChild(el);
+  it('renders the toolbar and design-mode scaffold against a real adapter', async () => {
+    const el = mountWithAdapter();
     await nextTick();
 
     const shadowText = el.shadowRoot?.textContent ?? '';
     expect(shadowText).not.toContain('No data adapter configured');
-    expect(shadowText).toContain('Phase 0 scaffold');
+    expect(shadowText).toContain('Design mode');
     el.remove();
   });
 
-  it('exposes getTemplate/setTemplate for the SDK to call', async () => {
-    const adapter = new StaticAdapter({ entities: [] });
-    const el = document.createElement('doc-designer') as DocDesignerEl;
-    el.config = { adapter };
-    document.body.appendChild(el);
+  it('exposes getTemplate/setTemplate seeded from core.newTemplate()', async () => {
+    const el = mountWithAdapter();
     await nextTick();
 
-    expect(el.getTemplate?.()).toBeNull();
-    // $state wraps objects in a reactive proxy, so identity (toBe) won't hold —
-    // assert content instead.
-    const fake = { version: 1 } as unknown;
+    const initial = el.getTemplate?.();
+    expect(initial?.version).toBe(1);
+    expect(Array.isArray(initial?.bands)).toBe(true);
+
+    const fake = { ...initial, name: 'Renamed' } as Template;
     el.setTemplate?.(fake);
     expect(el.getTemplate?.()).toStrictEqual(fake);
+    el.remove();
+  });
+
+  it('toggles Design/Preview mode via the toolbar', async () => {
+    const el = mountWithAdapter();
+    await nextTick();
+    expect(el.shadowRoot?.textContent).toContain('Design mode');
+
+    const previewBtn = Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Preview',
+    );
+    previewBtn?.click();
+    await nextTick();
+
+    expect(el.shadowRoot?.textContent).toContain('Preview mode');
+    el.remove();
+  });
+
+  it('renaming via the toolbar input updates the template', async () => {
+    const el = mountWithAdapter();
+    await nextTick();
+
+    const input = el.shadowRoot?.querySelector<HTMLInputElement>('#dd-template-name');
+    expect(input).toBeTruthy();
+    input!.value = 'My Invoice';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    expect(el.getTemplate?.()?.name).toBe('My Invoice');
+    el.remove();
+  });
+
+  it('Save persists to localStorage when no onSave is configured (D-010)', async () => {
+    const el = mountWithAdapter();
+    await nextTick();
+    const template = el.getTemplate?.();
+
+    const saveBtn = Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Save',
+    );
+    saveBtn?.click();
+    await nextTick();
+    await nextTick();
+
+    expect(localStorage.getItem(`erpdoc.templates.${template?.id}`)).not.toBeNull();
+    expect(el.shadowRoot?.textContent).toContain('Template saved.');
+    el.remove();
+  });
+
+  it('Save calls the host onSave instead of localStorage when provided', async () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    const saved: Template[] = [];
+    const el = document.createElement('doc-designer') as DocDesignerEl;
+    el.config = { adapter, onSave: (t: Template) => void saved.push(t) };
+    document.body.appendChild(el);
+    await nextTick();
+    const template = el.getTemplate?.();
+
+    const saveBtn = Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Save',
+    );
+    saveBtn?.click();
+    await nextTick();
+    await nextTick();
+
+    expect(saved).toStrictEqual([template]);
+    expect(localStorage.getItem(`erpdoc.templates.${template?.id}`)).toBeNull();
     el.remove();
   });
 });

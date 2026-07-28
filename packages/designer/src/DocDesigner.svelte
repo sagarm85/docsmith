@@ -1,17 +1,26 @@
 <svelte:options customElement={{ tag: 'doc-designer', shadow: 'open' }} />
 
 <script lang="ts">
-  import type { Template } from '@docsmith/core';
+  import { newTemplate, type Template } from '@docsmith/core';
   import type { DocDesignerConfig } from './types.js';
+  import { saveTemplateToLocalStorage } from './persistence.js';
   import ErrorInline from './ui/ErrorInline.svelte';
+  import Toast from './ui/Toast.svelte';
+  import Toolbar from './Toolbar.svelte';
 
   let { config }: { config?: DocDesignerConfig } = $props();
 
-  // Seed once from the initial config; `template` is independent mutable state
-  // afterward (see getTemplate/setTemplate below), so we deliberately don't want
-  // this to track later `config` changes.
+  // Seed once from the initial config (or a fresh, valid, empty template from
+  // `core.newTemplate()` — never hand-rolled here, per "business logic lives in
+  // core"); `template` is independent mutable state afterward (see
+  // getTemplate/setTemplate below), so we deliberately don't want this to track
+  // later `config` changes.
   // svelte-ignore state_referenced_locally
-  let template = $state<Template | null>(config?.template ?? null);
+  let template = $state<Template>(config?.template ?? newTemplate());
+
+  let mode = $state<'design' | 'preview'>('design');
+  let saving = $state(false);
+  let saveToast = $state<{ variant: 'success' | 'error'; message: string } | null>(null);
 
   // Host-page theme overrides (design.md §13 `theme`) are applied as inline custom
   // properties on the shadow-root's own top-level element, so they cascade to every
@@ -25,7 +34,31 @@
       : undefined,
   );
 
-  export function getTemplate(): Template | null {
+  function handleNameChange(name: string) {
+    template = { ...template, name };
+  }
+
+  async function handleSave() {
+    saving = true;
+    saveToast = null;
+    try {
+      if (config?.onSave) {
+        await config.onSave(template);
+      } else {
+        saveTemplateToLocalStorage(template);
+      }
+      saveToast = { variant: 'success', message: 'Template saved.' };
+    } catch (err) {
+      saveToast = {
+        variant: 'error',
+        message: err instanceof Error ? err.message : 'Failed to save template.',
+      };
+    } finally {
+      saving = false;
+    }
+  }
+
+  export function getTemplate(): Template {
     return template;
   }
 
@@ -42,11 +75,31 @@
       />
     </div>
   {:else}
-    <div class="dd-scaffold">
-      <p>
-        DocSmith designer — Phase 0 scaffold mounted against a live adapter. Toolbar,
-        Palette, and Canvas land in Phase 1.
-      </p>
+    <div class="dd-shell">
+      <Toolbar
+        templateName={template.name}
+        onNameChange={handleNameChange}
+        {mode}
+        onModeChange={(next) => (mode = next)}
+        {saving}
+        onSave={handleSave}
+      />
+      {#if saveToast}
+        <div class="dd-toast-slot">
+          <Toast
+            variant={saveToast.variant}
+            message={saveToast.message}
+            onDismiss={() => (saveToast = null)}
+          />
+        </div>
+      {/if}
+      <div class="dd-scaffold">
+        <p>
+          {mode === 'design'
+            ? 'Design mode — Canvas lands next in Phase 1.'
+            : 'Preview mode — Preview lands later in Phase 1.'}
+        </p>
+      </div>
     </div>
   {/if}
 </div>
@@ -65,6 +118,16 @@
 
   .dd-root {
     height: 100%;
+  }
+
+  .dd-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .dd-toast-slot {
+    padding: 8px 12px 0;
   }
 
   .dd-empty,

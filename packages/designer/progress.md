@@ -8,22 +8,20 @@
 
 ## Now / Next / Notes
 
-- **Now:** Phase 0 scaffold is done and green. `packages/designer` joined the pnpm
-  workspace, builds `<doc-designer>` as one custom-element bundle
-  (`dist/doc-designer.js`, ~80KB / ~24KB gzip — svelte + `@docsmith/core` +
-  `@docsmith/adapters` all bundled, zero extra runtime deps), and
-  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` are all green for the
-  package. `DocDesigner.svelte` mounts, reads `{ adapter, template, onSave,
-  onChange, renderServiceUrl, theme }`, exposes `getTemplate`/`setTemplate` for the
-  SDK, and shows an honest empty state when no adapter is configured — no fabricated
-  data. `pnpm --filter @docsmith/designer dev` serves a local harness
-  (`packages/designer/dev`) against the same `StaticAdapter` 60-line invoice fixture
-  the backend `pnpm demo` uses.
-- **Next:** P1 MVP shell — Toolbar → Palette/SourceConfig → FieldGroup/FieldChip →
-  Canvas (fixed bands from `printSetup`) → DetailTable (real sample rows via
-  `listSampleIds`→`fetchDocument`) → PrintSetup → Preview (iframe via
-  `core.renderToHtml`) → Export PDF. Build in the `design.md` §14 order; Phase 1 is
-  done only when the pagination gate (`claude.md` §8) passes.
+- **Now:** Phase 0 scaffold plus the first Phase 1 component (`Toolbar.svelte`) are
+  done and green. `DocDesigner.svelte` now seeds `template` from
+  `config?.template ?? core.newTemplate()` (never hand-rolls a default template —
+  business logic stays in `core`), owns `mode` ('design'|'preview') state, and wires
+  `Toolbar` for: editable template name, Design/Preview toggle, Save (calls
+  `config.onSave` if provided, else `localStorage` per D-010, with a success/error
+  `Toast`), and Undo/Redo + Export PDF rendered but disabled (no command stack /
+  no doc-id source yet — honestly unavailable, not stubbed-to-look-functional).
+  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
+  (`dist/doc-designer.js` ~98KB / ~29KB gzip).
+- **Next:** `Palette.svelte` + `SourceConfig.svelte` (entity dropdown from
+  `listEntities`, add/remove datasets from `getRelatedDatasets`), then
+  `FieldGroup`/`FieldChip`. Build in the `design.md` §14 order; Phase 1 is done only
+  when the pagination gate (`claude.md` §8) passes.
 - **Notes / open questions:**
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
@@ -37,10 +35,31 @@
     shadow-root's top-level `<div>` instead of via `$host()`, which cascades to every
     `--dd-*` consumer just the same. Revisit if a later Svelte version fixes `$host()`
     typings, but no behavior is lost with the current approach.
+  - vitest+jsdom quirk: neither this jsdom version nor Node 22's own experimental
+    global `localStorage` (undefined without `--localstorage-file`) gave a working
+    `Storage` in tests. Added `src/test-setup.ts`, a minimal in-memory `Storage`
+    polyfill wired via `vite.config.ts` `test.setupFiles` — test-only, excluded from
+    `dist` via `tsconfig.build.json`. `persistence.ts` itself just uses the ambient
+    `localStorage` global, which is real in any actual browser.
+  - `doc-save`/`doc-change` DOM `CustomEvent` dispatch (design.md §13's secondary
+    channel "for host frameworks that prefer events over callbacks") is **not yet
+    wired** — only the callback path (`config.onSave`) works so far. The SDK's
+    `mount()` already listens for these events, so this is a real gap to close,
+    likely alongside `onChange`/autosave in Phase 2, not silently dropped.
+  - Export PDF and Undo/Redo are visible in the toolbar but intentionally disabled:
+    Export needs an entity+doc-id source that doesn't exist until `Preview`/`SourceConfig`
+    land; Undo/Redo needs the Phase 2 command stack. Disabling (not hiding) keeps the
+    full toolbar layout visible per `design.md` §4 while staying honest about what's
+    implemented.
   - Pre-existing, not touched (out of scope for this frontend-only change):
     `pnpm -r test` fails on `@docsmith/adapters` — it declares a `test` script but
     has no test files yet, so `vitest run` exits 1. `packages/designer`'s own
     `pnpm test` is unaffected and green.
+  - `@playwright/test` is intentionally NOT installed yet — `claude.md` §1 scopes it
+    to "Phase 2+"; UI verification for Phase 0/1 so far is via `@testing-library`-style
+    jsdom tests that mount the real compiled custom element (click buttons, type into
+    inputs, assert shadow DOM text) plus manual `pnpm dev` + curl smoke checks. No
+    pixel-level/visual browser check has been done — say so rather than claim it.
   - Import types from `@docsmith/core` — do NOT redefine `Template`, `FieldMeta`,
     `DataSourceAdapter`. Preview/PDF MUST call `core.renderToHtml` (single renderer).
   - Reference the runnable backend: `pnpm demo` at repo root → `examples/invoice-demo/out.html`.
@@ -61,7 +80,7 @@
 
 ## Phase 1 — MVP shell (end-to-end, real data, multi-page PDF)
 
-- [ ] `Toolbar.svelte` — name, Design/Preview toggle, Save, Export PDF (undo/redo stubbed)
+- [x] `Toolbar.svelte` — name, Design/Preview toggle, Save, Export PDF (undo/redo stubbed)
 - [ ] `Palette.svelte` + `SourceConfig.svelte` — entity dropdown from `listEntities`;
       add/remove datasets from `getRelatedDatasets`
 - [ ] `FieldGroup.svelte` + `FieldChip.svelte` — System/Custom/dataset groups from
@@ -74,7 +93,7 @@
 - [ ] `Preview.svelte` — doc-id control; iframe renders `core.renderToHtml(template,data)`
 - [ ] Browser **Print** works; **Export PDF** posts to render service and downloads
 - [ ] **Pagination gate passed** (claude.md §8): ≥40-row doc, header repeats, no split row
-- [ ] localStorage default persistence when no `onSave` supplied
+- [x] localStorage default persistence when no `onSave` supplied
 
 ## Phase 2 — Full WYSIWYG
 
@@ -118,6 +137,16 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — `Toolbar.svelte` (Phase 1, first component).** `DocDesigner.svelte`
+  now seeds `template` via `core.newTemplate()` instead of `null`, owns `mode`
+  ('design'|'preview') state, and renders `Toolbar`: editable name input, Design/
+  Preview toggle, Save (host `onSave` or `localStorage` default per D-010, with a
+  `Toast`), Undo/Redo + Export PDF present but disabled (no command stack / no
+  doc-id source yet). Added `src/persistence.ts` (+ test) for the localStorage
+  path. Added `src/test-setup.ts` to work around a vitest+jsdom+Node22
+  `localStorage` gap (see notes above). 10 tests pass (was 4); lint/typecheck/build
+  all green. `doc-save`/`doc-change` CustomEvent dispatch is a known, tracked gap
+  (see notes) — not yet wired.
 - **2026-07-28 — Phase 0 scaffold landed.** `packages/designer` joined the pnpm
   workspace: Vite lib build compiling `DocDesigner.svelte` to the single
   `doc-designer` custom element (Shadow DOM, `<svelte:options customElement=...>`,
