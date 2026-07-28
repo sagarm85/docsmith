@@ -175,6 +175,28 @@ decision rather than guessing silently.
 already implied by testing-library's own docs as the default pairing).
 `[status: locked]`
 
+### D-017 — Placeholder `TemplateDataset.ref` when adding a dataset from the palette
+**Decision:** When `SourceConfig` adds a dataset the adapter offered via
+`getRelatedDatasets` (which returns only `{ id, label }` — no table/column info), it
+constructs `ref: { table: meta.id, fkColumn: '' }` (kind stays `'fk'`, semantically
+correct — it *is* a related dataset), leaving `fkColumn` honestly empty rather than
+guessing a naming convention (e.g. `` `${entity}_id` ``).
+**Why:** `DataSourceAdapter` has no method that returns a dataset's real FK column,
+and `TemplateDataset.ref` is confirmed **unused** by `core.renderToHtml` or any
+adapter at runtime (grepped `packages/core/src` and `packages/adapters/src` — the
+only reference is the type definition and the `datasetFromMeta` helper itself;
+render/fetch matches datasets by `datasetId` string only). So `ref` is authoring-time
+metadata, not a functional binding — guessing `fkColumn` would fabricate apparent
+schema knowledge the adapter never confirmed, which §0.1 forbids even for
+"cosmetic" defaults.
+**Rejected:** guessing `fkColumn: `${entity}_id`` from the fixture's naming
+convention (works for the demo fixture, not guaranteed for any real ERP schema —
+exactly the kind of assumption D-013/§0.1 warn against); using `kind: 'sql'` with an
+empty string instead (mislabels a genuine FK-relationship dataset as a raw-query
+one). If a real render/query path ever starts consuming `ref`, this decision must be
+revisited — it currently holds only because `ref` is inert.
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

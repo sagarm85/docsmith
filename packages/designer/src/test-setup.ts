@@ -1,3 +1,8 @@
+// Registers automatic cleanup() between tests for @testing-library/svelte, so
+// render() calls in one test don't leak DOM into the next (screen queries are
+// document-wide, so leftover nodes cause false "multiple elements" failures).
+import '@testing-library/svelte/vitest';
+
 // Neither this jsdom version nor Node's own experimental global `localStorage`
 // (which requires --localstorage-file and otherwise reads back as `undefined`)
 // gives vitest a working Storage here. Swap in a minimal in-memory polyfill for

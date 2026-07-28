@@ -14,6 +14,13 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig(({ command }) => ({
   plugins: [svelte({ compilerOptions: { customElement: true } })],
   root: command === 'serve' && !process.env.VITEST ? 'dev' : undefined,
+  // Under vitest, force Vite's "browser" export condition so it resolves svelte's
+  // client build (mount/render) instead of the server/SSR build — otherwise
+  // @testing-library/svelte's render() hits "mount(...) is not available on the
+  // server" even with environment: 'jsdom'.
+  resolve: {
+    conditions: process.env.VITEST ? ['browser'] : undefined,
+  },
   build: {
     lib: {
       entry: 'src/main.ts',

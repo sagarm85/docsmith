@@ -1,12 +1,13 @@
 <svelte:options customElement={{ tag: 'doc-designer', shadow: 'open' }} />
 
 <script lang="ts">
-  import { newTemplate, type Template } from '@docsmith/core';
+  import { newTemplate, type DataSource, type Template } from '@docsmith/core';
   import type { DocDesignerConfig } from './types.js';
   import { saveTemplateToLocalStorage } from './persistence.js';
   import ErrorInline from './ui/ErrorInline.svelte';
   import Toast from './ui/Toast.svelte';
   import Toolbar from './Toolbar.svelte';
+  import Palette from './Palette.svelte';
 
   let { config }: { config?: DocDesignerConfig } = $props();
 
@@ -36,6 +37,10 @@
 
   function handleNameChange(name: string) {
     template = { ...template, name };
+  }
+
+  function handleDataSourceChange(next: DataSource) {
+    template = { ...template, dataSource: next };
   }
 
   async function handleSave() {
@@ -75,6 +80,10 @@
       />
     </div>
   {:else}
+    <!-- The outer #if already proved config.adapter is set; the ! here is just
+         narrowing config itself, which Svelte's template analysis can't infer
+         across the block boundary the way plain TS control flow would. -->
+    {@const adapter = config!.adapter}
     <div class="dd-shell">
       <Toolbar
         templateName={template.name}
@@ -93,12 +102,21 @@
           />
         </div>
       {/if}
-      <div class="dd-scaffold">
-        <p>
-          {mode === 'design'
-            ? 'Design mode — Canvas lands next in Phase 1.'
-            : 'Preview mode — Preview lands later in Phase 1.'}
-        </p>
+      <div class="dd-workspace">
+        {#if mode === 'design'}
+          <Palette
+            {adapter}
+            dataSource={template.dataSource}
+            onDataSourceChange={handleDataSourceChange}
+          />
+          <div class="dd-canvas-placeholder">
+            <p>Canvas lands next in Phase 1.</p>
+          </div>
+        {:else}
+          <div class="dd-canvas-placeholder">
+            <p>Preview lands later in Phase 1.</p>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -124,18 +142,29 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-height: 0;
   }
 
   .dd-toast-slot {
     padding: 8px 12px 0;
   }
 
-  .dd-empty,
-  .dd-scaffold {
+  .dd-empty {
     padding: 16px;
   }
 
-  .dd-scaffold p {
+  .dd-workspace {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .dd-canvas-placeholder {
+    flex: 1;
+    padding: 16px;
+  }
+
+  .dd-canvas-placeholder p {
     margin: 0;
     color: var(--dd-muted);
   }

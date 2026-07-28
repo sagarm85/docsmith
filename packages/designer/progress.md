@@ -8,23 +8,35 @@
 
 ## Now / Next / Notes
 
-- **Now:** Phase 0 scaffold plus the first Phase 1 component (`Toolbar.svelte`) are
-  done and green. `DocDesigner.svelte` now seeds `template` from
-  `config?.template ?? core.newTemplate()` (never hand-rolls a default template —
-  business logic stays in `core`), owns `mode` ('design'|'preview') state, and wires
-  `Toolbar` for: editable template name, Design/Preview toggle, Save (calls
-  `config.onSave` if provided, else `localStorage` per D-010, with a success/error
-  `Toast`), and Undo/Redo + Export PDF rendered but disabled (no command stack /
-  no doc-id source yet — honestly unavailable, not stubbed-to-look-functional).
-  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
-  (`dist/doc-designer.js` ~98KB / ~29KB gzip).
-- **Next:** `Palette.svelte` + `SourceConfig.svelte` (entity dropdown from
-  `listEntities`, add/remove datasets from `getRelatedDatasets`), then
-  `FieldGroup`/`FieldChip`. Build in the `design.md` §14 order; Phase 1 is done only
-  when the pagination gate (`claude.md` §8) passes.
+- **Now:** Phase 0 scaffold, `Toolbar.svelte`, and `Palette.svelte` +
+  `SourceConfig.svelte` are done and green. `DocDesigner.svelte` renders a real
+  two-region workspace in design mode: `Palette` (left) + a Canvas placeholder
+  (center); preview mode shows its own placeholder and hides the Palette.
+  `SourceConfig` drives `template.dataSource` end-to-end against the adapter:
+  entity dropdown from `listEntities`, related-dataset add/remove from
+  `getRelatedDatasets` (via `core.datasetFromMeta`), full loading/empty/error
+  triads with Retry, and de-duped/cancellable fetches (generation-counter guard
+  against stale entity switches). `pnpm lint && pnpm typecheck && pnpm test &&
+  pnpm build` all green (`dist/doc-designer.js` ~124KB / ~35KB gzip; 14 tests).
+- **Next:** `FieldGroup.svelte` + `FieldChip.svelte` (System/Custom/dataset field
+  groups from `getFields`/`getDatasetFields`), then `Canvas.svelte` (page geometry
+  from `printSetup`, fixed bands). Build in the `design.md` §14 order; Phase 1 is
+  done only when the pagination gate (`claude.md` §8) passes.
 - **Notes / open questions:**
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
+  - D-017 (`memory.md`): `getRelatedDatasets` returns only `{id, label}`, no FK
+    column, so `SourceConfig` builds `ref: { table: meta.id, fkColumn: '' }` when
+    adding a dataset rather than guessing a naming convention. Confirmed by grep
+    that `TemplateDataset.ref` is unused by `core`/adapters at runtime — authoring
+    metadata only. Revisit if a real consumer of `.ref` is ever added.
+  - vitest+`@testing-library/svelte` gotcha: `render()` initially failed with
+    `mount(...) is not available on the server` — Vite/vitest was resolving
+    svelte's server/SSR export condition even under `environment: 'jsdom'`. Fixed
+    with `resolve.conditions: ['browser']` when `process.env.VITEST` is set (see
+    `vite.config.ts`). Also needed `@testing-library/svelte/vitest` (auto
+    `cleanup()` between tests) in `test-setup.ts`, or `screen` queries leak DOM
+    across tests in the same file and produce false "multiple elements" failures.
   - Doc-update ritual applied: `svelte-check` and `jsdom` added to the approved
     dev-dependency list (dev-only; zero runtime/bundle impact) to unblock TS
     type-checking of `.svelte` files and vitest's DOM environment for
@@ -81,7 +93,7 @@
 ## Phase 1 — MVP shell (end-to-end, real data, multi-page PDF)
 
 - [x] `Toolbar.svelte` — name, Design/Preview toggle, Save, Export PDF (undo/redo stubbed)
-- [ ] `Palette.svelte` + `SourceConfig.svelte` — entity dropdown from `listEntities`;
+- [x] `Palette.svelte` + `SourceConfig.svelte` — entity dropdown from `listEntities`;
       add/remove datasets from `getRelatedDatasets`
 - [ ] `FieldGroup.svelte` + `FieldChip.svelte` — System/Custom/dataset groups from
       `getFields`/`getDatasetFields`; loading/empty/error states
@@ -137,6 +149,22 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — `Palette.svelte` + `SourceConfig.svelte`.** `SourceConfig` drives
+  `template.dataSource` against the real adapter: entity `<Select>` from
+  `listEntities()`, related-dataset add/remove from `getRelatedDatasets(entity)`
+  using `core.datasetFromMeta` (never hand-rolled), full loading/empty/error
+  triads (Skeleton/ErrorInline+Retry/honest empty hint), a visually-hidden
+  `aria-live` region announcing load results, and generation-counter guards so a
+  stale fetch (superseded by a fast entity switch) can't clobber newer state.
+  `Palette` is a thin left-rail wrapper. `DocDesigner.svelte` now renders a real
+  two-region workspace: design mode shows `Palette` + a Canvas placeholder,
+  preview mode shows its own placeholder and hides the Palette. Recorded D-017 in
+  `memory.md` (placeholder `ref` for added datasets — `getRelatedDatasets` doesn't
+  expose FK column names, and `ref` is confirmed unused by `core`/adapters at
+  runtime). Fixed a real `@testing-library/svelte` + vitest resolution gap
+  (`resolve.conditions: ['browser']`) and added `@testing-library/svelte/vitest`
+  auto-cleanup to `test-setup.ts`. 14 tests pass (was 10); lint/typecheck/build
+  green (`dist/doc-designer.js` ~124KB / ~35KB gzip).
 - **2026-07-28 — `Toolbar.svelte` (Phase 1, first component).** `DocDesigner.svelte`
   now seeds `template` via `core.newTemplate()` instead of `null`, owns `mode`
   ('design'|'preview') state, and renders `Toolbar`: editable name input, Design/

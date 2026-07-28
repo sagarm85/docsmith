@@ -44,13 +44,14 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
-  it('renders the toolbar and design-mode scaffold against a real adapter', async () => {
+  it('renders the toolbar and Palette (design mode) against a real adapter', async () => {
     const el = mountWithAdapter();
     await nextTick();
 
     const shadowText = el.shadowRoot?.textContent ?? '';
     expect(shadowText).not.toContain('No data adapter configured');
-    expect(shadowText).toContain('Design mode');
+    expect(shadowText).toContain('Canvas lands next in Phase 1.');
+    expect(shadowText).toContain('Entity');
     el.remove();
   });
 
@@ -71,7 +72,8 @@ describe('<doc-designer>', () => {
   it('toggles Design/Preview mode via the toolbar', async () => {
     const el = mountWithAdapter();
     await nextTick();
-    expect(el.shadowRoot?.textContent).toContain('Design mode');
+    expect(el.shadowRoot?.textContent).toContain('Canvas lands next in Phase 1.');
+    expect(el.shadowRoot?.textContent).toContain('Entity');
 
     const previewBtn = Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).find(
       (b) => b.textContent?.trim() === 'Preview',
@@ -79,7 +81,10 @@ describe('<doc-designer>', () => {
     previewBtn?.click();
     await nextTick();
 
-    expect(el.shadowRoot?.textContent).toContain('Preview mode');
+    // Preview mode hides the Palette (Design-mode-only per design.md §4) and shows
+    // its own placeholder instead of the Canvas one.
+    expect(el.shadowRoot?.textContent).toContain('Preview lands later in Phase 1.');
+    expect(el.shadowRoot?.textContent).not.toContain('Entity');
     el.remove();
   });
 
