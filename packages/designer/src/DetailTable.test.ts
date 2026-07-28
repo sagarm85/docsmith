@@ -244,6 +244,50 @@ describe('DetailTable', () => {
     expect(screen.getByText('Gadget')).toBeTruthy();
   });
 
+  it('shows a tfoot with the real sample-row aggregate when a column has one configured', async () => {
+    const adapter = adapterWithSample();
+    const band: DetailBand = {
+      ...filledDetailBand(),
+      aggregates: [{ column: 'qty', fn: 'sum', into: 'tfoot' }],
+    };
+    render(DetailTable, {
+      props: {
+        band,
+        adapter,
+        entity: 'invoice',
+        onAddColumn: vi.fn(),
+        onUpdateColumns: vi.fn(),
+        onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
+      },
+    });
+
+    await waitFor(() => expect(screen.getByText('Widget')).toBeTruthy());
+    // Real sample rows are qty 3 + qty 1 = 4 — never a fabricated total.
+    const tfoot = document.querySelector('tfoot');
+    expect(tfoot?.textContent).toContain('4');
+  });
+
+  it('shows no tfoot when the band has no aggregates configured', async () => {
+    const adapter = adapterWithSample();
+    render(DetailTable, {
+      props: {
+        band: filledDetailBand(),
+        adapter,
+        entity: 'invoice',
+        onAddColumn: vi.fn(),
+        onUpdateColumns: vi.fn(),
+        onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
+      },
+    });
+
+    await waitFor(() => expect(screen.getByText('Widget')).toBeTruthy());
+    expect(document.querySelector('tfoot')).toBeNull();
+  });
+
   it('shows an honest hint when the adapter has no sample-id support', async () => {
     const adapter = new StaticAdapter({ entities: [] });
     // StaticAdapter.listSampleIds is a prototype method — shadow it with an own

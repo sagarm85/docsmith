@@ -101,7 +101,23 @@
   in DOM order), so `design.md`'s "[Tab to] a band" is satisfied for free.
   96 tests pass (was 89); lint/typecheck/build all green
   (`dist/doc-designer.js` ~263KB / ~64KB gzip).
-- **Next (Phase 3):** not yet started — see the Phase 3 checklist below.
+- **Now (Phase 3, in progress):** Started on the ERP-grade checklist. Two items
+  done so far — raw-query (SQL) dataset authoring in `SourceConfig.svelte`,
+  and per-column aggregates (`ColumnProps.svelte` + a real-sample-data
+  `<tfoot>` preview in `DetailTable.svelte`), both mostly UI-only since `core`
+  already had the underlying types/rendering (`TemplateDataset.kind:'sql'`,
+  `DetailBand.aggregates` → `renderDetailBand`'s `<tfoot>`) — see D-024.
+  106 tests pass (was 96); lint/typecheck/build all green
+  (`dist/doc-designer.js` ~271KB / ~66KB gzip). Continuing down the Phase 3
+  list next (i18n locale/currency picker, amount-in-words, conditional
+  formatting, saved themes). **Two remaining Phase 3 items — barcode/QR and
+  carried-forward subtotals — trip `claude.md` §9's "stop and flag" rule**
+  (barcode/QR generation has no correct hand-rollable implementation without a
+  new dependency; carried-forward subtotals need break positions only the
+  render-service's Puppeteer step can see, i.e. a second computation path
+  beyond `core.renderToHtml` — design.md §9 itself already flags this one as
+  "server-only, Phase 3"). Flagging these to the user for a decision rather
+  than guessing; not silently skipped.
   Also still carried forward from Phase 1/2: wiring `doc-save`/`doc-change`
   `CustomEvent` dispatch (see Phase 1 notes below — `onChange` now has a
   real callback-based path via `config.onChange`, but the DOM `CustomEvent`
@@ -272,8 +288,18 @@
 
 ## Phase 3 — ERP-grade
 
-- [ ] Multiple datasets + raw-query datasets
-- [ ] Per-column aggregates → `<tfoot>` (sum/count/avg)
+- [x] Multiple datasets + raw-query datasets — `SourceConfig.svelte` gained an
+      "Add a custom (SQL) dataset" form (id/label/SQL query), building a
+      `kind:'sql'` `TemplateDataset` via `core.datasetFromMeta`. Multiple
+      datasets already worked at the template level (`dataSource.datasets[]`);
+      this closes the "raw-query" half — declarative authoring metadata only,
+      never executed by the designer (same contract as D-017's FK `ref`).
+- [x] Per-column aggregates → `<tfoot>` (sum/count/avg) — `ColumnProps.svelte`
+      gained an "Aggregate (footer)" select reading/writing
+      `DetailBand.aggregates` (D-024); `DetailTable.svelte`'s canvas now shows
+      a live `<tfoot>` preview computed via `core.aggregate()` against the same
+      real sample rows already loaded (never fabricated). `core.renderToHtml`
+      already rendered this — only the authoring UI was missing.
 - [ ] Conditional formatting (declarative rules)
 - [ ] Barcode / QR element
 - [ ] i18n + locale currency; amount-in-words
@@ -302,6 +328,24 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Phase 3 started: raw-query datasets + per-column aggregates.**
+  `SourceConfig.svelte` gained an "Add a custom (SQL) dataset" form (dataset
+  id, label, SQL query text) building a `kind:'sql'` `TemplateDataset` via
+  `core.datasetFromMeta` — validates id/label/query are non-empty and the id
+  doesn't collide with an existing dataset, but never executes the query
+  itself (purely declarative authoring metadata the adapter's `fetchDocument`
+  is expected to honor by id, same contract as D-017). `ColumnProps.svelte`
+  gained an "Aggregate (footer)" select (None/Sum/Count/Average) reading/
+  writing `DetailBand.aggregates` — recorded as D-024 (aggregates stay keyed
+  on the band, never denormalized onto `DetailColumn`, since `core` already
+  owned that shape before Phase 3 and it's already fully wired into
+  `render.ts`'s real `<tfoot>` output). `DetailTable.svelte`'s canvas now
+  shows a live sample-data `<tfoot>` preview via `core.aggregate()` — computed
+  against the same real sample rows already loaded for the row-preview strip,
+  shown only once those rows are actually ready (never a fabricated total).
+  10 new tests (`SourceConfig` +3, `ColumnProps` new file +4, `DetailTable`
+  +2, `DocDesigner` +1). 106 tests pass (was 96); lint/typecheck/build all
+  green (`dist/doc-designer.js` ~271KB / ~66KB gzip).
 - **2026-07-28 — Keyboard drag-alternative — Phase 2 DONE.** Implemented
   design.md §12's "select a chip, press Enter to pick up, [Tab to] a band,
   Enter to drop" for both field chips and the Blocks group. New `PickedUp`

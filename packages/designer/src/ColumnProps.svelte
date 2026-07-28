@@ -7,9 +7,17 @@
   let {
     column,
     onChange,
+    aggregate = null,
+    onAggregateChange,
   }: {
     column: DetailColumn;
     onChange: (patch: Partial<DetailColumn>) => void;
+    /** This column's current tfoot aggregate function, or null for none
+     * (design.md §8.5 Phase 3: "an aggregate (sum/count/avg) rendered in
+     * <tfoot>"). Lives on `DetailBand.aggregates`, not the column itself —
+     * see memory.md D-024. */
+    aggregate?: 'sum' | 'count' | 'avg' | null;
+    onAggregateChange?: (fn: 'sum' | 'count' | 'avg' | null) => void;
   } = $props();
 
   const FORMAT_OPTIONS = [
@@ -22,6 +30,12 @@
     { value: 'left', label: 'Left' },
     { value: 'center', label: 'Center' },
     { value: 'right', label: 'Right' },
+  ];
+  const AGGREGATE_OPTIONS = [
+    { value: 'none', label: 'None' },
+    { value: 'sum', label: 'Sum' },
+    { value: 'count', label: 'Count' },
+    { value: 'avg', label: 'Average' },
   ];
 </script>
 
@@ -66,6 +80,18 @@
       value={column.format ?? 'text'}
       options={FORMAT_OPTIONS}
       onchange={(v) => onChange({ format: v as ValueFormat })}
+    />
+  </Field>
+
+  <Field label="Aggregate (footer)" fieldId="dd-col-aggregate">
+    <Select
+      id="dd-col-aggregate"
+      ariaLabel="Column aggregate"
+      value={aggregate ?? 'none'}
+      options={AGGREGATE_OPTIONS}
+      onchange={(v) =>
+        onAggregateChange?.(v === 'none' ? null : (v as 'sum' | 'count' | 'avg'))
+      }
     />
   </Field>
 </div>

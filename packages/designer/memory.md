@@ -362,6 +362,30 @@ already needed anyway would spread the same rule across three files instead
 of one).
 `[status: locked]`
 
+### D-024 — Per-column aggregate config lives on `DetailBand.aggregates`, never denormalized onto `DetailColumn`
+**Decision:** `ColumnProps.svelte`'s new "Aggregate (footer)" select reads/writes
+`DetailBand.aggregates` (an `Aggregate[]` keyed by `column`), not a new field on
+`DetailColumn` itself. `DocDesigner.handleColumnAggregateChange(columnIndex, fn)`
+looks up the column's name, then replaces (or removes) its one entry in
+`aggregates` by that name.
+**Why:** `core`'s `Aggregate` type (`{ column, fn, into: 'tfoot', label? }`) and
+`DetailBand.aggregates` already existed and were already fully wired into
+`render.ts`'s `renderDetailBand` (rendered into a real `<tfoot>`) before any
+designer UI touched this — only the authoring UI was missing. Respecting the
+existing core shape (rather than inventing a parallel `DetailColumn.aggregate`
+field) keeps `core` the single source of truth for the template shape, per
+`claude.md` §2's "types are imported from `@docsmith/core` — do not redefine."
+The canvas's `DetailTable.svelte` shows a live `<tfoot>` preview computed via
+`core.aggregate()` against the same real sample rows already loaded for the
+row-preview strip — never a fabricated total — shown only once sample rows are
+actually `ready` (not during loading/error/unavailable).
+**Rejected:** adding an `aggregate?: Aggregate['fn']` field directly to
+`DetailColumn` (simpler to wire in `ColumnProps`, but would create two sources
+of truth for the same fact and require a migration/sync step keeping a
+denormalized column field consistent with `DetailBand.aggregates` — `core`
+already made the "keyed array on the band" choice before Phase 3 started).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

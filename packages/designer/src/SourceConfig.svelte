@@ -92,6 +92,36 @@
       ? relatedState.data.filter((m) => !dataSource.datasets.some((d) => d.id === m.id))
       : [],
   );
+
+  // Raw-query (SQL) datasets (design.md §17 Phase 3 "multiple datasets + raw-query
+  // datasets"). No adapter method exists to list/validate these — they're purely
+  // authoring metadata the host's fetchDocument is expected to honor by id, the
+  // same "declarative, not executed here" contract as D-017's `ref.fkColumn`
+  // placeholder. Never sent anywhere or executed by the designer itself.
+  let sqlId = $state('');
+  let sqlLabel = $state('');
+  let sqlQuery = $state('');
+  let sqlError = $state<string | null>(null);
+
+  function addSqlDataset() {
+    const id = sqlId.trim();
+    const label = sqlLabel.trim();
+    const sql = sqlQuery.trim();
+    if (!id || !label || !sql) {
+      sqlError = 'Id, label, and SQL query are all required.';
+      return;
+    }
+    if (dataSource.datasets.some((d) => d.id === id)) {
+      sqlError = `A dataset with id “${id}” already exists.`;
+      return;
+    }
+    const next = datasetFromMeta({ id, label }, { sql });
+    onDataSourceChange({ ...dataSource, datasets: [...dataSource.datasets, next] });
+    sqlId = '';
+    sqlLabel = '';
+    sqlQuery = '';
+    sqlError = null;
+  }
 </script>
 
 <section class="dd-source-config" aria-label="Data source">
@@ -131,7 +161,10 @@
         <ul class="dd-dataset-list">
           {#each dataSource.datasets as ds (ds.id)}
             <li class="dd-dataset-item">
-              <span>{ds.label}</span>
+              <span>
+                {ds.label}
+                {#if ds.kind === 'sql'}<span class="dd-dataset-badge">SQL</span>{/if}
+              </span>
               <button
                 type="button"
                 class="dd-dataset-remove"
@@ -172,6 +205,32 @@
           {/each}
         </ul>
       {/if}
+
+      <div class="dd-sql-form">
+        <h4 class="dd-sql-form-title">Add a custom (SQL) dataset</h4>
+        <p class="dd-sql-form-hint">
+          Declares a named dataset your adapter's <code>fetchDocument</code> is expected
+          to populate by this id — the designer never runs this query itself.
+        </p>
+        <label class="dd-sql-field">
+          <span>Dataset id</span>
+          <input type="text" bind:value={sqlId} placeholder="e.g. top_customers" />
+        </label>
+        <label class="dd-sql-field">
+          <span>Label</span>
+          <input type="text" bind:value={sqlLabel} placeholder="e.g. Top Customers" />
+        </label>
+        <label class="dd-sql-field">
+          <span>SQL query</span>
+          <textarea bind:value={sqlQuery} rows="3" placeholder="SELECT ..."></textarea>
+        </label>
+        {#if sqlError}
+          <p class="dd-sql-error" role="alert">{sqlError}</p>
+        {/if}
+        <button type="button" class="dd-sql-add" onclick={addSqlDataset}>
+          + Add SQL dataset
+        </button>
+      </div>
     </div>
   {/if}
 </section>
@@ -267,6 +326,100 @@
 
   .dd-dataset-add:focus-visible,
   .dd-dataset-remove:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 2px;
+  }
+
+  .dd-dataset-badge {
+    margin-left: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--dd-accent);
+    background: var(--dd-accent-weak);
+    border-radius: 4px;
+    padding: 1px 4px;
+  }
+
+  .dd-sql-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--dd-border);
+  }
+
+  .dd-sql-form-title {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--dd-muted);
+  }
+
+  .dd-sql-form-hint {
+    margin: 0 0 4px;
+    font-size: 11px;
+    color: var(--dd-muted);
+  }
+
+  .dd-sql-form-hint code {
+    font-family: inherit;
+    background: var(--dd-panel-alt);
+    border-radius: 3px;
+    padding: 0 3px;
+  }
+
+  .dd-sql-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--dd-muted);
+  }
+
+  .dd-sql-field input,
+  .dd-sql-field textarea {
+    font: inherit;
+    font-size: 12px;
+    color: var(--dd-text);
+    background: var(--dd-panel);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    padding: 4px 6px;
+    resize: vertical;
+  }
+
+  .dd-sql-field input:focus-visible,
+  .dd-sql-field textarea:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+  }
+
+  .dd-sql-error {
+    margin: 0;
+    font-size: 11px;
+    color: var(--dd-danger);
+  }
+
+  .dd-sql-add {
+    align-self: flex-start;
+    border: 1px solid var(--dd-border);
+    background: var(--dd-panel);
+    color: var(--dd-text);
+    border-radius: var(--dd-radius);
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .dd-sql-add:hover {
+    background: var(--dd-panel-alt);
+  }
+
+  .dd-sql-add:focus-visible {
     outline: 2px solid var(--dd-accent);
     outline-offset: 2px;
   }

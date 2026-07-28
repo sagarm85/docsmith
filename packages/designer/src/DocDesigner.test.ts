@@ -630,6 +630,43 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('setting a column aggregate writes DetailBand.aggregates keyed by column (design.md §8.5 Phase 3)', async () => {
+    const el = await mountWithEntityAndDataset();
+
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Description column"]')!
+      .click();
+    await nextTick();
+
+    el.shadowRoot!.querySelector<HTMLTableCellElement>('th')!.click();
+    await nextTick();
+    expect(el.shadowRoot?.textContent).toContain('Column: description');
+
+    const aggSelect = el.shadowRoot!.querySelector<HTMLSelectElement>(
+      '[aria-label="Column aggregate"]',
+    );
+    expect(aggSelect).toBeTruthy();
+    aggSelect!.value = 'sum';
+    aggSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    const detail = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      aggregates?: Array<{ column: string; fn: string; into: string }>;
+    };
+    expect(detail.aggregates).toStrictEqual([{ column: 'description', fn: 'sum', into: 'tfoot' }]);
+
+    // Switching back to "None" removes the entry rather than leaving a stale one.
+    aggSelect!.value = 'none';
+    aggSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    const detailAfter = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      aggregates?: unknown[];
+    };
+    expect(detailAfter.aggregates).toStrictEqual([]);
+
+    el.remove();
+  });
+
   it('calls config.onChange (debounced) after an edit, not on every keystroke', async () => {
     vi.useFakeTimers();
     try {

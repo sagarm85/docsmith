@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     isDetailBand,
+    type Aggregate,
     type DetailBand,
     type DetailColumn,
     type FreeBand,
@@ -23,6 +24,7 @@
     onElementBringForward,
     onElementSendBack,
     onColumnChange,
+    onColumnAggregateChange,
     onBandChange,
     printSetup,
     onPrintSetupChange,
@@ -41,6 +43,7 @@
     onElementBringForward: (bandId: string, elementId: string) => void;
     onElementSendBack: (bandId: string, elementId: string) => void;
     onColumnChange: (columnIndex: number, patch: Partial<DetailColumn>) => void;
+    onColumnAggregateChange: (columnIndex: number, fn: Aggregate['fn'] | null) => void;
     onBandChange: (bandId: string, patch: Partial<FreeBand>) => void;
     printSetup: PrintSetupType;
     onPrintSetupChange: (next: PrintSetupType) => void;
@@ -71,6 +74,14 @@
     if (selection?.kind !== 'column') return null;
     const detail = template.bands.find((b) => isDetailBand(b)) as DetailBand | undefined;
     return detail?.columns[selection.columnIndex] ?? null;
+  });
+
+  const selectedColumnAggregate = $derived.by(() => {
+    if (selection?.kind !== 'column') return null;
+    const detail = template.bands.find((b) => isDetailBand(b)) as DetailBand | undefined;
+    const col = detail?.columns[selection.columnIndex];
+    if (!col) return null;
+    return detail?.aggregates?.find((a) => a.column === col.column)?.fn ?? null;
   });
 
   const selectedBand = $derived.by(() => {
@@ -121,6 +132,8 @@
         <ColumnProps
           column={selectedColumn}
           onChange={(patch) => onColumnChange(columnIndex, patch)}
+          aggregate={selectedColumnAggregate}
+          onAggregateChange={(fn) => onColumnAggregateChange(columnIndex, fn)}
         />
       {:else if selection?.kind === 'band' && selectedBand}
         {@const bandId = selection.bandId}

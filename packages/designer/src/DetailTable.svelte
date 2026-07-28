@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Align, DataSourceAdapter, DetailBand, DetailColumn, ValueFormat } from '@docsmith/core';
+  import { aggregate, formatValue, type Align, type DataSourceAdapter, type DetailBand, type DetailColumn, type ValueFormat } from '@docsmith/core';
   import { createDetailColumn } from './template-edits.js';
   import Select from './ui/Select.svelte';
   import NumberInput from './ui/NumberInput.svelte';
@@ -238,6 +238,24 @@
             {/each}
           </tr>
         </thead>
+        {#if band.aggregates?.length && sampleState.status === 'ready'}
+          <!-- Real sample-row aggregate preview (never fabricated) — matches
+               core.renderToHtml's thead/tfoot/tbody source order; the browser
+               renders tfoot at the bottom regardless (native table semantics),
+               same as the printed output will. -->
+          <tfoot>
+            <tr>
+              {#each band.columns as col (col.column)}
+                {@const agg = band.aggregates?.find((a) => a.column === col.column)}
+                <td style="text-align:{col.align ?? 'left'};font-weight:700">
+                  {#if agg}
+                    {formatValue(aggregate(sampleState.rows, agg.column, agg.fn), col.format ?? 'number')}
+                  {/if}
+                </td>
+              {/each}
+            </tr>
+          </tfoot>
+        {/if}
         <tbody>
           {#if sampleState.status === 'loading'}
             <tr>

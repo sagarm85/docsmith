@@ -98,4 +98,87 @@ describe('SourceConfig', () => {
     const removed = onDataSourceChange.mock.calls.at(-1)?.[0] as DataSource;
     expect(removed.datasets).toStrictEqual([]);
   });
+
+  async function selectInvoice(onDataSourceChange = vi.fn()) {
+    const adapter = makeAdapter();
+    const { rerender } = render(SourceConfig, {
+      props: { adapter, dataSource: emptyDataSource(), onDataSourceChange },
+    });
+    await waitFor(() => expect(screen.getByLabelText('Entity')).toBeTruthy());
+    await fireEvent.change(screen.getByLabelText('Entity'), { target: { value: 'invoice' } });
+    await rerender({
+      adapter,
+      dataSource: { entity: 'invoice', key: 'id', datasets: [] },
+      onDataSourceChange,
+    });
+    await waitFor(() => expect(screen.getByText('Add a custom (SQL) dataset')).toBeTruthy());
+    return { adapter, rerender };
+  }
+
+  it('adds a raw-query (SQL) dataset with kind:"sql" and the given id/label/query', async () => {
+    const onDataSourceChange = vi.fn();
+    await selectInvoice(onDataSourceChange);
+
+    await fireEvent.input(screen.getByPlaceholderText('e.g. top_customers'), {
+      target: { value: 'top_customers' },
+    });
+    await fireEvent.input(screen.getByPlaceholderText('e.g. Top Customers'), {
+      target: { value: 'Top Customers' },
+    });
+    await fireEvent.input(screen.getByPlaceholderText('SELECT ...'), {
+      target: { value: 'SELECT * FROM customers ORDER BY total DESC LIMIT 5' },
+    });
+    await fireEvent.click(screen.getByRole('button', { name: '+ Add SQL dataset' }));
+
+    const added = onDataSourceChange.mock.calls.at(-1)?.[0] as DataSource;
+    expect(added.datasets).toStrictEqual([
+      {
+        id: 'top_customers',
+        label: 'Top Customers',
+        kind: 'sql',
+        ref: { sql: 'SELECT * FROM customers ORDER BY total DESC LIMIT 5' },
+      },
+    ]);
+  });
+
+  it('rejects an incomplete SQL dataset form without calling onDataSourceChange', async () => {
+    const onDataSourceChange = vi.fn();
+    await selectInvoice(onDataSourceChange);
+    onDataSourceChange.mockClear();
+
+    await fireEvent.click(screen.getByRole('button', { name: '+ Add SQL dataset' }));
+
+    expect(onDataSourceChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toContain('required');
+  });
+
+  it('rejects a SQL dataset id that collides with an existing dataset', async () => {
+    const onDataSourceChange = vi.fn();
+    const { adapter, rerender } = await selectInvoice(onDataSourceChange);
+
+    await rerender({
+      adapter,
+      dataSource: {
+        entity: 'invoice',
+        key: 'id',
+        datasets: [{ id: 'invoice_items', label: 'Line items', kind: 'fk', ref: { table: 'invoice_items', fkColumn: '' } }],
+      },
+      onDataSourceChange,
+    });
+    onDataSourceChange.mockClear();
+
+    await fireEvent.input(screen.getByPlaceholderText('e.g. top_customers'), {
+      target: { value: 'invoice_items' },
+    });
+    await fireEvent.input(screen.getByPlaceholderText('e.g. Top Customers'), {
+      target: { value: 'Dup' },
+    });
+    await fireEvent.input(screen.getByPlaceholderText('SELECT ...'), {
+      target: { value: 'SELECT 1' },
+    });
+    await fireEvent.click(screen.getByRole('button', { name: '+ Add SQL dataset' }));
+
+    expect(onDataSourceChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toContain('already exists');
+  });
 });

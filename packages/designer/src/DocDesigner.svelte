@@ -12,6 +12,7 @@
     newTemplate,
     redo,
     undo,
+    type Aggregate,
     type Band,
     type DataSource,
     type DetailColumn,
@@ -362,6 +363,22 @@
     });
   }
 
+  // D-024: aggregates live on DetailBand.aggregates (core's shape), keyed by
+  // column name — not denormalized onto DetailColumn — so this replaces any
+  // existing entry for the column rather than patching one in place.
+  function handleColumnAggregateChange(columnIndex: number, fn: Aggregate['fn'] | null) {
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) => {
+        if (!isDetailBand(b)) return b;
+        const col = b.columns[columnIndex];
+        if (!col) return b;
+        const rest = (b.aggregates ?? []).filter((a) => a.column !== col.column);
+        return { ...b, aggregates: fn ? [...rest, { column: col.column, fn, into: 'tfoot' }] : rest };
+      }),
+    });
+  }
+
   function handleBandChange(bandId: string, patch: Partial<FreeBand>) {
     commitTemplate({
       ...template,
@@ -579,6 +596,7 @@
               onElementBringForward={handleElementBringForward}
               onElementSendBack={handleElementSendBack}
               onColumnChange={handleColumnChange}
+              onColumnAggregateChange={handleColumnAggregateChange}
               onBandChange={handleBandChange}
               printSetup={template.printSetup}
               onPrintSetupChange={handlePrintSetupChange}
