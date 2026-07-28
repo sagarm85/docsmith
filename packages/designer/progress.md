@@ -8,26 +8,52 @@
 
 ## Now / Next / Notes
 
-- **Now:** Export PDF and browser Print are wired for real, closing out Phase 1's
-  MVP-shell component list. `docId` moved out of `Preview` and up into
-  `DocDesigner` (a controlled prop) so the main Toolbar's Export PDF button —
-  outside Preview — can share it. Export PDF is disabled (not hidden) until
-  `renderServiceUrl` + a chosen `entity` + a `docId` are all present; when
-  enabled, it re-fetches the document via the adapter and `POST`s `{ template,
-  data }` (push mode — see D-019 in `memory.md`: the server's pull mode needs a
-  serializable `RestConfig`, which only `RestAdapter` has) to
-  `` `${renderServiceUrl}/render` ``, downloads the returned PDF blob, and shows
-  a success/error `Toast` (error suggests falling back to Print, per `design.md`
-  §9). Print is a button inside `Preview.svelte` itself (disabled until a
-  document has actually loaded) calling `iframe.contentWindow.print()` directly
-  — simplest correct placement since only `Preview` holds the iframe reference.
-  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
-  (`dist/doc-designer.js` ~189KB / ~50KB gzip; 48 tests).
-- **Next:** The pagination gate (`claude.md` §8) — verify with a ≥40-row
-  document that the column header repeats on page 2+, no row splits across a
-  page break, `reportHeader`/`totals` print once, and A4↔Letter/portrait↔
-  landscape/margins change page geometry. This is the last item before Phase 1
-  can be marked done.
+- **Now: Phase 1 (MVP shell) is DONE.** The pagination gate (`claude.md` §8)
+  passed with real, programmatic evidence (not just a manual eyeball check) —
+  see "Pagination gate evidence" below. Every Phase 1 checklist item is
+  checked off.
+- **Next:** Phase 2 (Full WYSIWYG) — free-form drag/move/resize with grid snap
+  and smart guides, the full `Properties` panel (`ElementProps`/`ColumnProps`/
+  `BandProps`), `pageHeader`/`pageFooter` bands, image/logo elements, the
+  undo/redo command stack, template list/rename/delete, `onChange` autosave,
+  and the keyboard drag-alternative (pick up chip → arrow to band → drop). Also
+  carries forward from Phase 1: wiring `doc-save`/`doc-change` `CustomEvent`
+  dispatch (see notes below) and the static "Blocks" palette group.
+- **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
+  `@docsmith/render-service`, started it locally, and ran
+  `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
+  `StaticAdapter` invoice fixture through the actual Puppeteer pipeline (the
+  same `core.renderToHtml` the designer's `Preview.svelte`/Export PDF call —
+  D-009 single renderer — so this transitively verifies the designer's own
+  pipeline, not just the backend in isolation). Parsed the resulting
+  `out.pdf` with `pdfjs-dist` (installed ad hoc in the scratchpad directory
+  for this verification only — never added to any package.json) instead of
+  trusting a raw-bytes string search, since Chromium's PDF text uses
+  glyph-indexed subset fonts that don't contain literal ASCII in the raw
+  stream bytes:
+  - **3 pages.** Page 1: 26 rows (100–125) + "INVOICE"/"INV-1001"
+    (`reportHeader`) + the "Description" column header. Page 2: 32 rows
+    (126–157) + "Description" header **repeats**, no `reportHeader` text.
+    Page 3: 2 rows (158–159) + "Description" header repeats again + "Payment
+    due within 30 days" (`totals` text, printing once, after the last row).
+  - **No split/duplicated/dropped rows:** extracted all 60
+    `Widget model X-NNNN` row markers across all 3 pages — 60 unique values,
+    contiguous 100→159, zero gaps, zero duplicates.
+  - **Geometry actually changes:** re-rendered the same template+data via
+    the render service with different `printSetup`s and measured real PDF
+    page dimensions with `pdfjs-dist`: A4 portrait → 210.2×297.0mm (3
+    pages); Letter landscape → 279.4×215.9mm, correctly swapped (4 pages —
+    less vertical room per page, a real geometry-driven page-count change);
+    A4 portrait with 40mm margins → same page size (correct — margins don't
+    change page dimensions) but a different row distribution (26/33/1 vs.
+    the base 26/32/2), confirming margins do change the usable content area.
+    All three variants still passed the same zero-gaps/zero-duplicates row
+    check independently.
+  - Scripts used were throwaway (`/tmp`, scratchpad) and are not part of this
+    change; reproduce via `pnpm --filter @docsmith/render-service build`,
+    run `node packages/render-service/dist/server.js`, then
+    `RENDER_URL=http://localhost:8090 pnpm demo` and inspect `out.pdf` with
+    any PDF text-extraction tool.
 - **Notes / open questions:**
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
@@ -113,7 +139,7 @@
       serves `packages/designer/dev`, which imports the same
       `examples/invoice-demo/fixtures.mjs` (60-line invoice) the backend demo uses
 
-## Phase 1 — MVP shell (end-to-end, real data, multi-page PDF)
+## Phase 1 — MVP shell (end-to-end, real data, multi-page PDF) — ✅ DONE 2026-07-28
 
 - [x] `Toolbar.svelte` — name, Design/Preview toggle, Save, Export PDF (undo/redo stubbed)
 - [x] `Palette.svelte` + `SourceConfig.svelte` — entity dropdown from `listEntities`;
@@ -127,7 +153,7 @@
 - [x] `PrintSetup.svelte` — page size/orientation/margins + repeat/keep toggles → `printSetup`
 - [x] `Preview.svelte` — doc-id control; iframe renders `core.renderToHtml(template,data)`
 - [x] Browser **Print** works; **Export PDF** posts to render service and downloads
-- [ ] **Pagination gate passed** (claude.md §8): ≥40-row doc, header repeats, no split row
+- [x] **Pagination gate passed** (claude.md §8): ≥40-row doc, header repeats, no split row
 - [x] localStorage default persistence when no `onSave` supplied
 
 ## Phase 2 — Full WYSIWYG
@@ -172,6 +198,20 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Phase 1 (MVP shell) DONE — pagination gate passed.** Verified
+  the `claude.md` §8 gate with real evidence, not a manual eyeball check: built
+  `@docsmith/render-service`, rendered the 60-row `StaticAdapter` invoice
+  fixture through the actual Puppeteer pipeline (same `core.renderToHtml` the
+  designer's own `Preview`/Export PDF call — D-009), and parsed the resulting
+  PDF with `pdfjs-dist` (ad hoc, scratchpad-only, not added to any
+  package.json). Result: 3 pages; column header repeats on every page;
+  `reportHeader` appears only on page 1; `totals` appears only on the last
+  page; all 60 line-item rows present exactly once, contiguous, no
+  splits/duplicates/gaps. Re-rendered with A4 portrait / Letter landscape / A4
+  with 40mm margins and confirmed real PDF page dimensions and row
+  distribution actually change accordingly. Full details and repro steps in
+  the "Pagination gate evidence" note above. All 11 Phase 1 checklist items
+  are now checked off.
 - **2026-07-28 — Export PDF + browser Print.** `docId` state moved from
   `Preview` up to `DocDesigner` (now a controlled `docId`/`onDocIdChange` prop
   pair on `Preview`) so the Toolbar's Export PDF button can share it.
