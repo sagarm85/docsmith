@@ -386,6 +386,108 @@ denormalized column field consistent with `DetailBand.aggregates` — `core`
 already made the "keyed array on the band" choice before Phase 3 started).
 `[status: locked]`
 
+### D-025 — Visual design system revised for approachability (supersedes design.md §11's original "calm/restrained" framing)
+**Decision:** The designer chrome's visual language moves from "Figma/Linear
+restraint, not a colorful SaaS dashboard" to **approachable and
+self-explanatory at a glance** — closer to how a polished consumer builder
+(the user's reference point: Mailchimp's email designer) presents structure.
+Concretely: bound-field elements get a visible chip treatment instead of bare
+`{label}` text; every band gets a card (tint background + accent edge, not
+just a small tab label); detail-table column controls (Format/Align/Width)
+get visible captions instead of stacking unlabeled; toolbar/palette/band
+entries get inline-SVG icons alongside labels. Full detail in `design.md` §11
+(now annotated with this decision at the top).
+**Why:** Real usage (a screenshot of the live designer, reviewed 2026-07-28)
+showed the original restrained style reading as bare/confusing rather than
+calm: raw `{Invoice #}`-style tokens looked like unrendered template code, the
+detail-table header packed `Text ▾ / Left ▾ / 300` with no labels so a
+first-time user had no way to know those were format/align/width controls,
+and bands were separated only by a small gray uppercase tab with no visual
+card boundary. The user explicitly asked for a fuller redesign toward a more
+approachable feel rather than only patching those three specific spots.
+**Scope boundary (what did NOT change):** the banded-hybrid layout *model*
+(D-002) is untouched — this is a color/spacing/labeling/iconography pass
+only, not an architecture change. No CSS framework or UI kit was added (§3's
+forbidden-dependency list is unaffected) — richer visuals are still hand-rolled
+token CSS + component `<style>` blocks, same as before. Light/dark theming via
+`--dd-*` custom properties and host `theme` overrides still work exactly as
+before; new tokens (`--dd-accent-strong`, `--dd-band-tint`, `--dd-radius-sm`)
+were *added* to the existing sheet, not a replacement of it.
+**Rejected:** a narrower "targeted usability fixes" pass (label the controls,
+chip the tokens, add band borders, stop there) — offered as a lower-risk
+option but explicitly not what the user chose; a literal free-form
+Mailchimp-style *layout* (rejected outright — that's D-002's territory, which
+stays locked, since a document's line-item table still needs the banded
+pagination contract a free-form email canvas can't express).
+`[status: locked]`
+
+### D-026 — Band-tint tokens (`--dd-hero`/`--dd-run`/`--dd-totals` and their `-weak` variants) never redefine for dark mode
+**Decision:** The new D-025 band-card tint tokens are defined exactly once
+(in `:host`'s base block) and are **not** redefined under `@media
+(prefers-color-scheme: dark)` or either `:host([data-dd-theme=...])`
+override block. `--dd-ok` itself is untouched and stays theme-reactive as
+before (Toast still needs a brighter green in dark mode); the totals band
+uses its own new `--dd-totals`/`--dd-totals-weak` pair instead of reusing
+`--dd-ok`/`--dd-ok-weak` directly, so the two uses (canvas paper vs. app
+chrome) can have independent theming rules under one token each.
+**Why:** Caught by an actual dark-mode screenshot (not just code review):
+`--dd-ok-weak`'s dark value is a near-black green, and `FreeElement.svelte`'s
+text elements have always used a hardcoded `color: #222` (never a `--dd-*`
+token) — safe only because every band body was previously hardcoded
+`background: #fff` regardless of theme. Making the totals-band tint
+theme-reactive silently made "Grand Total" text invisible in dark mode. Root
+cause was violating design.md §11's pre-existing, still-true principle: "the
+canvas page is pure white... regardless of theme (a document is white
+paper)" — band tints are part of that paper, not the surrounding app chrome,
+so they must stay visually constant even when the rest of the UI goes dark.
+**Rejected:** making `FreeElement.svelte`'s text color theme-reactive instead
+(would fix the immediate bug, but implies the canvas itself becomes a
+dark-mode surface, contradicting the "paper is always paper" principle and
+requiring the whole canvas rendering to become theme-aware, not just tints).
+`[status: locked]`
+
+### D-027 — Component `<style>` `@import` for tokens.css only works reliably in the production build; the local `pnpm dev` harness needs a same-shape redirect shim
+**Decision:** `DocDesigner.svelte`'s `<style>` block keeps a plain `@import
+'./ui/tokens.css';` (unchanged — this is what a real host consuming the
+published `dist/doc-designer.js` actually gets, and it works correctly
+there). For **this repo's own** `pnpm --filter @docsmith/designer dev`
+harness only, added `packages/designer/dev/ui/tokens.css` containing a single
+`@import '../../src/ui/tokens.css';` redirect line — dev-only scaffolding,
+excluded from the published package (`package.json`'s `files` is
+`["dist","src"]`, `dev/` isn't in it).
+**Why:** Found by finally taking a real screenshot of the dev harness (never
+done in any prior session — `progress.md`'s Phase 1 notes even flagged this
+gap explicitly). Every `--dd-*` token silently resolved to nothing there —
+all text black, no accent colors, no band tints — with zero console errors
+to point at the cause. Root cause: `vite-plugin-svelte`'s custom-element
+compilation embeds a component's `<style>` content as a literal JS string
+that gets appended into the shadow root at runtime; only `vite build`
+performs the CSS-bundling pass that resolves and inlines `@import` into that
+string ahead of time. In `pnpm dev`, the `@import` text survives verbatim
+into the browser, which then resolves its relative URL against **the page's
+own location** (not `DocDesigner.svelte`'s location) — and because
+`vite.config.ts` sets `root: 'dev'` for the serve command, the page lives at
+`packages/designer/dev/index.html`, so `./ui/tokens.css` resolves to
+`packages/designer/dev/ui/tokens.css`, not the real file at
+`packages/designer/src/ui/tokens.css`. That path didn't exist, so Vite's
+dev-server SPA-fallback silently served `index.html` there instead — a plain
+200 response with HTML content, which the CSS parser discards as invalid
+with no visible error. The redirect shim works because a *directly-requested*
+`.css` file (as opposed to one embedded inside a compiled JS string) genuinely
+goes through Vite's own CSS-transform pipeline, which resolves nested
+`@import`s correctly even in dev-serve mode.
+**Rejected:** importing tokens.css as a string in `DocDesigner.svelte`'s
+`<script>` (via `?inline`/`?raw`) and injecting a real `<style>` element at
+runtime via a Svelte action — functionally would have worked and avoids the
+dev/build asymmetry entirely, but broke `svelte-check`: its `vite-preprocess`
+step appears to scan the *whole compiled file* (script comments included, not
+just markup) for CSS content whenever a `.css`-suffixed import exists
+anywhere in the script block, and throws confusing PostCSS parse errors on
+ordinary English words in unrelated comments. Not worth fighting given the
+dev-only shim is simpler, smaller, and fixes the actual problem without
+touching the component that ships to real hosts at all.
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

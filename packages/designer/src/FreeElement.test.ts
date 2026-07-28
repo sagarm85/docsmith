@@ -45,11 +45,11 @@ function pointerUp() {
 }
 
 describe('FreeElement', () => {
-  it('renders a field element as a {label} token and is labelled for a11y', () => {
+  it('renders a field element as a bound-field chip (D-025) and is labelled for a11y', () => {
     render(FreeElementView, {
       props: { element: fieldElement(), selected: false, bandLabel: 'Report Header', ...callbacks() },
     });
-    expect(screen.getByText('{Invoice #}')).toBeTruthy();
+    expect(screen.getByText('Invoice #')).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Invoice # field, Report Header, x 0 y 0' }),
     ).toBeTruthy();

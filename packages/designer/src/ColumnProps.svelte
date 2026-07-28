@@ -3,6 +3,7 @@
   import Field from './ui/Field.svelte';
   import NumberInput from './ui/NumberInput.svelte';
   import Select from './ui/Select.svelte';
+  import Icon from './ui/Icon.svelte';
 
   let {
     column,
@@ -40,7 +41,7 @@
 </script>
 
 <div class="dd-column-props">
-  <h3 class="dd-props-title">Column: {column.column}</h3>
+  <h3 class="dd-props-title"><Icon name="table" size={13} />Column: {column.column}</h3>
 
   <Field label="Header text" fieldId="dd-col-header">
     <input
@@ -105,6 +106,9 @@
   }
 
   .dd-props-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
     font-size: 12px;
     font-weight: 600;

@@ -45,7 +45,7 @@ describe('Band', () => {
     expect(screen.getByText(/Drag header fields here/)).toBeTruthy();
   });
 
-  it('renders existing field elements as a {label} token', () => {
+  it('renders existing field elements as a bound-field chip', () => {
     const band: FreeBand = {
       id: 'reportHeader',
       type: 'reportHeader',
@@ -66,7 +66,7 @@ describe('Band', () => {
     render(Band, {
       props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...selectionCallbacks() },
     });
-    expect(screen.getByText('{Invoice #}')).toBeTruthy();
+    expect(screen.getByText('Invoice #')).toBeTruthy();
   });
 
   it('accepts a header-field drop and appends a bound element', async () => {
@@ -152,8 +152,8 @@ describe('Band', () => {
     render(Band, {
       props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...selectionCallbacks() },
     });
-    expect(screen.getByText('{A}')).toBeTruthy();
-    expect(screen.getByText('{B}')).toBeTruthy();
+    expect(screen.getByText('A')).toBeTruthy();
+    expect(screen.getByText('B')).toBeTruthy();
   });
 
   it('selecting an element and pressing Delete removes it', async () => {

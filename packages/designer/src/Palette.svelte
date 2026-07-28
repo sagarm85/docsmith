@@ -5,6 +5,8 @@
   import SourceConfig from './SourceConfig.svelte';
   import FieldGroup from './FieldGroup.svelte';
   import Collapsible from './ui/Collapsible.svelte';
+  import Icon from './ui/Icon.svelte';
+  import type { IconName } from './ui/icons.js';
 
   let {
     adapter,
@@ -34,11 +36,11 @@
 
   let search = $state('');
 
-  const BLOCKS: Array<{ kind: BlockKind; label: string; glyph: string }> = [
-    { kind: 'text', label: 'Text', glyph: 'T' },
-    { kind: 'image', label: 'Image', glyph: '🖼' },
-    { kind: 'line', label: 'Line', glyph: '―' },
-    { kind: 'box', label: 'Box', glyph: '▭' },
+  const BLOCKS: Array<{ kind: BlockKind; label: string; icon: IconName }> = [
+    { kind: 'text', label: 'Text', icon: 'text' },
+    { kind: 'image', label: 'Image', icon: 'image' },
+    { kind: 'line', label: 'Line', icon: 'line' },
+    { kind: 'box', label: 'Box', icon: 'box' },
   ];
 
   function handleBlockDragStart(e: DragEvent, kind: BlockKind) {
@@ -62,7 +64,7 @@
   <SourceConfig {adapter} {dataSource} {onDataSourceChange} />
 
   <div class="dd-blocks">
-    <Collapsible title="Blocks">
+    <Collapsible title="Blocks" icon="palette">
       {#each BLOCKS as block (block.kind)}
         <!-- Same intentional pattern as FieldChip.svelte: role="group" is
              accurate, and the chip is ALSO the keyboard pickup target per
@@ -79,7 +81,7 @@
           ondragstart={(e) => handleBlockDragStart(e, block.kind)}
           onkeydown={(e) => handleBlockKeydown(e, block.kind)}
         >
-          <span class="dd-chip-glyph" aria-hidden="true">{block.glyph}</span>
+          <span class="dd-chip-glyph" aria-hidden="true"><Icon name={block.icon} size={12} /></span>
           <span class="dd-chip-label">{block.label}</span>
           <button
             type="button"

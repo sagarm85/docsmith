@@ -1,5 +1,6 @@
 <script lang="ts">
   import { defaultFormatForType, type FieldMeta } from '@docsmith/core';
+  import Icon from './ui/Icon.svelte';
 
   let {
     field,
@@ -20,10 +21,6 @@
   } = $props();
 
   const format = $derived(defaultFormatForType(field.type));
-
-  const typeGlyph = $derived(
-    format === 'currency' ? '$' : format === 'date' ? '📅' : format === 'number' ? '#' : 'T',
-  );
 
   const addLabel = $derived(
     cls === 'header' ? `Add ${field.label} to report header` : `Add ${field.label} column`,
@@ -69,7 +66,17 @@
   ondragstart={handleDragStart}
   onkeydown={handleKeydown}
 >
-  <span class="dd-chip-glyph" aria-hidden="true">{typeGlyph}</span>
+  <span class="dd-chip-glyph" aria-hidden="true">
+    {#if format === 'currency'}
+      $
+    {:else if format === 'date'}
+      <Icon name="calendar" size={11} />
+    {:else if format === 'number'}
+      <Icon name="hash" size={11} />
+    {:else}
+      T
+    {/if}
+  </span>
   <span class="dd-chip-label">{field.label}</span>
   <button
     type="button"

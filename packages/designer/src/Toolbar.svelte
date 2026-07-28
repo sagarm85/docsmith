@@ -1,5 +1,6 @@
 <script lang="ts">
   import Button from './ui/Button.svelte';
+  import Icon from './ui/Icon.svelte';
   import TemplateList from './TemplateList.svelte';
 
   type Mode = 'design' | 'preview';
@@ -101,7 +102,7 @@
       disabled={!canUndo || !onUndo}
       onclick={onUndo}
     >
-      &#8630;
+      <Icon name="undo" size={15} />
     </button>
     <button
       type="button"
@@ -110,12 +111,14 @@
       disabled={!canRedo || !onRedo}
       onclick={onRedo}
     >
-      &#8631;
+      <Icon name="redo" size={15} />
     </button>
     <Button variant="secondary" disabled={saving} onclick={onSave}>
+      <Icon name="save" size={14} />
       {saving ? 'Saving…' : 'Save'}
     </Button>
     <Button variant="primary" disabled={!onExportPdf || exporting} onclick={onExportPdf}>
+      <Icon name="export" size={14} />
       {exporting ? 'Exporting…' : 'Export PDF'}
     </Button>
   </div>

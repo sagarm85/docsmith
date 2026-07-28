@@ -124,6 +124,44 @@
   variant for host frameworks that prefer events isn't wired yet); asset
   upload for the Image element (memory.md O-1, still open — URL-based images
   work today).
+- **Now (Phase 3 interlude) — cross-cutting visual redesign (D-025/D-026/D-027).**
+  The user flagged the UI as unapproachable versus a polished consumer builder
+  (a real screenshot showed raw `{Invoice #}`-style tokens, unlabeled stacked
+  detail-column controls, and bands distinguished only by a tiny gray tab).
+  Shown a static mockup of the proposed direction first and got explicit
+  approval for a *fuller* redesign (not just the 3 spot-fixes) before touching
+  any component. Landed: new shared `src/ui/Icon.svelte` + `icons.ts`
+  (hand-authored stroke-based SVG paths, house style, no icon
+  library/dependency); bound-field elements now render as a real chip
+  (icon + label, `--dd-mono`, accent-tinted) instead of bare `{label}` text
+  (`FreeElement.svelte`); every band is now a card — tinted background +
+  colored left-edge bar + icon in its tab (`Band.svelte`/`DetailTable.svelte`,
+  new tokens `--dd-hero`/`--dd-run`/`--dd-totals` + `-weak` pairs); detail-table
+  column controls got visible "Format"/"Align"/"Width (px)" captions instead of
+  stacking unlabeled; Toolbar/Palette/Properties/PrintSetup/ElementProps/
+  ColumnProps/BandProps all gained icons and tighter section grouping.
+  **Two real bugs caught only by actually looking at rendered output** (not
+  just jsdom tests, which don't visually render CSS): (1) the new band tints
+  went theme-reactive and made "Grand Total" text invisible in dark mode
+  against a near-black totals-band background, since `FreeElement.svelte`'s
+  text has always been a hardcoded `#222` — fixed by making band-tint tokens
+  theme-*constant* (D-026), consistent with design.md §11's pre-existing "the
+  canvas page is white paper regardless of theme" rule; (2) `pnpm --filter
+  @docsmith/designer dev` turned out to have been completely unstyled this
+  entire project (every `--dd-*` token silently failed to resolve, zero console
+  errors) — `DocDesigner.svelte`'s `@import './ui/tokens.css'` only gets
+  inlined by `vite build`; in dev-serve mode the browser tries to resolve it
+  against the *page's* URL, hits Vite's SPA-fallback `index.html` instead of
+  the real file, and silently discards the bogus "CSS." Fixed with a dev-only
+  redirect shim at `packages/designer/dev/ui/tokens.css` (D-027) — the
+  published component and its consumers were never affected, only this
+  repo's own local dev command. Verified visually with real browser
+  screenshots (Puppeteer, already a transitive dependency via
+  `@docsmith/render-service` — no new dependency added) against both the
+  production build and the fixed dev harness, light and dark, before and
+  after the fixes. 106 tests pass (unchanged — this was markup/CSS only, one
+  test's stale `{label}` assertion updated); lint/typecheck/build all green
+  (`dist/doc-designer.js` ~281KB / ~69KB gzip).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -328,6 +366,22 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Cross-cutting visual redesign (D-025/D-026/D-027).** Full
+  design plan + before/after covered in the "Now" note above. Amended
+  `design.md` §11 (visual design system revised for approachability, D-025 —
+  banded-hybrid layout model D-002 unchanged, no CSS framework added). New
+  `src/ui/Icon.svelte` + `icons.ts`; bound-field chips replace raw `{label}`
+  text (`FreeElement.svelte`); band cards with tint + accent edge + icon
+  (`Band.svelte`/`DetailTable.svelte`); labeled detail-column controls;
+  icons across Toolbar/Palette/Properties/PrintSetup/Element·Column·BandProps.
+  Found and fixed two real bugs via actual browser screenshots (not just
+  jsdom): dark-mode band tints made "Grand Total" text invisible (D-026, band
+  tints made theme-constant, matching design.md's "paper stays white
+  regardless of theme" rule); `pnpm --filter @docsmith/designer dev` had been
+  completely unstyled this whole project — `@import` only gets inlined by
+  `vite build`, not dev-serve — fixed with a dev-only redirect shim (D-027,
+  never affected real consumers of the published component). 106 tests pass;
+  lint/typecheck/build all green (`dist/doc-designer.js` ~281KB / ~69KB gzip).
 - **2026-07-28 — Phase 3 started: raw-query datasets + per-column aggregates.**
   `SourceConfig.svelte` gained an "Add a custom (SQL) dataset" form (dataset
   id, label, SQL query text) building a `kind:'sql'` `TemplateDataset` via

@@ -2,6 +2,8 @@
   import { isDetailBand, type Band, type DetailBand, type FreeBand } from '@docsmith/core';
   import Field from './ui/Field.svelte';
   import NumberInput from './ui/NumberInput.svelte';
+  import Icon from './ui/Icon.svelte';
+  import type { IconName } from './ui/icons.js';
 
   let {
     band,
@@ -19,11 +21,19 @@
     pageFooter: 'Page Footer',
   };
 
+  const BAND_ICON: Record<Band['type'], IconName> = {
+    reportHeader: 'doc',
+    pageHeader: 'repeat',
+    detail: 'table',
+    totals: 'calculator',
+    pageFooter: 'repeat',
+  };
+
   const isOptional = $derived(band.type === 'pageHeader' || band.type === 'pageFooter');
 </script>
 
 <div class="dd-band-props">
-  <h3 class="dd-props-title">{BAND_LABEL[band.type]} band</h3>
+  <h3 class="dd-props-title"><Icon name={BAND_ICON[band.type]} size={13} />{BAND_LABEL[band.type]} band</h3>
 
   {#if isDetailBand(band)}
     {@const detail = band as DetailBand}
@@ -80,6 +90,9 @@
   }
 
   .dd-props-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
     font-size: 12px;
     font-weight: 600;

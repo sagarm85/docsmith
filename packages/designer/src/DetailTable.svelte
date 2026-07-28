@@ -5,6 +5,7 @@
   import NumberInput from './ui/NumberInput.svelte';
   import Skeleton from './ui/Skeleton.svelte';
   import ErrorInline from './ui/ErrorInline.svelte';
+  import Icon from './ui/Icon.svelte';
 
   type DragPayload = {
     cls: 'header' | 'dataset';
@@ -174,6 +175,7 @@
     data-band-id={band.id}
     onclick={onSelectBand}
   >
+    <Icon name="table" size={12} />
     Detail (line items)
   </button>
   <div
@@ -187,6 +189,7 @@
   >
     {#if band.columns.length === 0}
       <p class="dd-band-empty">
+        <Icon name="plus" size={13} />
         Drag line-item fields here, or use a field's “+” button, to add table columns.
       </p>
     {:else}
@@ -214,25 +217,34 @@
                   </button>
                 </div>
                 <div class="dd-col-controls">
-                  <Select
-                    ariaLabel={`${col.header} format`}
-                    value={col.format ?? 'text'}
-                    options={FORMAT_OPTIONS}
-                    onchange={(v) => updateColumn(i, { format: v as ValueFormat })}
-                  />
-                  <Select
-                    ariaLabel={`${col.header} alignment`}
-                    value={col.align ?? 'left'}
-                    options={ALIGN_OPTIONS}
-                    onchange={(v) => updateColumn(i, { align: v as Align })}
-                  />
-                  <NumberInput
-                    ariaLabel={`${col.header} width`}
-                    value={col.width}
-                    min={20}
-                    max={800}
-                    onchange={(v) => updateColumn(i, { width: v })}
-                  />
+                  <div class="dd-ctrl">
+                    <span class="dd-ctrl-label">Format</span>
+                    <Select
+                      ariaLabel={`${col.header} format`}
+                      value={col.format ?? 'text'}
+                      options={FORMAT_OPTIONS}
+                      onchange={(v) => updateColumn(i, { format: v as ValueFormat })}
+                    />
+                  </div>
+                  <div class="dd-ctrl">
+                    <span class="dd-ctrl-label">Align</span>
+                    <Select
+                      ariaLabel={`${col.header} alignment`}
+                      value={col.align ?? 'left'}
+                      options={ALIGN_OPTIONS}
+                      onchange={(v) => updateColumn(i, { align: v as Align })}
+                    />
+                  </div>
+                  <div class="dd-ctrl">
+                    <span class="dd-ctrl-label">Width (px)</span>
+                    <NumberInput
+                      ariaLabel={`${col.header} width`}
+                      value={col.width}
+                      min={20}
+                      max={800}
+                      onchange={(v) => updateColumn(i, { width: v })}
+                    />
+                  </div>
                 </div>
               </th>
             {/each}
@@ -296,27 +308,39 @@
 
 <style>
   .dd-band {
+    position: relative;
     border-bottom: 1px solid var(--dd-border);
   }
 
+  .dd-band::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--dd-accent);
+  }
+
   .dd-band-tab {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 5px;
     width: 100%;
     text-align: left;
-    padding: 3px 8px;
+    padding: 4px 8px 4px 10px;
     font: inherit;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--dd-muted);
+    letter-spacing: 0.04em;
+    color: var(--dd-accent);
     background: var(--dd-panel-alt);
     border: none;
     cursor: pointer;
   }
 
   .dd-band-tab--selected {
-    color: var(--dd-accent);
     box-shadow: inset 0 0 0 1px var(--dd-accent);
   }
 
@@ -331,7 +355,7 @@
 
   .dd-detail-body {
     background: #fff;
-    padding: 8px;
+    padding: 8px 8px 8px 11px;
   }
 
   .dd-detail-body--dragover {
@@ -340,6 +364,9 @@
   }
 
   .dd-band-empty {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
     padding: 10px;
     font-size: 11px;
@@ -400,7 +427,21 @@
   .dd-col-controls {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 5px;
+  }
+
+  .dd-ctrl {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .dd-ctrl-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--dd-muted);
   }
 
   .dd-sample-hint {

@@ -14,6 +14,7 @@
   import ColumnProps from './ColumnProps.svelte';
   import BandProps from './BandProps.svelte';
   import PrintSetup from './PrintSetup.svelte';
+  import Icon from './ui/Icon.svelte';
 
   let {
     template,
@@ -100,6 +101,7 @@
       aria-selected={activeTab === 'selection'}
       onclick={() => (activeTab = 'selection')}
     >
+      <Icon name="field" size={12} />
       Selection
     </button>
     <button
@@ -110,6 +112,7 @@
       aria-selected={activeTab === 'page'}
       onclick={() => (activeTab = 'page')}
     >
+      <Icon name="page" size={12} />
       Page
     </button>
   </div>
@@ -171,6 +174,10 @@
   }
 
   .dd-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     flex: 1;
     height: 34px;
     border: none;

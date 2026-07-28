@@ -95,7 +95,7 @@
 </script>
 
 <div class="dd-field-group">
-  <Collapsible {title}>
+  <Collapsible {title} icon={cls === 'header' ? 'doc' : 'database'}>
     {#if state.status === 'loading'}
       <Skeleton width="100%" height="18px" />
       <Skeleton width="100%" height="18px" />

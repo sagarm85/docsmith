@@ -3,6 +3,7 @@
   import Select from './ui/Select.svelte';
   import NumberInput from './ui/NumberInput.svelte';
   import Field from './ui/Field.svelte';
+  import Icon from './ui/Icon.svelte';
 
   let {
     printSetup,
@@ -67,7 +68,7 @@
   </Field>
 
   <fieldset class="dd-margins-group">
-    <legend>Margins (mm)</legend>
+    <legend><Icon name="margins" size={11} />Margins (mm)</legend>
     <Field label="Top" fieldId="dd-margin-top">
       <NumberInput
         id="dd-margin-top"
@@ -110,38 +111,41 @@
     </Field>
   </fieldset>
 
-  <label class="dd-toggle">
-    <input
-      type="checkbox"
-      checked={pageHeaderEnabled}
-      onchange={(e) => onPageHeaderToggle((e.currentTarget as HTMLInputElement).checked)}
-    />
-    Repeat page header
-  </label>
-  <label class="dd-toggle">
-    <input
-      type="checkbox"
-      checked={pageFooterEnabled}
-      onchange={(e) => onPageFooterToggle((e.currentTarget as HTMLInputElement).checked)}
-    />
-    Repeat page footer
-  </label>
-  <label class="dd-toggle">
-    <input
-      type="checkbox"
-      checked={printSetup.showPageNumbers ?? false}
-      onchange={(e) => patch({ showPageNumbers: (e.currentTarget as HTMLInputElement).checked })}
-    />
-    Show page numbers
-  </label>
-  <label class="dd-toggle">
-    <input
-      type="checkbox"
-      checked={keepRowTogether}
-      onchange={(e) => onKeepRowTogetherChange((e.currentTarget as HTMLInputElement).checked)}
-    />
-    Keep line rows together
-  </label>
+  <fieldset class="dd-toggle-group">
+    <legend><Icon name="repeat" size={11} />Print behaviour</legend>
+    <label class="dd-toggle">
+      <input
+        type="checkbox"
+        checked={pageHeaderEnabled}
+        onchange={(e) => onPageHeaderToggle((e.currentTarget as HTMLInputElement).checked)}
+      />
+      Repeat page header
+    </label>
+    <label class="dd-toggle">
+      <input
+        type="checkbox"
+        checked={pageFooterEnabled}
+        onchange={(e) => onPageFooterToggle((e.currentTarget as HTMLInputElement).checked)}
+      />
+      Repeat page footer
+    </label>
+    <label class="dd-toggle">
+      <input
+        type="checkbox"
+        checked={printSetup.showPageNumbers ?? false}
+        onchange={(e) => patch({ showPageNumbers: (e.currentTarget as HTMLInputElement).checked })}
+      />
+      Show page numbers
+    </label>
+    <label class="dd-toggle">
+      <input
+        type="checkbox"
+        checked={keepRowTogether}
+        onchange={(e) => onKeepRowTogetherChange((e.currentTarget as HTMLInputElement).checked)}
+      />
+      Keep line rows together
+    </label>
+  </fieldset>
 </section>
 
 <style>
@@ -163,6 +167,31 @@
   }
 
   .dd-margins-group legend {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--dd-muted);
+    padding: 0 4px;
+  }
+
+  .dd-toggle-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    padding: 8px;
+    margin: 0;
+  }
+
+  .dd-toggle-group legend {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;

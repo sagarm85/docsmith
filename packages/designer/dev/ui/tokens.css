@@ -1,0 +1,12 @@
+/* Dev-harness-only redirect shim — not part of the published package (dev/ is
+   excluded from `files` in package.json). `pnpm --filter @docsmith/designer dev`
+   serves this folder as Vite's root, so a shadow-DOM <style>'s runtime `@import
+   './ui/tokens.css'` (written inside DocDesigner.svelte, resolved by the browser
+   against the *page's* location, not the component file's) lands here instead of
+   the real token sheet at ../../src/ui/tokens.css. Re-exporting it as a genuine
+   standalone .css request lets Vite's own dev-server CSS transform resolve this
+   nested @import correctly (unlike a @import textually embedded inside a
+   component's compiled JS string, which the browser must resolve itself and
+   can't). Production consumers never hit this: `vite build` inlines
+   DocDesigner.svelte's @import at bundle time, before any of this applies. */
+@import '../../src/ui/tokens.css';

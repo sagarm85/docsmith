@@ -6,19 +6,41 @@
 :host {
   color-scheme: light dark;
 
-  --dd-bg: #f5f6f8;
+  --dd-bg: #f2f4f8;
   --dd-panel: #ffffff;
-  --dd-panel-alt: #eceef1;
-  --dd-border: #d8dbe0;
-  --dd-text: #16181d;
-  --dd-muted: #5b6270;
+  --dd-panel-alt: #eef1f5;
+  --dd-border: #d7dce3;
+  --dd-text: #14161b;
+  --dd-muted: #5b6472;
   --dd-accent: #2563eb;
-  --dd-accent-weak: #dbe6fd;
+  --dd-accent-strong: #1d4ed8;
+  --dd-accent-weak: #dde9ff;
   --dd-danger: #b3261e;
   --dd-warn: #9a6700;
   --dd-ok: #1a7f37;
-  --dd-radius: 6px;
-  --dd-shadow: 0 1px 2px rgba(16, 18, 22, 0.08), 0 4px 12px rgba(16, 18, 22, 0.06);
+  --dd-ok-weak: #eaf7f0;
+  /* Band-card tints (D-025): reportHeader ("hero") gets a violet tint;
+     pageHeader/pageFooter ("running" bands) a cool slate tint; detail stays
+     untinted (max legibility for the data grid) with just an accent edge;
+     totals gets its own constant --dd-totals/--dd-totals-weak (same values as
+     the light --dd-ok/--dd-ok-weak, since "grand total" is semantically
+     positive) rather than reusing --dd-ok directly. These band-tint tokens
+     are intentionally NOT redefined below for dark mode: design.md §11 says
+     the canvas page is "pure white... regardless of theme" (a document is
+     white paper) — these tints are part of that paper, not the app chrome,
+     so they must stay constant even when the surrounding UI goes dark. (A
+     theme-reactive --dd-ok-weak here previously made the Totals band nearly
+     black in dark mode while FreeElement's text stayed a hardcoded #222,
+     making "Grand Total" invisible — see memory.md D-025 follow-up note.) */
+  --dd-hero: #7c6fd1;
+  --dd-hero-weak: #f4f1fb;
+  --dd-run: #8a93a6;
+  --dd-run-weak: #eef1f5;
+  --dd-totals: #1a7f37;
+  --dd-totals-weak: #eaf7f0;
+  --dd-radius: 10px;
+  --dd-radius-sm: 6px;
+  --dd-shadow: 0 1px 2px rgba(16, 18, 22, 0.08), 0 8px 24px rgba(16, 18, 22, 0.08);
   --dd-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --dd-font:
     system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -33,29 +55,31 @@
     --dd-text: #e7e9ec;
     --dd-muted: #9198a6;
     --dd-accent: #5b8def;
+    --dd-accent-strong: #8ab0f5;
     --dd-accent-weak: #1c2942;
     --dd-danger: #ff6b64;
     --dd-warn: #e0a83f;
     --dd-ok: #3fb964;
-    --dd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    --dd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
   }
 }
 
 /* Host page can force a theme regardless of OS preference. */
 :host([data-dd-theme='light']) {
   color-scheme: light;
-  --dd-bg: #f5f6f8;
+  --dd-bg: #f2f4f8;
   --dd-panel: #ffffff;
-  --dd-panel-alt: #eceef1;
-  --dd-border: #d8dbe0;
-  --dd-text: #16181d;
-  --dd-muted: #5b6270;
+  --dd-panel-alt: #eef1f5;
+  --dd-border: #d7dce3;
+  --dd-text: #14161b;
+  --dd-muted: #5b6472;
   --dd-accent: #2563eb;
-  --dd-accent-weak: #dbe6fd;
+  --dd-accent-strong: #1d4ed8;
+  --dd-accent-weak: #dde9ff;
   --dd-danger: #b3261e;
   --dd-warn: #9a6700;
   --dd-ok: #1a7f37;
-  --dd-shadow: 0 1px 2px rgba(16, 18, 22, 0.08), 0 4px 12px rgba(16, 18, 22, 0.06);
+  --dd-shadow: 0 1px 2px rgba(16, 18, 22, 0.08), 0 8px 24px rgba(16, 18, 22, 0.08);
 }
 
 :host([data-dd-theme='dark']) {
@@ -67,11 +91,12 @@
   --dd-text: #e7e9ec;
   --dd-muted: #9198a6;
   --dd-accent: #5b8def;
+  --dd-accent-strong: #8ab0f5;
   --dd-accent-weak: #1c2942;
   --dd-danger: #ff6b64;
   --dd-warn: #e0a83f;
   --dd-ok: #3fb964;
-  --dd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --dd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 * {

@@ -4,6 +4,16 @@
   import NumberInput from './ui/NumberInput.svelte';
   import Select from './ui/Select.svelte';
   import Button from './ui/Button.svelte';
+  import Icon from './ui/Icon.svelte';
+  import type { IconName } from './ui/icons.js';
+
+  const ELEMENT_ICON: Record<FreeElement['kind'], IconName> = {
+    field: 'field',
+    text: 'text',
+    image: 'image',
+    line: 'line',
+    box: 'box',
+  };
 
   let {
     element,
@@ -39,7 +49,7 @@
 </script>
 
 <div class="dd-element-props">
-  <h3 class="dd-props-title">{element.kind} element</h3>
+  <h3 class="dd-props-title"><Icon name={ELEMENT_ICON[element.kind]} size={13} />{element.kind} element</h3>
 
   <fieldset class="dd-props-grid">
     <legend>Position</legend>
@@ -178,6 +188,9 @@
   }
 
   .dd-props-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
     font-size: 12px;
     font-weight: 600;

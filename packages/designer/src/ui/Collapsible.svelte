@@ -1,10 +1,15 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+  import type { IconName } from './icons.js';
+
   let {
     title,
+    icon,
     open = $bindable(true),
     children,
   }: {
     title: string;
+    icon?: IconName;
     open?: boolean;
     children?: import('svelte').Snippet;
   } = $props();
@@ -26,6 +31,9 @@
     <span class="dd-collapsible-chevron" class:dd-collapsible-chevron--open={open} aria-hidden="true">
       &#9656;
     </span>
+    {#if icon}
+      <span class="dd-collapsible-icon" aria-hidden="true"><Icon name={icon} size={12} /></span>
+    {/if}
     <span class="dd-collapsible-title">{title}</span>
   </button>
   {#if open}
@@ -70,6 +78,11 @@
 
   .dd-collapsible-chevron--open {
     transform: rotate(90deg);
+  }
+
+  .dd-collapsible-icon {
+    display: inline-flex;
+    color: var(--dd-accent);
   }
 
   .dd-collapsible-content {

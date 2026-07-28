@@ -2,6 +2,8 @@
   import type { FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
   import { createBlockElement, createFieldElement, type BlockKind } from './template-edits.js';
   import FreeElementView from './FreeElement.svelte';
+  import Icon from './ui/Icon.svelte';
+  import type { IconName } from './ui/icons.js';
 
   type DragPayload = {
     cls: 'header' | 'dataset';
@@ -59,6 +61,21 @@
     pageFooter: 'Page Footer',
   };
 
+  // D-025: each band type reads as a distinct card (tint + accent edge + icon)
+  // rather than just a small gray tab label.
+  const bandVariant: Record<FreeBand['type'], 'hero' | 'run' | 'totals'> = {
+    reportHeader: 'hero',
+    pageHeader: 'run',
+    totals: 'totals',
+    pageFooter: 'run',
+  };
+  const bandIcon: Record<FreeBand['type'], IconName> = {
+    reportHeader: 'doc',
+    pageHeader: 'repeat',
+    totals: 'calculator',
+    pageFooter: 'repeat',
+  };
+
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
@@ -110,7 +127,7 @@
   }
 </script>
 
-<div class="dd-band" class:dd-band--dragover={dragOver}>
+<div class="dd-band dd-band--{bandVariant[band.type]}" class:dd-band--dragover={dragOver}>
   <button
     type="button"
     class="dd-band-tab"
@@ -118,6 +135,7 @@
     data-band-id={band.id}
     onclick={onSelectBand}
   >
+    <Icon name={bandIcon[band.type]} size={12} />
     {bandLabel[band.type]}
   </button>
   <!-- Clicking empty band space to deselect is a mouse convenience; Escape
@@ -135,7 +153,10 @@
     onclick={handleBodyClick}
   >
     {#if band.elements.length === 0}
-      <p class="dd-band-empty">Drag header fields here, or use a field's “+” button.</p>
+      <p class="dd-band-empty">
+        <Icon name="plus" size={13} />
+        Drag header fields here, or use a field's “+” button.
+      </p>
     {:else}
       {#each band.elements as el (el.id)}
         <FreeElementView
@@ -159,28 +180,51 @@
 
 <style>
   .dd-band {
+    position: relative;
     border-bottom: 1px solid var(--dd-border);
   }
 
+  .dd-band::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+  }
+
+  .dd-band--hero::before { background: var(--dd-hero); }
+  .dd-band--run::before { background: var(--dd-run); }
+  .dd-band--totals::before { background: var(--dd-totals); }
+
+  .dd-band--hero .dd-band-body { background: var(--dd-hero-weak); }
+  .dd-band--run .dd-band-body { background: var(--dd-run-weak); }
+  .dd-band--totals .dd-band-body { background: var(--dd-totals-weak); }
+
   .dd-band-tab {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 5px;
     width: 100%;
     text-align: left;
-    padding: 3px 8px;
+    padding: 4px 8px 4px 10px;
     font: inherit;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     color: var(--dd-muted);
     background: var(--dd-panel-alt);
     border: none;
     cursor: pointer;
   }
 
+  .dd-band--hero .dd-band-tab { color: var(--dd-hero); }
+  .dd-band--run .dd-band-tab { color: var(--dd-run); }
+  .dd-band--totals .dd-band-tab { color: var(--dd-totals); }
+
   .dd-band-tab--selected {
-    color: var(--dd-accent);
-    box-shadow: inset 0 0 0 1px var(--dd-accent);
+    box-shadow: inset 0 0 0 1px currentColor;
   }
 
   .dd-band-tab:focus-visible {
@@ -191,6 +235,7 @@
   .dd-band-body {
     position: relative;
     background: #fff;
+    padding-left: 3px;
   }
 
   .dd-band--dragover .dd-band-body {
@@ -199,8 +244,11 @@
   }
 
   .dd-band-empty {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
-    padding: 10px;
+    padding: 10px 10px 10px 13px;
     font-size: 11px;
     color: var(--dd-muted);
     font-style: italic;

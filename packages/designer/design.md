@@ -424,24 +424,62 @@ All numeric inputs are typed, min/max-clamped, and reflect the model immediately
 
 ## 11. Visual design system
 
-The designer chrome is calm, neutral, and defers to the *document* being designed.
-Think Figma/Linear restraint, not a colorful SaaS dashboard.
+> **Revised 2026-07-28 (memory.md D-025).** The original framing here ("calm,
+> neutral... Figma/Linear restraint, not a colorful SaaS dashboard") is
+> **superseded**. Real usage found the result reads as bare and unapproachable —
+> curly-brace binding tokens with no chip treatment, unlabeled stacked controls
+> in the detail-table header, no visual separation between bands. The bar is
+> now **approachable and self-explanatory at a glance**, closer to how a
+> consumer-grade builder (e.g. Mailchimp's email designer) presents structure
+> and affordances — **without** changing the banded-hybrid layout *model*
+> (D-002 stands; this section is about color/spacing/labeling only) and
+> **without** adding a CSS framework or UI kit (§3 still forbids that — the
+> richer look is still hand-rolled tokens + component `<style>` blocks).
 
 **Design tokens** (CSS custom properties on `:host`, light + dark via
 `prefers-color-scheme`; the host may override):
 ```
 --dd-bg, --dd-panel, --dd-panel-alt, --dd-border, --dd-text, --dd-muted,
---dd-accent (#2563eb), --dd-accent-weak, --dd-danger, --dd-warn, --dd-ok,
---dd-radius (6px), --dd-shadow, --dd-mono, --dd-font
+--dd-accent (#2563eb), --dd-accent-weak, --dd-accent-strong, --dd-danger,
+--dd-warn, --dd-ok, --dd-band-tint (per-band-type subtle background —
+reportHeader/detail/totals/pageHeader/pageFooter each get a distinguishable
+tint, still low-saturation enough for text to sit on top),
+--dd-radius (10px), --dd-radius-sm (6px), --dd-shadow, --dd-shadow-soft,
+--dd-mono, --dd-font
 ```
 Ship a light and dark value set; never hardcode a hex outside the token sheet.
+Radii grew from the original 6px flat value (10px main / 6px small) for a
+softer, friendlier surface language.
 
 **Type scale:** 11 / 12 / 13 (base UI) / 14 / 16 / 18 / 22. System font stack.
-**Spacing:** 4px base grid (4/8/12/16/24). **Rails:** 240px palette, 300px properties.
+**Spacing:** 4px base grid (4/8/12/16/24), but default component padding moved
+up a step (e.g. 8px→12px, 12px→16px) for more breathing room than the original
+"restraint" pass allowed.
+**Rails:** 240px palette, 300px properties (unchanged).
 **Buttons:** primary = accent fill; secondary = bordered `.ghost`; destructive =
 danger text. Focus-visible ring on every interactive element (accent, 2px).
 **Canvas surface:** the *page* is pure white with a soft shadow on a neutral
-`--dd-panel-alt` desk, regardless of theme (a document is white paper).
+`--dd-panel-alt` desk, regardless of theme (a document is white paper) —
+unchanged, since the printed document itself must stay the visual truth.
+
+**New affordance rules from the D-025 pass:**
+- **Bound-field elements never render as bare `{label}` text.** They get a
+  visible chip treatment (background `--dd-accent-weak`, border, rounded,
+  small monospace-ish label) so a placeholder unmistakably reads as "live data
+  goes here," not unrendered code. Static text/box/line/image elements keep
+  their plain look — only *bound* content gets the chip.
+- **Every band gets a distinct card**: a subtle `--dd-band-tint` background
+  behind its content area (not just its tab), a colored left-edge accent bar,
+  and enough padding that adjacent bands read as separate regions without
+  needing to study the tiny uppercase tab label.
+- **Every inline control in the detail-table column header gets a visible
+  caption** (e.g. "Format", "Align", "Width" above their respective
+  select/input) — no more bare dropdowns/numbers stacked with nothing to name
+  them.
+- **Palette/Toolbar icons:** every band type, block kind, and toolbar action
+  gets a small inline-SVG icon (house style: stroke-based, 1.6 stroke width,
+  `currentColor`) alongside its label — text-only controls are the exception
+  now, not the default.
 
 **Motion:** 120–160ms ease for hovers/panels; drag has no transition (must feel 1:1).
 Respect `prefers-reduced-motion`.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import type { FreeElement } from '@docsmith/core';
+  import Icon from './ui/Icon.svelte';
 
   const GRID = 4;
   const MIN_SIZE = 10;
@@ -239,7 +240,10 @@
   ondblclick={handleDblClick}
 >
   {#if element.kind === 'field'}
-    <span class="dd-el-token">{`{${displayLabel}}`}</span>
+    <span class="dd-el-token">
+      <Icon name="field" size={10} />
+      {displayLabel}
+    </span>
   {:else if element.kind === 'text'}
     {#if editingText}
       <!-- onclick only stops the click bubbling into the parent's drag/select
@@ -262,7 +266,10 @@
     {#if element.src?.value}
       <img class="dd-el-image" src={element.src.value} alt="" />
     {:else}
-      <span class="dd-el-placeholder">Image</span>
+      <span class="dd-el-placeholder">
+        <Icon name="image" size={16} />
+        Image
+      </span>
     {/if}
   {:else if element.kind === 'line'}
     <span class="dd-el-line"></span>
@@ -297,17 +304,37 @@
     cursor: grabbing;
   }
 
+  .dd-el:hover:not(.dd-el--selected) {
+    outline: 1px dashed var(--dd-border);
+  }
+
   .dd-el:focus-visible {
     outline: 2px solid var(--dd-accent);
     outline-offset: 1px;
   }
 
   .dd-el--selected {
-    outline: 1px solid var(--dd-accent);
+    outline: 1.5px solid var(--dd-accent);
+    box-shadow: 0 0 0 3px var(--dd-accent-weak);
   }
 
   .dd-el-token {
-    color: var(--dd-accent);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--dd-accent-strong);
+    background: var(--dd-accent-weak);
+    border: 1px solid var(--dd-accent);
+    border-radius: var(--dd-radius-sm);
+    padding: 1px 6px;
+    font-family: var(--dd-mono);
+    font-size: 11px;
+    max-width: 100%;
+  }
+
+  .dd-el-token :global(svg) {
+    flex: none;
+    opacity: 0.8;
   }
 
   .dd-el-text-edit {
@@ -317,8 +344,17 @@
   }
 
   .dd-el-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
     color: var(--dd-muted);
     font-style: italic;
+    background: var(--dd-panel-alt);
+    border: 1px dashed var(--dd-border);
+    border-radius: var(--dd-radius-sm);
   }
 
   .dd-el-line {
@@ -332,6 +368,7 @@
     width: 100%;
     height: 100%;
     border: 1px solid #333;
+    border-radius: 2px;
   }
 
   .dd-el-image {
