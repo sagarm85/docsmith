@@ -9,11 +9,24 @@
     onPrintSetupChange,
     keepRowTogether,
     onKeepRowTogetherChange,
+    pageHeaderEnabled,
+    onPageHeaderToggle,
+    pageFooterEnabled,
+    onPageFooterToggle,
   }: {
     printSetup: PrintSetup;
     onPrintSetupChange: (next: PrintSetup) => void;
     keepRowTogether: boolean;
     onKeepRowTogetherChange: (next: boolean) => void;
+    /** Whether the `pageHeader`/`pageFooter` bands actually render (their own
+     * `enabled` flag — see design.md's note on this in memory.md/progress.md:
+     * `printSetup.repeatPageHeader/Footer` is never read by core.renderToHtml
+     * or the render service, so this toggle controls the real switch instead
+     * of writing to those inert fields). */
+    pageHeaderEnabled: boolean;
+    onPageHeaderToggle: (enabled: boolean) => void;
+    pageFooterEnabled: boolean;
+    onPageFooterToggle: (enabled: boolean) => void;
   } = $props();
 
   const PAGE_SIZE_OPTIONS = [
@@ -100,16 +113,16 @@
   <label class="dd-toggle">
     <input
       type="checkbox"
-      checked={printSetup.repeatPageHeader ?? false}
-      onchange={(e) => patch({ repeatPageHeader: (e.currentTarget as HTMLInputElement).checked })}
+      checked={pageHeaderEnabled}
+      onchange={(e) => onPageHeaderToggle((e.currentTarget as HTMLInputElement).checked)}
     />
     Repeat page header
   </label>
   <label class="dd-toggle">
     <input
       type="checkbox"
-      checked={printSetup.repeatPageFooter ?? false}
-      onchange={(e) => patch({ repeatPageFooter: (e.currentTarget as HTMLInputElement).checked })}
+      checked={pageFooterEnabled}
+      onchange={(e) => onPageFooterToggle((e.currentTarget as HTMLInputElement).checked)}
     />
     Repeat page footer
   </label>

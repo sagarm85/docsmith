@@ -385,4 +385,32 @@ describe('<doc-designer>', () => {
 
     el.remove();
   });
+
+  it('"Repeat page header" creates the pageHeader band and shows it on the canvas', async () => {
+    const el = await mountWithEntitySelected();
+    expect(el.getTemplate?.()?.bands.some((b) => b.type === 'pageHeader')).toBe(false);
+
+    // Switch to the Page tab.
+    const pageTab = Array.from(el.shadowRoot!.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Page',
+    );
+    pageTab?.click();
+    await nextTick();
+
+    const repeatHeaderCheckbox = Array.from(
+      el.shadowRoot!.querySelectorAll('label'),
+    ).find((l) => l.textContent?.includes('Repeat page header'))?.querySelector('input');
+    expect(repeatHeaderCheckbox).toBeTruthy();
+
+    (repeatHeaderCheckbox as HTMLInputElement).click();
+    await nextTick();
+
+    const pageHeaderBand = el.getTemplate?.()?.bands.find((b) => b.type === 'pageHeader') as
+      | { enabled?: boolean }
+      | undefined;
+    expect(pageHeaderBand?.enabled).toBe(true);
+    expect(el.shadowRoot?.textContent).toContain('Page Header');
+
+    el.remove();
+  });
 });

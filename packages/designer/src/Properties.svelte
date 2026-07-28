@@ -28,6 +28,10 @@
     onPrintSetupChange,
     keepRowTogether,
     onKeepRowTogetherChange,
+    pageHeaderEnabled,
+    onPageHeaderToggle,
+    pageFooterEnabled,
+    onPageFooterToggle,
   }: {
     template: Template;
     selection: Selection;
@@ -42,6 +46,10 @@
     onPrintSetupChange: (next: PrintSetupType) => void;
     keepRowTogether: boolean;
     onKeepRowTogetherChange: (next: boolean) => void;
+    pageHeaderEnabled: boolean;
+    onPageHeaderToggle: (enabled: boolean) => void;
+    pageFooterEnabled: boolean;
+    onPageFooterToggle: (enabled: boolean) => void;
   } = $props();
 
   let activeTab = $state<'selection' | 'page'>('selection');
@@ -128,6 +136,10 @@
         {onPrintSetupChange}
         {keepRowTogether}
         {onKeepRowTogetherChange}
+        {pageHeaderEnabled}
+        {onPageHeaderToggle}
+        {pageFooterEnabled}
+        {onPageFooterToggle}
       />
     {/if}
   </div>

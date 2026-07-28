@@ -274,6 +274,32 @@ for a UX nicety that isn't required by any doc; can reconsider if it becomes a
 real pain point once used).
 `[status: locked]`
 
+### D-021 — `printSetup.repeatPageHeader`/`repeatPageFooter` are dead fields; the real switch is `band.enabled`
+**Decision:** `PrintSetup`'s "Repeat page header/footer" checkboxes no longer
+write to `printSetup.repeatPageHeader`/`repeatPageFooter`. They now control the
+`pageHeader`/`pageFooter` `FreeBand`'s own `enabled` flag directly (creating the
+band with sensible defaults — `height: 40`, empty `elements`, `enabled: true` —
+on first toggle-on, since a fresh `core.newTemplate()` has neither band).
+**Why:** Found while wiring Phase 2's `pageHeader`/`pageFooter` support: grepped
+`packages/core/src/render.ts` and `packages/render-service/src/pdf.ts` and
+confirmed `repeatPageHeader`/`repeatPageFooter` are **never read** anywhere —
+`render.ts` gates a running band purely on `band.enabled !== false`, and
+`pdf.ts`'s Puppeteer header/footer templates are a completely separate
+mechanism driven by `showPageNumbers`/`pageNumberFormat` (real "Page X of Y",
+D-012), unrelated to whether the pageHeader/pageFooter *bands* render. The
+Phase 1 `PrintSetup.svelte` (before Phase 2 added real pageHeader/pageFooter
+bands to wire against) wrote these checkboxes to the inert `printSetup` fields
+— a control that looked functional but silently did nothing, which is exactly
+the kind of dishonesty §0.1 forbids for data and should equally not apply to a
+UI affordance. Fixed rather than left in place once discovered, per `claude.md`
+§9 ("never fabricate... to make the screen look finished").
+**Rejected:** leaving the inert toggle as-is now that a real mechanism
+(`band.enabled`) exists to back it (would keep shipping a fake control);
+removing `repeatPageHeader`/`repeatPageFooter` from `core`'s `PrintSetup` type
+entirely (out of scope for a designer-only change — those fields are part of
+the shipped backend contract; simply no longer written to by this UI).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

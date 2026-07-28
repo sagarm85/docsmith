@@ -64,6 +64,11 @@
   const page = $derived(pageDimensionsPx(template.printSetup));
   const margins = $derived(marginsPx(template.printSetup));
 
+  // pageHeader/pageFooter are optional (design.md §2) — absent from a fresh
+  // template until enabled from the Page tab. Shown here whenever they exist
+  // (dimmed if currently disabled) so their content stays editable even while
+  // toggled off, matching design.md §8.2's "toggle on/off" (not "delete").
+  const pageHeader = $derived(template.bands.find((b) => b.type === 'pageHeader') as FreeBand | undefined);
   const reportHeader = $derived(
     template.bands.find((b) => b.id === 'reportHeader' && !isDetailBand(b)) as FreeBand | undefined,
   );
@@ -71,6 +76,7 @@
   const totals = $derived(
     template.bands.find((b) => b.id === 'totals' && !isDetailBand(b)) as FreeBand | undefined,
   );
+  const pageFooter = $derived(template.bands.find((b) => b.type === 'pageFooter') as FreeBand | undefined);
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
@@ -91,6 +97,28 @@
         style="top:{margins.top}px;right:{margins.right}px;bottom:{margins.bottom}px;left:{margins.left}px"
       ></div>
 
+      {#if pageHeader}
+        <div class="dd-optional-band" class:dd-optional-band--disabled={pageHeader.enabled === false}>
+          <Band
+            band={pageHeader}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'pageHeader' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'pageHeader'}
+            onAddElement={(el) => onAddElement('pageHeader', el)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('pageHeader', id)}
+            onSelectBand={() => onSelectBand('pageHeader')}
+            {onDeselect}
+            onElementLiveChange={(id, patch) => onElementLiveChange('pageHeader', id, patch)}
+            {onElementDragStart}
+            {onElementDragEnd}
+            onElementDelete={(id) => onElementDelete('pageHeader', id)}
+            onElementDuplicate={(id) => onElementDuplicate('pageHeader', id)}
+            onElementBringForward={(id) => onElementBringForward('pageHeader', id)}
+            onElementSendBack={(id) => onElementSendBack('pageHeader', id)}
+            onElementEditText={(id, text) => onElementEditText('pageHeader', id, text)}
+          />
+        </div>
+      {/if}
       {#if reportHeader}
         <Band
           band={reportHeader}
@@ -145,6 +173,28 @@
           onElementEditText={(id, text) => onElementEditText('totals', id, text)}
         />
       {/if}
+      {#if pageFooter}
+        <div class="dd-optional-band" class:dd-optional-band--disabled={pageFooter.enabled === false}>
+          <Band
+            band={pageFooter}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'pageFooter' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'pageFooter'}
+            onAddElement={(el) => onAddElement('pageFooter', el)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('pageFooter', id)}
+            onSelectBand={() => onSelectBand('pageFooter')}
+            {onDeselect}
+            onElementLiveChange={(id, patch) => onElementLiveChange('pageFooter', id, patch)}
+            {onElementDragStart}
+            {onElementDragEnd}
+            onElementDelete={(id) => onElementDelete('pageFooter', id)}
+            onElementDuplicate={(id) => onElementDuplicate('pageFooter', id)}
+            onElementBringForward={(id) => onElementBringForward('pageFooter', id)}
+            onElementSendBack={(id) => onElementSendBack('pageFooter', id)}
+            onElementEditText={(id, text) => onElementEditText('pageFooter', id, text)}
+          />
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -179,5 +229,9 @@
     position: absolute;
     border: 1px dashed #c6cbd2;
     pointer-events: none;
+  }
+
+  .dd-optional-band--disabled {
+    opacity: 0.45;
   }
 </style>

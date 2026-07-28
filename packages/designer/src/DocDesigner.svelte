@@ -135,6 +135,35 @@
       ?.keepRowTogether ?? false,
   );
 
+  // pageHeader/pageFooter are optional FreeBands (design.md §2) that don't exist
+  // in a fresh core.newTemplate(). "Repeat page header/footer" in PrintSetup
+  // toggles the band's own `enabled` flag — the actual switch core.renderToHtml
+  // reads — creating the band on first enable. (printSetup.repeatPageHeader/
+  // Footer exist on the type but are never read by core or the render service;
+  // see memory.md/progress.md for this discovery — this is the real control.)
+  const pageHeaderBand = $derived(
+    template.bands.find((b) => b.type === 'pageHeader') as FreeBand | undefined,
+  );
+  const pageFooterBand = $derived(
+    template.bands.find((b) => b.type === 'pageFooter') as FreeBand | undefined,
+  );
+
+  function handleTogglePageBand(type: 'pageHeader' | 'pageFooter', enabled: boolean) {
+    const exists = template.bands.some((b) => b.type === type);
+    if (exists) {
+      commitTemplate({
+        ...template,
+        bands: template.bands.map((b): Band => (b.type === type && !isDetailBand(b) ? { ...b, enabled } : b)),
+      });
+      return;
+    }
+    if (!enabled) return; // nothing to disable if it doesn't exist yet
+    const newBand: FreeBand = { id: type, type, height: 40, elements: [], enabled: true };
+    const bands = [...template.bands];
+    bands.splice(type === 'pageHeader' ? 0 : bands.length, 0, newBand);
+    commitTemplate({ ...template, bands });
+  }
+
   // The click-to-add "+" on a FieldChip has no "selected band" concept in Phase 1
   // (no free-form selection yet — that's Phase 2). Header fields default to
   // reportHeader; dataset fields have only one legal destination, the detail
@@ -432,6 +461,10 @@
               onPrintSetupChange={handlePrintSetupChange}
               {keepRowTogether}
               onKeepRowTogetherChange={handleKeepRowTogetherChange}
+              pageHeaderEnabled={pageHeaderBand?.enabled ?? false}
+              onPageHeaderToggle={(enabled) => handleTogglePageBand('pageHeader', enabled)}
+              pageFooterEnabled={pageFooterBand?.enabled ?? false}
+              onPageFooterToggle={(enabled) => handleTogglePageBand('pageFooter', enabled)}
             />
           </aside>
         {:else}

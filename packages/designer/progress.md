@@ -27,16 +27,27 @@
   decision (one step per completed drag/nudge; one step per field-change
   event — not debounced). `pnpm lint && pnpm typecheck && pnpm test && pnpm
   build` all green (`dist/doc-designer.js` ~236KB / ~59KB gzip; 64 tests).
-- **Next:** `pageHeader`/`pageFooter` bands (toggle on/off, `position:fixed`
-  running bands — `BandProps`'s visibility toggle already has the UI, but no
-  template currently has these bands to toggle); the static "Blocks" palette
-  group (Text/Image/Line/Box) now that `FreeElement` exists to receive a
-  drop; template list/rename/delete; `onChange` autosave (debounced); the
-  keyboard drag-alternative (pick up chip → arrow to band → drop — the "+"
-  button already covers the keyboard-parity *requirement*, per D-018, so this
-  is closing the gap to the *literal* interaction design.md §12 describes).
-  Also still carried forward: wiring `doc-save`/`doc-change` `CustomEvent`
-  dispatch (see Phase 1 notes below).
+- **Now (2):** `pageHeader`/`pageFooter` bands are wired. `PrintSetup`'s
+  "Repeat page header/footer" toggles create the band (`height: 40`, empty
+  `elements`, `enabled: true`) on first enable, or flip an existing band's
+  `enabled` — the real switch `core.renderToHtml` reads. **Found and fixed a
+  latent bug while wiring this:** these two checkboxes previously wrote to
+  `printSetup.repeatPageHeader`/`repeatPageFooter`, fields that neither
+  `core/render.ts` nor the render service's `pdf.ts` ever read — a
+  functionally inert control since Phase 1. Recorded as D-021 in `memory.md`.
+  `Canvas.svelte` now renders `pageHeader` above `reportHeader` and
+  `pageFooter` below `totals` whenever the band exists (dimmed at 45% opacity
+  when currently disabled, so content stays editable while toggled off,
+  per design.md §8.2 "toggle on/off" — not delete). 67 tests pass (was 64);
+  lint/typecheck/build green (`dist/doc-designer.js` ~243KB / ~60KB gzip).
+- **Next:** the static "Blocks" palette group (Text/Image/Line/Box) now that
+  `FreeElement` exists to receive a drop; template list/rename/delete;
+  `onChange` autosave (debounced); the keyboard drag-alternative (pick up
+  chip → arrow to band → drop — the "+" button already covers the
+  keyboard-parity *requirement*, per D-018, so this closes the gap to the
+  *literal* interaction design.md §12 describes). Also still carried forward:
+  wiring `doc-save`/`doc-change` `CustomEvent` dispatch (see Phase 1 notes
+  below).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -188,7 +199,7 @@
       (smart guides-to-siblings and multi-select/marquee are deferred — see
       notes above; single-select move/resize/keyboard is fully real)
 - [x] `Properties.svelte` + `ElementProps`/`ColumnProps`/`BandProps` — full editors
-- [ ] `pageHeader`/`pageFooter` bands (toggle on/off; `position:fixed` running bands)
+- [x] `pageHeader`/`pageFooter` bands (toggle on/off; `position:fixed` running bands)
 - [ ] Image/logo element (URL, then upload via host/adapter) — `ElementProps`
       already has the URL field and `FreeElement` already renders `<img>`;
       what's missing is a way to *add* an image element (the Blocks palette group)
@@ -229,6 +240,17 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — `pageHeader`/`pageFooter` bands.** `PrintSetup`'s "Repeat page
+  header/footer" toggles now create/enable the actual `pageHeader`/`pageFooter`
+  `FreeBand` (`DocDesigner.handleTogglePageBand`), which `Canvas.svelte` renders
+  above `reportHeader`/below `totals` whenever present (dimmed when disabled,
+  content stays editable). Found and fixed a real latent bug while wiring
+  this: the toggles previously wrote to `printSetup.repeatPageHeader/Footer`,
+  fields neither `core.renderToHtml` nor the render service's Puppeteer PDF
+  generation ever read — confirmed by grep, a functionally inert control since
+  Phase 1. Recorded as D-021 in `memory.md`. `BandProps`'s existing "Show this
+  band" toggle (built during the Properties-panel work) now has bands to
+  actually toggle. 67 tests pass (was 64); lint/typecheck/build green.
 - **2026-07-28 — Phase 2: free-form select/move/resize + Properties + undo/redo.**
   Added `packages/core/src/history.ts` (`HistoryState<T>`, `commit`/`commitFrom`/
   `undo`/`redo`/`canUndo`/`canRedo`, `DEFAULT_MAX_HISTORY = 50`) — generic, pure,

@@ -3,19 +3,27 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import { newTemplate } from '@docsmith/core';
 import PrintSetup from './PrintSetup.svelte';
 
-function setup(overrides: Partial<{ keepRowTogether: boolean }> = {}) {
+function setup(
+  overrides: Partial<{ keepRowTogether: boolean; pageHeaderEnabled: boolean; pageFooterEnabled: boolean }> = {},
+) {
   const template = newTemplate('invoice', 'invoice');
   const onPrintSetupChange = vi.fn();
   const onKeepRowTogetherChange = vi.fn();
+  const onPageHeaderToggle = vi.fn();
+  const onPageFooterToggle = vi.fn();
   render(PrintSetup, {
     props: {
       printSetup: template.printSetup,
       onPrintSetupChange,
       keepRowTogether: overrides.keepRowTogether ?? true,
       onKeepRowTogetherChange,
+      pageHeaderEnabled: overrides.pageHeaderEnabled ?? false,
+      onPageHeaderToggle,
+      pageFooterEnabled: overrides.pageFooterEnabled ?? false,
+      onPageFooterToggle,
     },
   });
-  return { template, onPrintSetupChange, onKeepRowTogetherChange };
+  return { template, onPrintSetupChange, onKeepRowTogetherChange, onPageHeaderToggle, onPageFooterToggle };
 }
 
 describe('PrintSetup', () => {
@@ -43,10 +51,31 @@ describe('PrintSetup', () => {
     });
   });
 
-  it('toggles repeatPageHeader/repeatPageFooter/showPageNumbers', async () => {
+  it('toggles showPageNumbers via printSetup', async () => {
+    // core's newTemplate() default is showPageNumbers: true, so a click unchecks it.
     const { template, onPrintSetupChange } = setup();
+    expect(template.printSetup.showPageNumbers).toBe(true);
+    await fireEvent.click(screen.getByLabelText('Show page numbers'));
+    expect(onPrintSetupChange).toHaveBeenCalledWith({ ...template.printSetup, showPageNumbers: false });
+  });
+
+  it('"Repeat page header/footer" calls onPageHeaderToggle/onPageFooterToggle, NOT onPrintSetupChange', async () => {
+    // These toggles used to write to printSetup.repeatPageHeader/Footer, fields
+    // neither core.renderToHtml nor the render service ever read — a functionally
+    // inert control. They now drive the actual pageHeader/pageFooter band's
+    // `enabled` flag instead (see memory.md/progress.md).
+    const { onPageHeaderToggle, onPageFooterToggle, onPrintSetupChange } = setup();
     await fireEvent.click(screen.getByLabelText('Repeat page header'));
-    expect(onPrintSetupChange).toHaveBeenCalledWith({ ...template.printSetup, repeatPageHeader: true });
+    expect(onPageHeaderToggle).toHaveBeenCalledWith(true);
+    await fireEvent.click(screen.getByLabelText('Repeat page footer'));
+    expect(onPageFooterToggle).toHaveBeenCalledWith(true);
+    expect(onPrintSetupChange).not.toHaveBeenCalled();
+  });
+
+  it('reflects the current pageHeader/pageFooter enabled state', () => {
+    setup({ pageHeaderEnabled: true, pageFooterEnabled: false });
+    expect((screen.getByLabelText('Repeat page header') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Repeat page footer') as HTMLInputElement).checked).toBe(false);
   });
 
   it('toggles keep-rows-together independently of printSetup', async () => {
