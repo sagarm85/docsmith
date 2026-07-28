@@ -4,8 +4,11 @@ import { StaticAdapter } from '@docsmith/adapters';
 import type { DetailBand } from '@docsmith/core';
 import DetailTable from './DetailTable.svelte';
 
-function fakeDataTransfer(payload: unknown) {
-  return { getData: () => JSON.stringify(payload) };
+// Must respect the requested MIME type (like a real DataTransfer, which returns
+// '' for any type that wasn't set) since DetailTable.svelte probes for
+// 'application/x-doc-block' before 'application/x-doc-field'.
+function fakeDataTransfer(type: string, payload: unknown) {
+  return { getData: (t: string) => (t === type ? JSON.stringify(payload) : '') };
 }
 
 function emptyDetailBand(): DetailBand {
@@ -84,7 +87,7 @@ describe('DetailTable', () => {
 
     const dropzone = screen.getByRole('group', { name: 'Detail band' });
     await fireEvent.drop(dropzone, {
-      dataTransfer: fakeDataTransfer({
+      dataTransfer: fakeDataTransfer('application/x-doc-field', {
         cls: 'dataset',
         datasetId: 'invoice_items',
         column: 'qty',
@@ -122,7 +125,7 @@ describe('DetailTable', () => {
     const dropzone = screen.getByRole('group', { name: 'Detail band' });
 
     await fireEvent.drop(dropzone, {
-      dataTransfer: fakeDataTransfer({
+      dataTransfer: fakeDataTransfer('application/x-doc-field', {
         cls: 'header',
         datasetId: null,
         column: 'invoice_number',
@@ -136,7 +139,7 @@ describe('DetailTable', () => {
     );
 
     await fireEvent.drop(dropzone, {
-      dataTransfer: fakeDataTransfer({
+      dataTransfer: fakeDataTransfer('application/x-doc-field', {
         cls: 'dataset',
         datasetId: 'shipments',
         column: 'tracking',
@@ -146,6 +149,32 @@ describe('DetailTable', () => {
       }),
     });
     expect(onInvalidDrop).toHaveBeenCalledWith('That field belongs to a different dataset than this table.');
+    expect(onAddColumn).not.toHaveBeenCalled();
+  });
+
+  it('rejects a block drop — blocks are free-form-only, never table columns', async () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    const onAddColumn = vi.fn();
+    const onInvalidDrop = vi.fn();
+    render(DetailTable, {
+      props: {
+        band: emptyDetailBand(),
+        adapter,
+        entity: 'invoice',
+        onAddColumn,
+        onUpdateColumns: vi.fn(),
+        onInvalidDrop,
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
+      },
+    });
+
+    await fireEvent.drop(screen.getByRole('group', { name: 'Detail band' }), {
+      dataTransfer: fakeDataTransfer('application/x-doc-block', { kind: 'text' }),
+    });
+    expect(onInvalidDrop).toHaveBeenCalledWith(
+      'Blocks (text/image/line/box) can only go on a header, totals, or page band.',
+    );
     expect(onAddColumn).not.toHaveBeenCalled();
   });
 

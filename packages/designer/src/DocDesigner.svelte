@@ -23,7 +23,7 @@
   } from '@docsmith/core';
   import type { DocDesignerConfig, Selection } from './types.js';
   import { saveTemplateToLocalStorage } from './persistence.js';
-  import { createFieldElement, createDetailColumn } from './template-edits.js';
+  import { createFieldElement, createDetailColumn, createBlockElement, type BlockKind } from './template-edits.js';
   import ErrorInline from './ui/ErrorInline.svelte';
   import Toast from './ui/Toast.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -177,6 +177,16 @@
     const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
     handleAddElement('reportHeader', createFieldElement('header', field, reportHeader?.elements ?? []));
     void datasetId;
+  }
+
+  // Same D-018 default-target rule as header fields: Blocks have no dataset tie
+  // and no "selected band" concept yet, so the click-to-add "+" always targets
+  // reportHeader; dragging a block chip directly onto another free-form band
+  // (Band.svelte accepts application/x-doc-block on any of them) is the way to
+  // place it elsewhere.
+  function handlePaletteAddBlock(kind: BlockKind) {
+    const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
+    handleAddElement('reportHeader', createBlockElement(kind, reportHeader?.elements ?? []));
   }
 
   // ── Free-form element selection + move/resize/duplicate/delete/z-order ──────
@@ -425,6 +435,7 @@
             dataSource={template.dataSource}
             onDataSourceChange={handleDataSourceChange}
             onAddField={handlePaletteAddField}
+            onAddBlock={handlePaletteAddBlock}
           />
           <Canvas
             {template}

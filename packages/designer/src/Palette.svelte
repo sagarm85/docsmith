@@ -1,13 +1,16 @@
 <script lang="ts">
   import type { DataSource, DataSourceAdapter, FieldMeta } from '@docsmith/core';
+  import type { BlockKind } from './template-edits.js';
   import SourceConfig from './SourceConfig.svelte';
   import FieldGroup from './FieldGroup.svelte';
+  import Collapsible from './ui/Collapsible.svelte';
 
   let {
     adapter,
     dataSource,
     onDataSourceChange,
     onAddField,
+    onAddBlock,
   }: {
     adapter: DataSourceAdapter;
     dataSource: DataSource;
@@ -18,13 +21,46 @@
      * same pattern used for Toolbar's Export PDF / Undo / Redo.
      */
     onAddField?: (field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) => void;
+    onAddBlock?: (kind: BlockKind) => void;
   } = $props();
 
   let search = $state('');
+
+  const BLOCKS: Array<{ kind: BlockKind; label: string; glyph: string }> = [
+    { kind: 'text', label: 'Text', glyph: 'T' },
+    { kind: 'image', label: 'Image', glyph: '🖼' },
+    { kind: 'line', label: 'Line', glyph: '―' },
+    { kind: 'box', label: 'Box', glyph: '▭' },
+  ];
+
+  function handleBlockDragStart(e: DragEvent, kind: BlockKind) {
+    e.dataTransfer?.setData('application/x-doc-block', JSON.stringify({ kind }));
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+  }
 </script>
 
 <aside class="dd-palette" aria-label="Field palette">
   <SourceConfig {adapter} {dataSource} {onDataSourceChange} />
+
+  <div class="dd-blocks">
+    <Collapsible title="Blocks">
+      {#each BLOCKS as block (block.kind)}
+        <div class="dd-chip" role="group" aria-label={`${block.label} block`} draggable="true" ondragstart={(e) => handleBlockDragStart(e, block.kind)}>
+          <span class="dd-chip-glyph" aria-hidden="true">{block.glyph}</span>
+          <span class="dd-chip-label">{block.label}</span>
+          <button
+            type="button"
+            class="dd-chip-add"
+            aria-label={`Add ${block.label} to report header`}
+            disabled={!onAddBlock}
+            onclick={() => onAddBlock?.(block.kind)}
+          >
+            +
+          </button>
+        </div>
+      {/each}
+    </Collapsible>
+  </div>
 
   {#if dataSource.entity}
     <div class="dd-search">
@@ -99,6 +135,75 @@
   }
 
   .dd-search-input:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 2px;
+  }
+
+  .dd-blocks {
+    padding: 0 8px;
+    border-bottom: 1px solid var(--dd-border);
+  }
+
+  .dd-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    margin-bottom: 4px;
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    background: var(--dd-panel);
+    cursor: grab;
+  }
+
+  .dd-chip:active {
+    cursor: grabbing;
+  }
+
+  .dd-chip-glyph {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--dd-accent);
+    background: var(--dd-accent-weak);
+    border-radius: 4px;
+  }
+
+  .dd-chip-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--dd-text);
+  }
+
+  .dd-chip-add {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    border: 1px solid var(--dd-border);
+    border-radius: 4px;
+    background: var(--dd-panel);
+    color: var(--dd-text);
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .dd-chip-add:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .dd-chip-add:hover:not(:disabled) {
+    background: var(--dd-panel-alt);
+  }
+
+  .dd-chip-add:focus-visible {
     outline: 2px solid var(--dd-accent);
     outline-offset: 2px;
   }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
-  import { createFieldElement } from './template-edits.js';
+  import { createBlockElement, createFieldElement, type BlockKind } from './template-edits.js';
   import FreeElementView from './FreeElement.svelte';
 
   type DragPayload = {
@@ -11,6 +11,8 @@
     label: string;
     format: ValueFormat;
   };
+
+  type BlockDragPayload = { kind: BlockKind };
 
   let {
     band,
@@ -70,6 +72,18 @@
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     dragOver = false;
+
+    const blockRaw = e.dataTransfer?.getData('application/x-doc-block');
+    if (blockRaw) {
+      try {
+        const payload = JSON.parse(blockRaw) as BlockDragPayload;
+        onAddElement(createBlockElement(payload.kind, band.elements));
+      } catch {
+        /* malformed payload — ignore, nothing to add */
+      }
+      return;
+    }
+
     const raw = e.dataTransfer?.getData('application/x-doc-field');
     if (!raw) return;
     let payload: DragPayload;

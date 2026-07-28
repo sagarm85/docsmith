@@ -5,9 +5,11 @@ import Band from './Band.svelte';
 
 // jsdom doesn't implement the DataTransfer/DragEvent APIs, so tests fake just the
 // getData() surface Band.svelte actually reads — the standard pattern for testing
-// native HTML5 DnD under jsdom.
-function fakeDataTransfer(payload: unknown) {
-  return { getData: () => JSON.stringify(payload) };
+// native HTML5 DnD under jsdom. Must respect the requested MIME type (like a real
+// DataTransfer, which returns '' for any type that wasn't set) since Band.svelte
+// probes for 'application/x-doc-block' before 'application/x-doc-field'.
+function fakeDataTransfer(type: string, payload: unknown) {
+  return { getData: (t: string) => (t === type ? JSON.stringify(payload) : '') };
 }
 
 function emptyBand(type: FreeBand['type'] = 'reportHeader'): FreeBand {
@@ -80,7 +82,7 @@ describe('Band', () => {
 
     const dropzone = screen.getByRole('group', { name: 'Report Header band' });
     await fireEvent.drop(dropzone, {
-      dataTransfer: fakeDataTransfer({
+      dataTransfer: fakeDataTransfer('application/x-doc-field', {
         cls: 'header',
         datasetId: null,
         column: 'invoice_number',
@@ -108,7 +110,7 @@ describe('Band', () => {
 
     const dropzone = screen.getByRole('group', { name: 'Report Header band' });
     await fireEvent.drop(dropzone, {
-      dataTransfer: fakeDataTransfer({
+      dataTransfer: fakeDataTransfer('application/x-doc-field', {
         cls: 'dataset',
         datasetId: 'invoice_items',
         column: 'qty',
@@ -120,6 +122,21 @@ describe('Band', () => {
 
     expect(onAddElement).not.toHaveBeenCalled();
     expect(onInvalidDrop).toHaveBeenCalledWith('Line-item fields can only go in the items table.');
+  });
+
+  it('accepts a block drop (Text/Image/Line/Box) and appends the right element kind', async () => {
+    const onAddElement = vi.fn();
+    render(Band, {
+      props: { band: emptyBand(), onAddElement, onInvalidDrop: vi.fn(), ...selectionCallbacks() },
+    });
+
+    const dropzone = screen.getByRole('group', { name: 'Report Header band' });
+    await fireEvent.drop(dropzone, {
+      dataTransfer: fakeDataTransfer('application/x-doc-block', { kind: 'box' }),
+    });
+
+    expect(onAddElement).toHaveBeenCalledTimes(1);
+    expect(onAddElement.mock.calls[0]?.[0]).toMatchObject({ kind: 'box', w: 100, h: 60 });
   });
 
   it('stacks a second added element below the first', () => {

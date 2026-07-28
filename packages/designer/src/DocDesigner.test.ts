@@ -330,6 +330,25 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('adding a Blocks element via its "+" appends a real element to reportHeader', async () => {
+    const el = await mountWithEntitySelected();
+
+    const addBtn = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '[aria-label="Add Box to report header"]',
+    );
+    expect(addBtn).toBeTruthy();
+    addBtn!.click();
+    await nextTick();
+
+    const reportHeader = el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+      elements: Array<{ kind: string; w: number; h: number }>;
+    };
+    expect(reportHeader.elements).toHaveLength(1);
+    expect(reportHeader.elements[0]).toMatchObject({ kind: 'box', w: 100, h: 60 });
+
+    el.remove();
+  });
+
   it('selecting an element shows ElementProps, and editing its position is one undo step', async () => {
     const el = await mountWithEntitySelected();
     el.shadowRoot!

@@ -55,6 +55,12 @@
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     dragOver = false;
+
+    if (e.dataTransfer?.getData('application/x-doc-block')) {
+      onInvalidDrop('Blocks (text/image/line/box) can only go on a header, totals, or page band.');
+      return;
+    }
+
     const raw = e.dataTransfer?.getData('application/x-doc-field');
     if (!raw) return;
     let payload: DragPayload;

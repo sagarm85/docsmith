@@ -40,14 +40,27 @@
   when currently disabled, so content stays editable while toggled off,
   per design.md §8.2 "toggle on/off" — not delete). 67 tests pass (was 64);
   lint/typecheck/build green (`dist/doc-designer.js` ~243KB / ~60KB gzip).
-- **Next:** the static "Blocks" palette group (Text/Image/Line/Box) now that
-  `FreeElement` exists to receive a drop; template list/rename/delete;
-  `onChange` autosave (debounced); the keyboard drag-alternative (pick up
-  chip → arrow to band → drop — the "+" button already covers the
-  keyboard-parity *requirement*, per D-018, so this closes the gap to the
-  *literal* interaction design.md §12 describes). Also still carried forward:
-  wiring `doc-save`/`doc-change` `CustomEvent` dispatch (see Phase 1 notes
-  below).
+- **Now (3):** The static "Blocks" palette group (Text/Image/Line/Box, design.md
+  §5) is live — the last piece needed to actually *create* non-data elements.
+  `Palette.svelte` shows it unconditionally (blocks aren't data, so no entity
+  needs to be chosen first), each block a draggable chip (dragstart sets a new
+  `application/x-doc-block` MIME payload `{ kind }`) plus a keyboard "+"
+  (disabled until wired, same honesty pattern as everywhere else). Added
+  `createBlockElement`/`BlockKind` to `template-edits.ts` with per-kind
+  defaults (text 200×20 w/ `text:'Text'`; image 120×60 w/ empty URL; line
+  200×1; box 100×60). `Band.svelte` now checks for a block payload before a
+  field payload on drop; `DetailTable.svelte` rejects block drops outright
+  (blocks are free-form-only, never table columns — line-item tables are
+  strictly column-mapped). Click-to-add defaults to `reportHeader`, same D-018
+  rule as header fields (no "selected band" concept for a plain click).
+  74 tests pass (was 67); lint/typecheck/build green (`dist/doc-designer.js`
+  ~246KB / ~61KB gzip).
+- **Next:** template list/rename/delete; `onChange` autosave (debounced); the
+  keyboard drag-alternative (pick up chip → arrow to band → drop — the "+"
+  button already covers the keyboard-parity *requirement*, per D-018, so this
+  closes the gap to the *literal* interaction design.md §12 describes). Also
+  still carried forward: wiring `doc-save`/`doc-change` `CustomEvent` dispatch
+  (see Phase 1 notes below).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -200,9 +213,9 @@
       notes above; single-select move/resize/keyboard is fully real)
 - [x] `Properties.svelte` + `ElementProps`/`ColumnProps`/`BandProps` — full editors
 - [x] `pageHeader`/`pageFooter` bands (toggle on/off; `position:fixed` running bands)
-- [ ] Image/logo element (URL, then upload via host/adapter) — `ElementProps`
-      already has the URL field and `FreeElement` already renders `<img>`;
-      what's missing is a way to *add* an image element (the Blocks palette group)
+- [x] Image/logo element (URL) — `ElementProps` has the URL field, `FreeElement`
+      renders `<img>`, and the Blocks group adds one. Upload-via-host/adapter is
+      still open (memory.md O-1: asset storage API isn't decided yet)
 - [x] Undo/redo command stack (≥50 steps, `core.DEFAULT_MAX_HISTORY`) wired
       through all mutations
 - [ ] Template list / rename / delete; `onChange` autosave (debounced)
@@ -240,6 +253,18 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Blocks palette group (Text/Image/Line/Box).** Added the static
+  "Blocks" group to `Palette.svelte` (design.md §5), shown unconditionally since
+  blocks aren't data-bound. Each is a draggable chip (`application/x-doc-block`
+  MIME payload `{ kind }`) plus a keyboard "+" (honestly disabled until
+  `onAddBlock` is wired). Added `createBlockElement`/`BlockKind` to
+  `template-edits.ts` with sensible per-kind defaults. `Band.svelte` checks for
+  a block payload before a field payload on drop; `DetailTable.svelte` rejects
+  block drops outright with an explanatory reason (free-form-only, never table
+  columns). Click-to-add defaults to `reportHeader` (D-018's established
+  no-selected-band rule). This closes the "Image/logo element" Phase 2 item
+  for the URL-based path (upload-via-adapter is still open, memory.md O-1).
+  74 tests pass (was 67); lint/typecheck/build green.
 - **2026-07-28 — `pageHeader`/`pageFooter` bands.** `PrintSetup`'s "Repeat page
   header/footer" toggles now create/enable the actual `pageHeader`/`pageFooter`
   `FreeBand` (`DocDesigner.handleTogglePageBand`), which `Canvas.svelte` renders
