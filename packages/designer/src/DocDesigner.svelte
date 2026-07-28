@@ -36,6 +36,11 @@
   let mode = $state<'design' | 'preview'>('design');
   let saving = $state(false);
   let saveToast = $state<{ variant: 'success' | 'error'; message: string } | null>(null);
+  // Lifted out of Preview (rather than kept local there) so Export PDF — which
+  // lives in the main Toolbar, not inside Preview — can share the same id.
+  let docId = $state('');
+  let exporting = $state(false);
+  let exportToast = $state<{ variant: 'success' | 'error'; message: string } | null>(null);
 
   // Host-page theme overrides (design.md §13 `theme`) are applied as inline custom
   // properties on the shadow-root's own top-level element, so they cascade to every
@@ -131,6 +136,56 @@
     }
   }
 
+  // claude.md §10: the frontend's only interop with the backend beyond the
+  // adapter is this HTTP contract — plain `fetch`, never importing
+  // @docsmith/sdk (not on the designer's approved dependency list, and would
+  // create a designer→sdk edge the other way round from how a real embed uses
+  // both packages). We already have the document's data on hand (Preview just
+  // fetched it via the same adapter), so this pushes {template, data} straight
+  // through rather than asking the service to re-pull via a serialized adapter
+  // config — the server's pull mode only understands a RestAdapter config
+  // (packages/render-service/src/server.ts), which isn't guaranteed to exist
+  // for whatever adapter this designer instance was actually given.
+  const canExportPdf = $derived(
+    Boolean(config?.renderServiceUrl) && Boolean(template.dataSource.entity) && Boolean(docId),
+  );
+
+  async function handleExportPdf() {
+    if (!config?.renderServiceUrl || !config.adapter || !docId) return;
+    exporting = true;
+    exportToast = null;
+    try {
+      const data = await config.adapter.fetchDocument(template.dataSource.entity, docId);
+      const res = await fetch(`${config.renderServiceUrl.replace(/\/+$/, '')}/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template, data }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(body || `Render service error ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${template.name || 'document'}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      exportToast = { variant: 'success', message: `Exported ${a.download}.` };
+    } catch (err) {
+      exportToast = {
+        variant: 'error',
+        message:
+          err instanceof Error
+            ? `Export failed: ${err.message}`
+            : 'Export failed. The render service may be unreachable — try browser Print instead.',
+      };
+    } finally {
+      exporting = false;
+    }
+  }
+
   export function getTemplate(): Template {
     return template;
   }
@@ -160,6 +215,8 @@
         onModeChange={(next) => (mode = next)}
         {saving}
         onSave={handleSave}
+        {exporting}
+        onExportPdf={canExportPdf ? handleExportPdf : undefined}
       />
       {#if saveToast}
         <div class="dd-toast-slot">
@@ -167,6 +224,15 @@
             variant={saveToast.variant}
             message={saveToast.message}
             onDismiss={() => (saveToast = null)}
+          />
+        </div>
+      {/if}
+      {#if exportToast}
+        <div class="dd-toast-slot">
+          <Toast
+            variant={exportToast.variant}
+            message={exportToast.message}
+            onDismiss={() => (exportToast = null)}
           />
         </div>
       {/if}
@@ -194,7 +260,7 @@
             />
           </aside>
         {:else}
-          <Preview {template} {adapter} />
+          <Preview {template} {adapter} {docId} onDocIdChange={(id) => (docId = id)} />
         {/if}
       </div>
     </div>

@@ -3,13 +3,19 @@
   import Select from './ui/Select.svelte';
   import Skeleton from './ui/Skeleton.svelte';
   import ErrorInline from './ui/ErrorInline.svelte';
+  import Button from './ui/Button.svelte';
 
   let {
     template,
     adapter,
+    docId,
+    onDocIdChange,
   }: {
     template: Template;
     adapter: DataSourceAdapter;
+    /** Controlled: DocDesigner owns this so Export PDF (in Toolbar) can share it. */
+    docId: string;
+    onDocIdChange: (id: string) => void;
   } = $props();
 
   type IdsState =
@@ -26,9 +32,9 @@
 
   let idsState = $state<IdsState>({ status: 'loading' });
   let docState = $state<DocState>({ status: 'idle' });
-  let manualId = $state('');
   let idsGen = 0;
   let docGen = 0;
+  let iframeEl = $state<HTMLIFrameElement | undefined>();
 
   async function loadIds() {
     const gen = ++idsGen;
@@ -41,7 +47,7 @@
       const ids = await adapter.listSampleIds(template.dataSource.entity);
       if (gen !== idsGen) return;
       idsState = { status: 'ready', ids };
-      if (ids[0] && !manualId) manualId = ids[0].id;
+      if (ids[0] && !docId) onDocIdChange(ids[0].id);
     } catch (err) {
       if (gen !== idsGen) return;
       idsState = {
@@ -78,19 +84,19 @@
   });
 
   $effect(() => {
-    loadDocument(template.dataSource.entity, manualId);
+    loadDocument(template.dataSource.entity, docId);
   });
 
   const previewDocument = $derived(
     docState.status === 'ready' ? renderToHtml(template, docState.data).document : undefined,
   );
 
-  function handleIdChange(id: string) {
-    manualId = id;
+  function handleManualInput(e: Event) {
+    onDocIdChange((e.currentTarget as HTMLInputElement).value);
   }
 
-  function handleManualInput(e: Event) {
-    manualId = (e.currentTarget as HTMLInputElement).value;
+  function handlePrint() {
+    iframeEl?.contentWindow?.print();
   }
 </script>
 
@@ -99,9 +105,9 @@
     {#if idsState.status === 'ready' && idsState.ids.length > 0}
       <Select
         ariaLabel="Sample document"
-        value={manualId}
+        value={docId}
         options={idsState.ids.map((i) => ({ value: i.id, label: i.label }))}
-        onchange={handleIdChange}
+        onchange={onDocIdChange}
       />
     {:else}
       <label class="dd-preview-id-label" for="dd-preview-doc-id">Document id</label>
@@ -110,10 +116,13 @@
         class="dd-preview-id-input"
         type="text"
         placeholder="Enter a document id…"
-        value={manualId}
+        value={docId}
         oninput={handleManualInput}
       />
     {/if}
+    <Button variant="secondary" disabled={docState.status !== 'ready'} onclick={handlePrint}>
+      Print
+    </Button>
   </div>
 
   <div class="dd-preview-body">
@@ -129,10 +138,15 @@
     {:else if docState.status === 'error'}
       <ErrorInline
         message={docState.message}
-        onRetry={() => loadDocument(template.dataSource.entity, manualId)}
+        onRetry={() => loadDocument(template.dataSource.entity, docId)}
       />
     {:else if previewDocument}
-      <iframe class="dd-preview-frame" title="Document preview" srcdoc={previewDocument}></iframe>
+      <iframe
+        class="dd-preview-frame"
+        title="Document preview"
+        srcdoc={previewDocument}
+        bind:this={iframeEl}
+      ></iframe>
     {/if}
   </div>
 </div>

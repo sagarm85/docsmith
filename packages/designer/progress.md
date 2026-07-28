@@ -8,27 +8,26 @@
 
 ## Now / Next / Notes
 
-- **Now:** `Preview.svelte` is done and green — Preview mode is real. A doc-id
-  control (a `<Select>` from `listSampleIds` when the adapter implements it,
-  auto-selecting the first result; a free-text `<input>` fallback otherwise)
-  drives `adapter.fetchDocument(entity, id)`, and the fetched `DocumentData` is
-  fed straight into `core.renderToHtml(template, data)` — the SAME renderer
-  Design mode's Canvas conceptually mirrors and the render service will use for
-  PDF (D-009, single renderer). The resulting standalone HTML document string is
-  bound to an `<iframe srcdoc=...>` (same-origin, print CSS never leaks into the
-  editor chrome, per `claude.md` §4). Because `previewDocument` is a `$derived`
-  over both `template` and the fetched data, any Design-mode edit is reflected
-  the next time you switch to Preview — no extra wiring needed. Full
-  loading/error+Retry/honest-empty-id states. Verified against the 60-line
-  `StaticAdapter` fixture that the iframe's `srcdoc` really does contain
-  `<thead>`/`@page`/real row data (test: `Preview.test.ts`).
+- **Now:** Export PDF and browser Print are wired for real, closing out Phase 1's
+  MVP-shell component list. `docId` moved out of `Preview` and up into
+  `DocDesigner` (a controlled prop) so the main Toolbar's Export PDF button —
+  outside Preview — can share it. Export PDF is disabled (not hidden) until
+  `renderServiceUrl` + a chosen `entity` + a `docId` are all present; when
+  enabled, it re-fetches the document via the adapter and `POST`s `{ template,
+  data }` (push mode — see D-019 in `memory.md`: the server's pull mode needs a
+  serializable `RestConfig`, which only `RestAdapter` has) to
+  `` `${renderServiceUrl}/render` ``, downloads the returned PDF blob, and shows
+  a success/error `Toast` (error suggests falling back to Print, per `design.md`
+  §9). Print is a button inside `Preview.svelte` itself (disabled until a
+  document has actually loaded) calling `iframe.contentWindow.print()` directly
+  — simplest correct placement since only `Preview` holds the iframe reference.
   `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
-  (`dist/doc-designer.js` ~185KB / ~49KB gzip; 44 tests).
-- **Next:** Wiring Export PDF for real (POST `{template, entity, id}` to
-  `renderServiceUrl`/render per `claude.md` §10 — plain `fetch`, NOT importing
-  `@docsmith/sdk`, which isn't on the designer's approved dependency list) and
-  browser Print. Phase 1 is done only when the pagination gate (`claude.md` §8)
-  passes against a ≥40-row document.
+  (`dist/doc-designer.js` ~189KB / ~50KB gzip; 48 tests).
+- **Next:** The pagination gate (`claude.md` §8) — verify with a ≥40-row
+  document that the column header repeats on page 2+, no row splits across a
+  page break, `reportHeader`/`totals` print once, and A4↔Letter/portrait↔
+  landscape/margins change page geometry. This is the last item before Phase 1
+  can be marked done.
 - **Notes / open questions:**
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
@@ -127,7 +126,7 @@
       real sample rows via `listSampleIds`→`fetchDocument`
 - [x] `PrintSetup.svelte` — page size/orientation/margins + repeat/keep toggles → `printSetup`
 - [x] `Preview.svelte` — doc-id control; iframe renders `core.renderToHtml(template,data)`
-- [ ] Browser **Print** works; **Export PDF** posts to render service and downloads
+- [x] Browser **Print** works; **Export PDF** posts to render service and downloads
 - [ ] **Pagination gate passed** (claude.md §8): ≥40-row doc, header repeats, no split row
 - [x] localStorage default persistence when no `onSave` supplied
 
@@ -173,6 +172,23 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Export PDF + browser Print.** `docId` state moved from
+  `Preview` up to `DocDesigner` (now a controlled `docId`/`onDocIdChange` prop
+  pair on `Preview`) so the Toolbar's Export PDF button can share it.
+  `handleExportPdf` re-fetches the document via the adapter and `POST`s
+  `{ template, data }` to `` `${renderServiceUrl}/render` `` — push mode, not the
+  `{ template, entity, id }` shape `claude.md` §10 summarizes, because the
+  server's pull mode additionally needs a serialized `RestConfig` that only
+  `RestAdapter` has (D-019 in `memory.md`). Downloads the returned PDF blob via
+  a temporary `<a download>`; shows a success/error `Toast` (error message
+  suggests Print as a fallback, per `design.md` §9). The button itself is
+  disabled — not hidden — until `renderServiceUrl` + `entity` + `docId` are all
+  present. Added a `Print` button inside `Preview.svelte` (disabled until a
+  document has loaded) calling `iframe.contentWindow.print()` directly, since
+  Preview is the only component holding the iframe reference. 48 tests pass
+  (was 44); lint/typecheck/build green (`dist/doc-designer.js` ~189KB / ~50KB
+  gzip). This closes out Phase 1's MVP-shell component list — only the
+  pagination gate verification remains before Phase 1 is done.
 - **2026-07-28 — `Preview.svelte`.** Preview mode calls the real
   `core.renderToHtml(template, data)` — the single-renderer requirement (D-009)
   — and injects the result into a same-origin `<iframe srcdoc>`. Doc-id control:

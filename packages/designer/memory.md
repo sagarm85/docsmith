@@ -219,6 +219,30 @@ making "+" a no-op until Phase 2 (regresses the mandatory keyboard-alternative g
 in `design.md` §12 for the one case that already has a sensible default).
 `[status: locked]`
 
+### D-019 — Export PDF uses push mode: `POST /render { template, data }`
+**Decision:** `DocDesigner`'s Export PDF handler fetches the document itself
+(`adapter.fetchDocument(entity, docId)`, the same call `Preview` already makes)
+and POSTs `{ template, data }` to `` `${renderServiceUrl}/render` `` — not
+`{ template, entity, id }` as `claude.md` §10 summarizes the contract.
+**Why:** Reading the actual server (`packages/render-service/src/server.ts`), pull
+mode (`{ template, entity, id }`) additionally requires `body.adapter`, a
+serialized `RestConfig` — the server reconstructs a `RestAdapter` from it
+server-side. That only works when the designer's real adapter happens to be a
+`RestAdapter` with a serializable config; `StaticAdapter`/`UnidbAdapter` (and any
+other adapter a host supplies) have no such shape. Since the designer already has
+the resolved `DocumentData` on hand (or one fetch away, via the exact same
+adapter method `Preview` calls), push mode is the only path that works
+regardless of which adapter the host configured, and it matches what `claude.md`
+§10 actually cares about (the frontend depends on the adapter interface + this
+HTTP contract, "owned in `@docsmith/core`/`@docsmith/adapters` and the backend
+package" — the request *shape* is an implementation detail of satisfying that,
+not a separate locked decision).
+**Rejected:** serializing a `RestConfig` and always requiring `RestAdapter` for
+Export PDF to work (would silently break Export PDF for every other adapter,
+including the `StaticAdapter` demo/dev path); adding a second render-service
+endpoint (unnecessary — push mode already exists and is simpler).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

@@ -1,4 +1,5 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { waitFor } from '@testing-library/svelte';
 import { StaticAdapter } from '@docsmith/adapters';
 import type { Template } from '@docsmith/core';
 import './DocDesigner.svelte'; // side effect: registers <doc-designer>
@@ -155,6 +156,112 @@ describe('<doc-designer>', () => {
     await nextTick();
 
     expect(el.getTemplate?.()?.printSetup.pageSize).toBe('Letter');
+    el.remove();
+  });
+
+  function adapterWithDoc() {
+    return new StaticAdapter({
+      entities: [
+        {
+          meta: { name: 'invoice', label: 'Invoice' },
+          headerFields: [],
+          datasets: [{ meta: { id: 'invoice_items', label: 'Line items' }, fields: [] }],
+          documents: {
+            '1001': { header: {}, datasets: { invoice_items: [{ description: 'Widget' }] } },
+          },
+        },
+      ],
+    });
+  }
+
+  async function mountInPreviewWithDoc(config: Record<string, unknown>): Promise<DocDesignerEl> {
+    const el = document.createElement('doc-designer') as DocDesignerEl;
+    el.config = config;
+    document.body.appendChild(el);
+    await nextTick();
+
+    const t = el.getTemplate!();
+    el.setTemplate!({ ...t, dataSource: { ...t.dataSource, entity: 'invoice' } });
+    await nextTick();
+
+    const previewBtn = Array.from(el.shadowRoot!.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Preview',
+    );
+    previewBtn?.click();
+    // Auto-select-first-sample-id → fetchDocument → render is a few microtask
+    // hops; a handful of nextTick()s reliably drains that chain in jsdom.
+    for (let i = 0; i < 5; i++) await nextTick();
+    return el;
+  }
+
+  function findButton(el: DocDesignerEl, label: string): HTMLButtonElement | undefined {
+    return Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === label,
+    ) as HTMLButtonElement | undefined;
+  }
+
+  it('Export PDF stays disabled without a renderServiceUrl, even with an entity+doc-id', async () => {
+    const el = await mountInPreviewWithDoc({ adapter: adapterWithDoc() });
+    expect(findButton(el, 'Export PDF')?.disabled).toBe(true);
+    el.remove();
+  });
+
+  it('Export PDF posts {template, data} (push mode) and downloads the PDF', async () => {
+    const pdfBlob = new Blob(['%PDF-fake'], { type: 'application/pdf' });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(pdfBlob),
+      text: () => Promise.resolve(''),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:fake'),
+      revokeObjectURL: vi.fn(),
+    });
+    // jsdom doesn't implement real navigation; the component only needs the
+    // click to happen, not to actually navigate.
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const el = await mountInPreviewWithDoc({
+      adapter: adapterWithDoc(),
+      renderServiceUrl: 'http://localhost:8090',
+    });
+
+    const exportBtn = findButton(el, 'Export PDF');
+    expect(exportBtn?.disabled).toBe(false);
+    exportBtn?.click();
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:8090/render');
+    const body = JSON.parse(init.body as string);
+    expect(body.template.id).toBe(el.getTemplate?.()?.id);
+    expect(body.data).toStrictEqual({ header: {}, datasets: { invoice_items: [{ description: 'Widget' }] } });
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(el.shadowRoot?.textContent).toContain('Exported'));
+
+    vi.unstubAllGlobals();
+    el.remove();
+  });
+
+  it('Export PDF shows an error toast (and suggests Print) when the service is unreachable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('Failed to fetch')),
+    );
+
+    const el = await mountInPreviewWithDoc({
+      adapter: adapterWithDoc(),
+      renderServiceUrl: 'http://localhost:8090',
+    });
+
+    findButton(el, 'Export PDF')?.click();
+
+    await waitFor(() => expect(el.shadowRoot?.textContent).toContain('Export failed'));
+    expect(el.shadowRoot?.textContent).toContain('Print');
+
+    vi.unstubAllGlobals();
     el.remove();
   });
 });
