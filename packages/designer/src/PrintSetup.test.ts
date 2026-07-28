@@ -66,6 +66,18 @@ describe('PrintSetup', () => {
     });
   });
 
+  it('defaults locale/currency to en-US/USD and patches printSetup on change', async () => {
+    const { template, onPrintSetupChange } = setup();
+    expect((screen.getByLabelText('Locale') as HTMLSelectElement).value).toBe('en-US');
+    expect((screen.getByLabelText('Currency') as HTMLSelectElement).value).toBe('USD');
+
+    await fireEvent.change(screen.getByLabelText('Locale'), { target: { value: 'en-IN' } });
+    expect(onPrintSetupChange).toHaveBeenCalledWith({ ...template.printSetup, locale: 'en-IN' });
+
+    await fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'INR' } });
+    expect(onPrintSetupChange).toHaveBeenCalledWith({ ...template.printSetup, currency: 'INR' });
+  });
+
   it('toggles showPageNumbers via printSetup', async () => {
     // core's newTemplate() default is showPageNumbers: true, so a click unchecks it.
     const { template, onPrintSetupChange } = setup();

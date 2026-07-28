@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToHtml } from './render.js';
 import { newTemplate, convertLayoutUnit, convertBandArrangement } from './schema.js';
-import { formatValue } from './format.js';
+import { formatValue, numberToWords } from './format.js';
 import type { DocumentData, FreeBand, FreeElement, Template } from './types.js';
 
 function invoiceTemplate(): Template {
@@ -250,5 +250,34 @@ describe('formatValue', () => {
     expect(formatValue('2026-01-15', 'date', { locale: 'en-US' })).toMatch(/Jan/);
     expect(formatValue(null, 'text')).toBe('');
     expect(formatValue('hello', 'text')).toBe('hello');
+  });
+});
+
+describe('numberToWords — "amount in words" (design.md §2 totals band)', () => {
+  it('spells whole numbers, including scale words (thousand/million)', () => {
+    expect(numberToWords(0)).toBe('Zero');
+    expect(numberToWords(7)).toBe('Seven');
+    expect(numberToWords(19)).toBe('Nineteen');
+    expect(numberToWords(42)).toBe('Forty-Two');
+    expect(numberToWords(100)).toBe('One Hundred');
+    expect(numberToWords(1234)).toBe('One Thousand Two Hundred Thirty-Four');
+    expect(numberToWords(1000000)).toBe('One Million');
+    expect(numberToWords(2500000)).toBe('Two Million Five Hundred Thousand');
+  });
+
+  it('renders a fractional part as "and NN/100", not a second round of words', () => {
+    expect(numberToWords(1234.56)).toBe('One Thousand Two Hundred Thirty-Four and 56/100');
+    expect(numberToWords(9.5)).toBe('Nine and 50/100');
+    expect(numberToWords(10)).toBe('Ten'); // no ".00" suffix when there's no fraction
+  });
+
+  it('prefixes negative values with "Negative"', () => {
+    expect(numberToWords(-42)).toBe('Negative Forty-Two');
+  });
+
+  it('is wired into formatValue via the "words" ValueFormat', () => {
+    expect(formatValue(1234.56, 'words')).toBe('One Thousand Two Hundred Thirty-Four and 56/100');
+    expect(formatValue(null, 'words')).toBe('');
+    expect(formatValue('not a number', 'words')).toBe('not a number');
   });
 });

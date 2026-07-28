@@ -23,6 +23,68 @@ function toNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const ONES = [
+  '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen',
+];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+const SCALES = ['', 'Thousand', 'Million', 'Billion', 'Trillion'];
+
+function threeDigitsToWords(n: number): string {
+  const parts: string[] = [];
+  if (n >= 100) {
+    parts.push(ONES[Math.floor(n / 100)]!, 'Hundred');
+    n %= 100;
+  }
+  if (n >= 20) {
+    let word = TENS[Math.floor(n / 10)]!;
+    if (n % 10) word += `-${ONES[n % 10]}`;
+    parts.push(word);
+  } else if (n > 0) {
+    parts.push(ONES[n]!);
+  }
+  return parts.join(' ');
+}
+
+function integerToWords(n: number): string {
+  if (n === 0) return 'Zero';
+  const groups: string[] = [];
+  let scaleIdx = 0;
+  let rest = n;
+  while (rest > 0) {
+    const group = rest % 1000;
+    if (group > 0) {
+      const scale = SCALES[scaleIdx];
+      groups.unshift(scale ? `${threeDigitsToWords(group)} ${scale}` : threeDigitsToWords(group));
+    }
+    rest = Math.floor(rest / 1000);
+    scaleIdx += 1;
+  }
+  return groups.join(' ');
+}
+
+/**
+ * Spell a number out in English words — design.md's "amount-in-words", the
+ * classic line under a `totals` band's grand total (e.g. "One Thousand Two
+ * Hundred Thirty-Four and 56/100"). English-only by design: a real
+ * multi-locale number-to-words system has genuinely different grammar per
+ * language (gendered forms, different large-number groupings like Indian
+ * lakh/crore) — a much bigger feature than reusing `Intl` the way every
+ * other format here does, so it's out of scope rather than faked. The
+ * fractional part renders as "and NN/100" (the standard check-writing
+ * convention), never a second round of word-spelling.
+ */
+export function numberToWords(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  const negative = value < 0;
+  const abs = Math.abs(value);
+  const whole = Math.floor(abs);
+  const cents = Math.round((abs - whole) * 100);
+  let words = integerToWords(whole);
+  if (cents > 0) words += ` and ${String(cents).padStart(2, '0')}/100`;
+  return (negative ? 'Negative ' : '') + words;
+}
+
 /**
  * Format one value for display. Never throws — an unformattable value falls back
  * to its string form so a template can't crash a render. NULL/undefined → ''.
@@ -61,6 +123,11 @@ export function formatValue(
         month: 'short',
         day: '2-digit',
       }).format(d);
+    }
+    case 'words': {
+      const n = toNumber(value);
+      if (n === null) return String(value);
+      return numberToWords(n);
     }
     case 'text':
     default:

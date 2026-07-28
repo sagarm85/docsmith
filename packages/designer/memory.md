@@ -584,6 +584,23 @@ keep in sync with selection/undo/duplicate/delete, for no real benefit over
 one flat array plus a grouping key).
 `[status: locked]`
 
+### D-030 — `numberToWords`/`'words'` format is English-only
+**Decision:** `core.numberToWords()` and the `'words'` `ValueFormat` spell
+numbers out in English only, regardless of `printSetup.locale`. A fractional
+part renders as `"and NN/100"` (the check-writing convention), not a second
+round of word-spelling.
+**Why:** design.md §2 lists "amount-in-words" as expected `totals`-band
+content, and every other format (`number`/`currency`/`date`) is already
+genuinely locale-aware via `Intl` at no extra cost — but number-to-words has
+no `Intl` equivalent, and real multi-locale support means implementing
+actual per-language grammar (gendered forms, and structurally different
+large-number groupings like Indian lakh/crore, not just different word
+lists) — a materially bigger feature than every other formatter in this
+file, so it's out of scope for now rather than faked as "supported."
+**Rejected:** silently ignoring `locale` was considered risky without saying
+so — the doc comment on `ValueFormat` and this entry are the "say so."
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

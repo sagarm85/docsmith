@@ -224,6 +224,25 @@
   DocDesigner integration test, and a real-browser screenshot. 27 core tests
   pass (was 22); 124 designer tests pass (was 113); lint/typecheck/build all
   green (`dist/doc-designer.js` ~316KB / ~75KB gzip).
+- **Now — i18n locale/currency picker + amount-in-words format.** Two small
+  Phase 3 checklist items. `core.formatValue` already did real
+  `Intl.NumberFormat`/`Intl.DateTimeFormat` work against
+  `printSetup.locale`/`currency` — the only gap was that `PrintSetup.svelte`
+  never exposed a way to set them. Added "Locale"/"Currency" selects (Page
+  tab, a fixed reference list of common values — same pattern as the
+  existing `PAGE_SIZE_OPTIONS`, not adapter/business data) defaulting to
+  en-US/USD (core's existing defaults). New `numberToWords()` in
+  `core/format.ts` and a `'words'` `ValueFormat` (design.md §2's "amount in
+  words" line under a grand total) — English-only by design (real
+  multi-locale number-to-words has genuinely different grammar per
+  language — gendered forms, Indian lakh/crore groupings — a much bigger
+  feature than reusing `Intl`, so it's out of scope rather than faked);
+  handles a fractional part as "and NN/100" (check-writing convention), not
+  a second round of word-spelling. Added "Words" to the format `<Select>` in
+  `ElementProps.svelte`, `ColumnProps.svelte`, and `DetailTable.svelte`'s
+  inline column header select. 31 core tests pass (was 27); 125 designer
+  tests pass (was 124); lint/typecheck/build all green (`dist/doc-designer.js`
+  ~320KB / ~76KB gzip).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -402,7 +421,12 @@
       already rendered this — only the authoring UI was missing.
 - [ ] Conditional formatting (declarative rules)
 - [ ] Barcode / QR element
-- [ ] i18n + locale currency; amount-in-words
+- [x] i18n + locale currency; amount-in-words — `PrintSetup.svelte` gained
+      Locale/Currency selects (Page tab; `core.formatValue` already did the
+      real `Intl` work, only the UI was missing); new `core.numberToWords()`
+      + `'words'` `ValueFormat` for the classic "amount in words" totals-band
+      line (English-only by design — see progress.md's "Now" note/memory.md
+      for the reasoning).
 - [ ] Carried-forward subtotals (server-assisted)
 - [ ] Saved themes / brand presets
 
@@ -428,6 +452,20 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — i18n locale/currency picker + amount-in-words.**
+  `PrintSetup.svelte` gained "Locale"/"Currency" selects (a fixed reference
+  list, same pattern as `PAGE_SIZE_OPTIONS`) — `core.formatValue` already
+  did the real `Intl.NumberFormat`/`Intl.DateTimeFormat` work against
+  `printSetup.locale`/`currency`, only the UI control was missing. New
+  `core.numberToWords()` + `'words'` `ValueFormat` for the classic "amount in
+  words" line under a `totals` band's grand total (e.g. "One Thousand Two
+  Hundred Thirty-Four and 56/100") — English-only by design, since real
+  multi-locale number-to-words has genuinely different grammar per language
+  (gendered forms, Indian lakh/crore groupings), a much bigger feature than
+  reusing `Intl` the way every other format here does. Added to the format
+  `<Select>` in `ElementProps.svelte`, `ColumnProps.svelte`, and
+  `DetailTable.svelte`. 31 core tests pass (was 27); 125 designer tests pass
+  (was 124); lint/typecheck/build all green.
 - **2026-07-29 — Stacked/auto-flow arrangement (D-029).** New
   `FreeBand.arrangement?: 'free' | 'stack'` (per-band, absent = 'free') and
   `FreeElement.row?: number` (shared row numbers render side by side).

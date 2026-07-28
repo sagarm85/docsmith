@@ -52,6 +52,47 @@
     { value: '%', label: 'Relative (%)' },
   ];
 
+  // core.formatValue already does real Intl.NumberFormat/DateTimeFormat work
+  // against printSetup.locale/currency (no gap there) — this was purely a
+  // missing UI control. A fixed reference list, same pattern as
+  // PAGE_SIZE_OPTIONS above — not adapter/business data.
+  const LOCALE_OPTIONS = [
+    { value: 'en-US', label: 'English (US)' },
+    { value: 'en-GB', label: 'English (UK)' },
+    { value: 'en-IN', label: 'English (India)' },
+    { value: 'en-AU', label: 'English (Australia)' },
+    { value: 'en-CA', label: 'English (Canada)' },
+    { value: 'de-DE', label: 'German (Germany)' },
+    { value: 'fr-FR', label: 'French (France)' },
+    { value: 'es-ES', label: 'Spanish (Spain)' },
+    { value: 'es-MX', label: 'Spanish (Mexico)' },
+    { value: 'it-IT', label: 'Italian (Italy)' },
+    { value: 'pt-BR', label: 'Portuguese (Brazil)' },
+    { value: 'nl-NL', label: 'Dutch (Netherlands)' },
+    { value: 'ja-JP', label: 'Japanese (Japan)' },
+    { value: 'zh-CN', label: 'Chinese (Simplified)' },
+    { value: 'ko-KR', label: 'Korean (South Korea)' },
+    { value: 'hi-IN', label: 'Hindi (India)' },
+    { value: 'ar-SA', label: 'Arabic (Saudi Arabia)' },
+  ];
+  const CURRENCY_OPTIONS = [
+    { value: 'USD', label: 'USD — US Dollar' },
+    { value: 'EUR', label: 'EUR — Euro' },
+    { value: 'GBP', label: 'GBP — British Pound' },
+    { value: 'INR', label: 'INR — Indian Rupee' },
+    { value: 'JPY', label: 'JPY — Japanese Yen' },
+    { value: 'CNY', label: 'CNY — Chinese Yuan' },
+    { value: 'AUD', label: 'AUD — Australian Dollar' },
+    { value: 'CAD', label: 'CAD — Canadian Dollar' },
+    { value: 'CHF', label: 'CHF — Swiss Franc' },
+    { value: 'BRL', label: 'BRL — Brazilian Real' },
+    { value: 'MXN', label: 'MXN — Mexican Peso' },
+    { value: 'ZAR', label: 'ZAR — South African Rand' },
+    { value: 'SGD', label: 'SGD — Singapore Dollar' },
+    { value: 'AED', label: 'AED — UAE Dirham' },
+    { value: 'KRW', label: 'KRW — South Korean Won' },
+  ];
+
   function patch(next: Partial<PrintSetup>) {
     onPrintSetupChange({ ...printSetup, ...next });
   }
@@ -118,6 +159,28 @@
         max={100}
         value={printSetup.margins.left}
         onchange={(v) => patch({ margins: { ...printSetup.margins, left: v } })}
+      />
+    </Field>
+  </fieldset>
+
+  <fieldset class="dd-margins-group">
+    <legend><Icon name="database" size={11} />Formatting</legend>
+    <Field label="Locale" fieldId="dd-locale">
+      <Select
+        id="dd-locale"
+        ariaLabel="Locale"
+        value={printSetup.locale ?? 'en-US'}
+        options={LOCALE_OPTIONS}
+        onchange={(v) => patch({ locale: v })}
+      />
+    </Field>
+    <Field label="Currency" fieldId="dd-currency">
+      <Select
+        id="dd-currency"
+        ariaLabel="Currency"
+        value={printSetup.currency ?? 'USD'}
+        options={CURRENCY_OPTIONS}
+        onchange={(v) => patch({ currency: v })}
       />
     </Field>
   </fieldset>

@@ -40,7 +40,13 @@ export interface DataSourceAdapter {
 
 export type PageSize = 'A4' | 'Letter' | 'A5' | 'Legal';
 export type Orientation = 'portrait' | 'landscape';
-export type ValueFormat = 'text' | 'number' | 'currency' | 'date';
+/** 'words' spells a numeric value out in English (e.g. "One Thousand Two
+ * Hundred Thirty-Four and 56/100") — for the `totals` band's classic
+ * "amount in words" line (design.md §2's band table). English-only by
+ * design: a real multi-locale number-to-words system is a large, genuinely
+ * different feature (grammar rules vary far more than Intl's locale-aware
+ * number/date formatting does) — see format.ts's `numberToWords` doc comment. */
+export type ValueFormat = 'text' | 'number' | 'currency' | 'date' | 'words';
 export type Align = 'left' | 'center' | 'right';
 
 export type PrintSetup = {

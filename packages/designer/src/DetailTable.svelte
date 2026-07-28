@@ -114,6 +114,7 @@
     { value: 'number', label: 'Number' },
     { value: 'currency', label: 'Currency' },
     { value: 'date', label: 'Date' },
+    { value: 'words', label: 'Words' },
   ];
   const ALIGN_OPTIONS = [
     { value: 'left', label: 'Left' },
