@@ -8,23 +8,30 @@
 
 ## Now / Next / Notes
 
-- **Now:** Phase 0 scaffold, `Toolbar.svelte`, and `Palette.svelte` +
-  `SourceConfig.svelte` are done and green. `DocDesigner.svelte` renders a real
-  two-region workspace in design mode: `Palette` (left) + a Canvas placeholder
-  (center); preview mode shows its own placeholder and hides the Palette.
-  `SourceConfig` drives `template.dataSource` end-to-end against the adapter:
-  entity dropdown from `listEntities`, related-dataset add/remove from
-  `getRelatedDatasets` (via `core.datasetFromMeta`), full loading/empty/error
-  triads with Retry, and de-duped/cancellable fetches (generation-counter guard
-  against stale entity switches). `pnpm lint && pnpm typecheck && pnpm test &&
-  pnpm build` all green (`dist/doc-designer.js` ~124KB / ~35KB gzip; 14 tests).
-- **Next:** `FieldGroup.svelte` + `FieldChip.svelte` (System/Custom/dataset field
-  groups from `getFields`/`getDatasetFields`), then `Canvas.svelte` (page geometry
-  from `printSetup`, fixed bands). Build in the `design.md` §14 order; Phase 1 is
-  done only when the pagination gate (`claude.md` §8) passes.
+- **Now:** Phase 0 scaffold through `FieldGroup.svelte`/`FieldChip.svelte` are done
+  and green — the full Palette side is now live. `FieldGroup` self-fetches its own
+  field list (`getFields` for the header group, `getDatasetFields` per dataset
+  group), splits System/Custom sub-groups only when both kinds are actually
+  present (D-013), applies the Palette-wide search filter, and has the same
+  loading/empty/error+Retry triad as `SourceConfig`. `FieldChip` renders the native
+  HTML5 DnD drag source (`application/x-doc-field` payload, format defaulted via
+  `core.defaultFormatForType`) plus a keyboard "+" affordance that's honestly
+  disabled until Canvas/Band/DetailTable exist to receive an add (`Palette`'s new
+  `onAddField` prop is threaded through but not yet wired from `DocDesigner`).
+  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
+  (`dist/doc-designer.js` ~141KB / ~39KB gzip; 21 tests).
+- **Next:** `Canvas.svelte` (page geometry from `printSetup`, fixed bands
+  stacked top-to-bottom) and `Band.svelte` (report/totals bands accept header
+  fields via an add-list; this is also where `Palette`'s `onAddField` and each
+  chip's drag payload finally get a real drop target). Build in the `design.md`
+  §14 order; Phase 1 is done only when the pagination gate (`claude.md` §8) passes.
 - **Notes / open questions:**
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
+  - The static "Blocks" palette group (Text/Image/Line/Box, per `design.md` §5/§14
+    mockup) is deliberately **not built yet** — it only makes sense once
+    `FreeElement.svelte` exists to receive a block drop, and that's explicitly
+    Phase 2 (`design.md` §17). Not forgotten, just sequenced correctly.
   - D-017 (`memory.md`): `getRelatedDatasets` returns only `{id, label}`, no FK
     column, so `SourceConfig` builds `ref: { table: meta.id, fkColumn: '' }` when
     adding a dataset rather than guessing a naming convention. Confirmed by grep
@@ -95,7 +102,7 @@
 - [x] `Toolbar.svelte` — name, Design/Preview toggle, Save, Export PDF (undo/redo stubbed)
 - [x] `Palette.svelte` + `SourceConfig.svelte` — entity dropdown from `listEntities`;
       add/remove datasets from `getRelatedDatasets`
-- [ ] `FieldGroup.svelte` + `FieldChip.svelte` — System/Custom/dataset groups from
+- [x] `FieldGroup.svelte` + `FieldChip.svelte` — System/Custom/dataset groups from
       `getFields`/`getDatasetFields`; loading/empty/error states
 - [ ] `Canvas.svelte` — page geometry from `printSetup`; **fixed bands** rendered
 - [ ] `Band.svelte` — report/totals bands accept header fields via add-list (drag optional in P1)
@@ -149,6 +156,26 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — `FieldGroup.svelte` + `FieldChip.svelte`.** `FieldGroup` is
+  self-contained: it fetches its own field list (`getFields` for the header group,
+  `getDatasetFields(entity, datasetId)` per dataset group — decided by its `cls`
+  prop), with the same loading/empty/error+Retry triad and generation-counter
+  cancellation as `SourceConfig`. It splits System/Custom sub-groups only when
+  both kinds are present (D-013 — never an empty "Custom" header). `FieldChip`
+  renders the native HTML5 DnD drag source (`application/x-doc-field` MIME
+  payload per `design.md` §5, format defaulted via `core.defaultFormatForType`)
+  plus a keyboard "+" affordance, `aria-label`led per field, disabled whenever no
+  `onAdd` is supplied. `Palette.svelte` adds the field-search box (filters every
+  `FieldGroup`) and now renders one header `FieldGroup` plus one per
+  `dataSource.datasets` entry, plus a new `onAddField` prop threaded through but
+  left unwired from `DocDesigner` — there's no Canvas/Band/DetailTable yet to
+  receive an add, so every chip's "+" is honestly disabled for now, same pattern
+  as Toolbar's Export PDF/Undo/Redo. Also updated root `README.md`: it previously
+  said the frontend was "spec complete, not yet implemented" — now documents
+  `pnpm --filter @docsmith/designer dev/lint/typecheck/test/build`. 21 tests pass
+  (was 14); lint/typecheck/build all green (`dist/doc-designer.js` ~141KB / ~39KB
+  gzip). The static "Blocks" palette group (Text/Image/Line/Box) is deliberately
+  deferred to Phase 2, when `FreeElement.svelte` exists to receive it.
 - **2026-07-28 — `Palette.svelte` + `SourceConfig.svelte`.** `SourceConfig` drives
   `template.dataSource` against the real adapter: entity `<Select>` from
   `listEntities()`, related-dataset add/remove from `getRelatedDatasets(entity)`

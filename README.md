@@ -80,6 +80,27 @@ RENDER_URL=http://localhost:8090 pnpm demo         # also writes out.pdf with "P
 
 Docker: `docker build -f packages/render-service/Dockerfile -t erpdoc-render .`
 
+## Quick start (frontend designer, in progress)
+
+```bash
+pnpm install
+pnpm --filter @docsmith/designer dev
+```
+
+Opens a local Vite dev server (`packages/designer/dev`) that mounts the real
+`<doc-designer>` custom element against the same `StaticAdapter` 60-line invoice
+fixture the backend demo uses (`examples/invoice-demo/fixtures.mjs`) — no ERP or
+render service needed. Toolbar, Palette (entity/dataset picker, field groups) are
+built; Canvas/Preview/Export PDF are still landing (see
+`packages/designer/progress.md` for exact status).
+
+```bash
+pnpm --filter @docsmith/designer lint        # eslint
+pnpm --filter @docsmith/designer typecheck   # svelte-check
+pnpm --filter @docsmith/designer test        # vitest
+pnpm --filter @docsmith/designer build       # → packages/designer/dist/doc-designer.js
+```
+
 ## Integrating with your ERP
 
 1. Implement `DataSourceAdapter` (or configure `RestAdapter` against your existing
@@ -96,5 +117,9 @@ Docker: `docker build -f packages/render-service/Dockerfile -t erpdoc-render .`
 ## Status
 
 Backend (`core`, `adapters`, `sdk`, `render-service`) — scaffolded and testable.
-Frontend (`designer`) — spec complete (`packages/designer/*.md`); implementation in
-Antigravity IDE, tracked in `packages/designer/progress.md`.
+Frontend (`designer`) — Phase 0 scaffold plus the first several Phase 1 components
+(Toolbar, Palette/SourceConfig, FieldGroup/FieldChip) are built and green; Canvas,
+DetailTable, Preview, and Export PDF are still to come. Exact status lives in
+`packages/designer/progress.md` (see its "Now / Next / Notes" block); the four
+governance docs in that folder (`design.md`, `claude.md`, `memory.md`,
+`progress.md`) remain the source of truth — read them before touching the code.
