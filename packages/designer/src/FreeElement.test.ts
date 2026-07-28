@@ -159,6 +159,81 @@ describe('FreeElement', () => {
     expect(onEditText).toHaveBeenCalledWith('Updated');
   });
 
+  it('in "%" mode, the aria-label and rendered style use % instead of px', () => {
+    render(FreeElementView, {
+      props: {
+        element: fieldElement({ x: 10, y: 20 }),
+        selected: false,
+        bandLabel: 'Report Header',
+        unit: '%',
+        contentWidthPx: 1000,
+        bandHeightPx: 200,
+        ...callbacks(),
+      },
+    });
+    const el = screen.getByRole('button', { name: 'Invoice # field, Report Header, x 10% y 20%' });
+    expect(el.style.left).toBe('10%');
+    expect(el.style.top).toBe('20%');
+  });
+
+  it('in "%" mode, dragging moves the element by a percentage delta (memory.md D-028)', () => {
+    const cb = callbacks();
+    render(FreeElementView, {
+      props: {
+        element: fieldElement({ x: 10, y: 10 }),
+        selected: false,
+        bandLabel: 'Report Header',
+        unit: '%',
+        contentWidthPx: 1000, // x/w basis
+        bandHeightPx: 200, // y/h basis
+        ...cb,
+      },
+    });
+    const el = screen.getByRole('button', { name: /Invoice #/ });
+    pointerDown(el, 100, 100);
+    pointerMove(150, 120); // dx=50px -> 5% of 1000; dy=20px -> 10% of 200
+    expect(cb.onChange).toHaveBeenCalledWith({ x: 15, y: 20 });
+  });
+
+  it('in "%" mode, resizing the SE handle grows width/height using the same percentage bases', () => {
+    const cb = callbacks();
+    render(FreeElementView, {
+      props: {
+        element: fieldElement({ x: 0, y: 0, w: 20, h: 20 }),
+        selected: true,
+        bandLabel: 'Report Header',
+        unit: '%',
+        contentWidthPx: 1000,
+        bandHeightPx: 200,
+        ...cb,
+      },
+    });
+    const handle = screen.getByRole('button', { name: 'Resize (se)' });
+    pointerDown(handle, 0, 0);
+    pointerMove(100, 20); // dx=100px -> 10% of 1000; dy=20px -> 10% of 200
+    expect(cb.onChange).toHaveBeenCalledWith({ x: 0, y: 0, w: 30, h: 30 });
+  });
+
+  it('in "%" mode, keyboard arrows nudge by a percentage step derived from the px step', async () => {
+    const cb = callbacks();
+    render(FreeElementView, {
+      props: {
+        element: fieldElement({ x: 10, y: 10 }),
+        selected: false,
+        bandLabel: 'Report Header',
+        unit: '%',
+        contentWidthPx: 100, // 1px -> 1%
+        bandHeightPx: 100, // 1px -> 1%
+        ...cb,
+      },
+    });
+    const el = screen.getByRole('button', { name: /Invoice #/ });
+    await fireEvent.keyDown(el, { key: 'ArrowRight' });
+    expect(cb.onChange).toHaveBeenCalledWith({ x: 11 });
+    await fireEvent.keyDown(el, { key: 'ArrowDown', shiftKey: true });
+    expect(cb.onChange).toHaveBeenCalledWith({ y: 20 });
+  });
+
   it('renders an image with its src, or a placeholder when empty', () => {
     const withSrc: FreeElement = { id: 'e3', kind: 'image', x: 0, y: 0, w: 50, h: 50, src: { kind: 'url', value: 'https://example.com/logo.png' } };
     const { container, unmount } = render(FreeElementView, {

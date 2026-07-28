@@ -4,13 +4,19 @@ import { newTemplate } from '@docsmith/core';
 import PrintSetup from './PrintSetup.svelte';
 
 function setup(
-  overrides: Partial<{ keepRowTogether: boolean; pageHeaderEnabled: boolean; pageFooterEnabled: boolean }> = {},
+  overrides: Partial<{
+    keepRowTogether: boolean;
+    pageHeaderEnabled: boolean;
+    pageFooterEnabled: boolean;
+    layoutUnit: 'px' | '%';
+  }> = {},
 ) {
   const template = newTemplate('invoice', 'invoice');
   const onPrintSetupChange = vi.fn();
   const onKeepRowTogetherChange = vi.fn();
   const onPageHeaderToggle = vi.fn();
   const onPageFooterToggle = vi.fn();
+  const onLayoutUnitChange = vi.fn();
   render(PrintSetup, {
     props: {
       printSetup: template.printSetup,
@@ -21,9 +27,18 @@ function setup(
       onPageHeaderToggle,
       pageFooterEnabled: overrides.pageFooterEnabled ?? false,
       onPageFooterToggle,
+      layoutUnit: overrides.layoutUnit ?? 'px',
+      onLayoutUnitChange,
     },
   });
-  return { template, onPrintSetupChange, onKeepRowTogetherChange, onPageHeaderToggle, onPageFooterToggle };
+  return {
+    template,
+    onPrintSetupChange,
+    onKeepRowTogetherChange,
+    onPageHeaderToggle,
+    onPageFooterToggle,
+    onLayoutUnitChange,
+  };
 }
 
 describe('PrintSetup', () => {
@@ -57,6 +72,20 @@ describe('PrintSetup', () => {
     expect(template.printSetup.showPageNumbers).toBe(true);
     await fireEvent.click(screen.getByLabelText('Show page numbers'));
     expect(onPrintSetupChange).toHaveBeenCalledWith({ ...template.printSetup, showPageNumbers: false });
+  });
+
+  it('defaults the layout-unit select to "Fixed (px)"', () => {
+    setup();
+    const select = screen.getByLabelText('Element position/size unit') as HTMLSelectElement;
+    expect(select.value).toBe('px');
+  });
+
+  it('calls onLayoutUnitChange with "%" when switched to Relative', async () => {
+    const { onLayoutUnitChange } = setup();
+    await fireEvent.change(screen.getByLabelText('Element position/size unit'), {
+      target: { value: '%' },
+    });
+    expect(onLayoutUnitChange).toHaveBeenCalledWith('%');
   });
 
   it('"Repeat page header/footer" calls onPageHeaderToggle/onPageFooterToggle, NOT onPrintSetupChange', async () => {

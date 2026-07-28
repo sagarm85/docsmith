@@ -162,6 +162,18 @@ export type Template = {
   printSetup: PrintSetup;
   dataSource: DataSource;
   bands: Band[];
+  /** Global unit for every free-form element's x/y/w/h (never per-element —
+   * see designer memory.md D-028). Absent means 'px' (the original, only
+   * behavior before this field existed — existing templates keep working
+   * unchanged). '%' means x/w are relative to the band's content width (the
+   * FULL page width — bands are direct children of `.page`, spanning
+   * edge-to-edge; `printSetup.margins` is a print-only `@page` concept, never
+   * a CSS inset on the HTML box model) and y/h are relative to the band's own
+   * height — CSS resolves this natively since every band is already
+   * `position:relative` with an explicit height. Band heights themselves
+   * (FreeBand.height) always stay px regardless — they're the outer box,
+   * not content inside one. */
+  layoutUnit?: 'px' | '%';
 };
 
 // ─── Render inputs/outputs ───────────────────────────────────────────────────

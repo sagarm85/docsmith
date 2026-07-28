@@ -667,6 +667,56 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('switching the layout unit to "%" migrates existing element coordinates (memory.md D-028)', async () => {
+    const el = await mountWithEntitySelected();
+
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Invoice # to report header"]')!
+      .click();
+    await nextTick();
+
+    const before = el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+      elements: Array<{ x: number; y: number; w: number; h: number }>;
+    };
+    expect(before.elements[0]?.x).toBe(0);
+    expect(el.getTemplate?.()?.layoutUnit).toBeUndefined();
+
+    const pageTab = Array.from(el.shadowRoot!.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Page',
+    );
+    pageTab?.click();
+    await nextTick();
+
+    const unitSelect = el.shadowRoot!.querySelector<HTMLSelectElement>(
+      '[aria-label="Element position/size unit"]',
+    );
+    expect(unitSelect?.value).toBe('px');
+    unitSelect!.value = '%';
+    unitSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    expect(el.getTemplate?.()?.layoutUnit).toBe('%');
+    const after = el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+      elements: Array<{ x: number; y: number; w: number; h: number }>;
+    };
+    // A4 portrait content width in px (geometry.ts's mm->px, 96/25.4) is
+    // ~793.7 — a field element added at x:0 stays 0% regardless of basis.
+    expect(after.elements[0]?.x).toBe(0);
+    // width converts to a real percentage of that basis (not left as raw px).
+    expect(after.elements[0]?.w).toBeGreaterThan(0);
+    expect(after.elements[0]?.w).toBeLessThan(100);
+
+    // ElementProps' Position legend reflects the new unit once selected.
+    const elementBtn = Array.from(el.shadowRoot!.querySelectorAll('[role="button"]')).find((b) =>
+      b.getAttribute('aria-label')?.startsWith('Invoice # field'),
+    ) as HTMLElement;
+    elementBtn.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await nextTick();
+    expect(el.shadowRoot?.textContent).toContain('Position (%)');
+
+    el.remove();
+  });
+
   it('calls config.onChange (debounced) after an edit, not on every keystroke', async () => {
     vi.useFakeTimers();
     try {

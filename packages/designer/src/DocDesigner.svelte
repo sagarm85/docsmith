@@ -6,6 +6,7 @@
     canUndo,
     commit,
     commitFrom,
+    convertLayoutUnit,
     defaultFormatForType,
     initHistory,
     isDetailBand,
@@ -31,6 +32,7 @@
     saveTemplateToLocalStorage,
   } from './persistence.js';
   import { createFieldElement, createDetailColumn, createBlockElement, type BlockKind } from './template-edits.js';
+  import { pageDimensionsPx } from './geometry.js';
   import ErrorInline from './ui/ErrorInline.svelte';
   import Toast from './ui/Toast.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -142,6 +144,17 @@
 
   function handlePrintSetupChange(next: PrintSetupType) {
     commitTemplate({ ...template, printSetup: next });
+  }
+
+  // Template.layoutUnit (memory.md D-028): toggling migrates every free-form
+  // element's x/y/w/h via core.convertLayoutUnit in the same commit, so undo
+  // reverts the whole switch (unit + values) as one step. contentWidthPx is
+  // the page's FULL width (Canvas.svelte's contentWidthPx derivation — bands
+  // span edge-to-edge; printSetup.margins is a print-only @page concept, not
+  // a box-model inset).
+  function handleLayoutUnitChange(nextUnit: 'px' | '%') {
+    const contentWidthPx = pageDimensionsPx(template.printSetup).width;
+    commitTemplate(convertLayoutUnit(template, nextUnit, contentWidthPx));
   }
 
   function handleKeepRowTogetherChange(next: boolean) {
@@ -606,6 +619,7 @@
               onPageHeaderToggle={(enabled) => handleTogglePageBand('pageHeader', enabled)}
               pageFooterEnabled={pageFooterBand?.enabled ?? false}
               onPageFooterToggle={(enabled) => handleTogglePageBand('pageFooter', enabled)}
+              onLayoutUnitChange={handleLayoutUnitChange}
             />
           </aside>
         {:else}

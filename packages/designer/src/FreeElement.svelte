@@ -6,15 +6,14 @@
   const GRID = 4;
   const MIN_SIZE = 10;
 
-  function snap(n: number): number {
-    return Math.round(n / GRID) * GRID;
-  }
-
   let {
     element,
     selected,
     zoom = 1,
     bandLabel,
+    unit = 'px',
+    contentWidthPx = 0,
+    bandHeightPx = 0,
     onSelect,
     onChange,
     onDragStart,
@@ -35,6 +34,12 @@
     /** Name of the containing band, for the accessible label (design.md §12:
      * "Invoice # field, report header, x 12 y 48"). */
     bandLabel: string;
+    /** Template-global layout unit (memory.md D-028). x/w are relative to
+     * `contentWidthPx`; y/h are relative to `bandHeightPx` — both required
+     * (and used) only when unit === '%'; ignored in 'px' mode. */
+    unit?: 'px' | '%';
+    contentWidthPx?: number;
+    bandHeightPx?: number;
     onSelect: () => void;
     /** Called continuously during a move/resize drag — the parent applies this
      * live (no history push) so undo/redo sees the whole drag as one step. */
@@ -50,6 +55,24 @@
     onSendBack: () => void;
     onEditText?: (text: string) => void;
   } = $props();
+
+  // px<->% conversion (memory.md D-028). No-ops in 'px' mode. x/w use the
+  // band's content width as their basis; y/h use the band's own height —
+  // same split core.convertLayoutUnit uses for the one-time migration.
+  function toPx(value: number, basisPx: number): number {
+    return unit === '%' ? (value / 100) * basisPx : value;
+  }
+  function fromPx(value: number, basisPx: number): number {
+    return unit === '%' ? (value / basisPx) * 100 : value;
+  }
+  function snapX(n: number): number {
+    return unit === '%' ? Math.round(n * 2) / 2 : Math.round(n / GRID) * GRID;
+  }
+  function snapY(n: number): number {
+    return unit === '%' ? Math.round(n * 2) / 2 : Math.round(n / GRID) * GRID;
+  }
+  const minW = $derived(fromPx(MIN_SIZE, contentWidthPx));
+  const minH = $derived(fromPx(MIN_SIZE, bandHeightPx));
 
   type DragState =
     | { kind: 'move'; startX: number; startY: number; ox: number; oy: number }
@@ -92,7 +115,10 @@
       oy: element.y,
       ow: element.w,
       oh: element.h,
-      aspect: element.w / (element.h || 1),
+      // Visual (true px-equivalent) aspect ratio — w/h alone would be wrong
+      // in '%' mode since x/w and y/h use different bases (content width vs
+      // band height); see memory.md D-028.
+      aspect: toPx(element.w, contentWidthPx) / (toPx(element.h, bandHeightPx) || 1),
     };
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
@@ -100,11 +126,13 @@
 
   function handlePointerMove(e: PointerEvent) {
     if (!drag) return;
-    const dx = (e.clientX - drag.startX) / zoom;
-    const dy = (e.clientY - drag.startY) / zoom;
+    const dxRaw = (e.clientX - drag.startX) / zoom;
+    const dyRaw = (e.clientY - drag.startY) / zoom;
+    const dx = fromPx(dxRaw, contentWidthPx);
+    const dy = fromPx(dyRaw, bandHeightPx);
 
     if (drag.kind === 'move') {
-      onChange({ x: Math.max(0, snap(drag.ox + dx)), y: Math.max(0, snap(drag.oy + dy)) });
+      onChange({ x: Math.max(0, snapX(drag.ox + dx)), y: Math.max(0, snapY(drag.oy + dy)) });
       return;
     }
 
@@ -117,27 +145,29 @@
     const lockAspect = e.shiftKey && element.kind === 'image';
 
     if (handle.includes('w')) {
-      w = Math.max(MIN_SIZE, ow - dx);
+      w = Math.max(minW, ow - dx);
       x = ox + (ow - w);
     }
     if (handle.includes('e')) {
-      w = Math.max(MIN_SIZE, ow + dx);
+      w = Math.max(minW, ow + dx);
     }
     if (handle.includes('n')) {
-      h = Math.max(MIN_SIZE, oh - dy);
+      h = Math.max(minH, oh - dy);
       y = oy + (oh - h);
     }
     if (handle.includes('s')) {
-      h = Math.max(MIN_SIZE, oh + dy);
+      h = Math.max(minH, oh + dy);
     }
 
     if (lockAspect && (handle.length === 2)) {
-      // Corner handle: derive height from width to keep the original aspect.
-      h = Math.max(MIN_SIZE, w / aspect);
+      // Corner handle: derive height from width to keep the original visual
+      // aspect ratio (in true px terms, then converted back to this unit).
+      const visualW = toPx(w, contentWidthPx);
+      h = Math.max(minH, fromPx(visualW / aspect, bandHeightPx));
       if (handle.includes('n')) y = oy + (oh - h);
     }
 
-    onChange({ x: snap(x), y: snap(y), w: snap(w), h: snap(h) });
+    onChange({ x: snapX(x), y: snapY(y), w: snapX(w), h: snapY(h) });
   }
 
   function handlePointerUp() {
@@ -165,23 +195,25 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    const step = e.shiftKey ? 10 : 1;
+    const stepPx = e.shiftKey ? 10 : 1;
+    const stepX = fromPx(stepPx, contentWidthPx);
+    const stepY = fromPx(stepPx, bandHeightPx);
     switch (e.key) {
       case 'ArrowUp':
         e.preventDefault();
-        nudge({ y: Math.max(0, element.y - step) });
+        nudge({ y: Math.max(0, element.y - stepY) });
         break;
       case 'ArrowDown':
         e.preventDefault();
-        nudge({ y: element.y + step });
+        nudge({ y: element.y + stepY });
         break;
       case 'ArrowLeft':
         e.preventDefault();
-        nudge({ x: Math.max(0, element.x - step) });
+        nudge({ x: Math.max(0, element.x - stepX) });
         break;
       case 'ArrowRight':
         e.preventDefault();
-        nudge({ x: element.x + step });
+        nudge({ x: element.x + stepX });
         break;
       case 'Delete':
       case 'Backspace':
@@ -220,8 +252,12 @@
     element.kind === 'field' ? (element.label ?? element.binding?.column ?? 'field') : undefined,
   );
 
+  // design.md §12's documented pattern is "x {x} y {y}" (no unit suffix) —
+  // preserved exactly for the default 'px' case; '%' appends the suffix so
+  // the two modes aren't ambiguous to a screen-reader user.
+  const posSuffix = $derived(unit === '%' ? '%' : '');
   const ariaLabel = $derived(
-    `${element.kind === 'field' ? `${displayLabel} field` : `${element.kind} element`}, ${bandLabel}, x ${element.x} y ${element.y}`,
+    `${element.kind === 'field' ? `${displayLabel} field` : `${element.kind} element`}, ${bandLabel}, x ${element.x}${posSuffix} y ${element.y}${posSuffix}`,
   );
 
   const HANDLES = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'];
@@ -230,7 +266,7 @@
 <div
   class="dd-el"
   class:dd-el--selected={selected}
-  style="left:{element.x}px;top:{element.y}px;width:{element.w}px;height:{element.h}px"
+  style="left:{element.x}{unit};top:{element.y}{unit};width:{element.w}{unit};height:{element.h}{unit}"
   role="button"
   tabindex="0"
   aria-label={ariaLabel}

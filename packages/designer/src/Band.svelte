@@ -20,6 +20,8 @@
     band,
     selectedElementId,
     bandSelected,
+    unit = 'px',
+    contentWidthPx = 0,
     onAddElement,
     onInvalidDrop,
     onSelectElement,
@@ -37,6 +39,11 @@
     band: FreeBand;
     selectedElementId?: string;
     bandSelected?: boolean;
+    /** Template-global layout unit (memory.md D-028), passed through to every
+     * FreeElement so its drag/resize math and rendered position use the
+     * right basis. */
+    unit?: 'px' | '%';
+    contentWidthPx?: number;
     onAddElement: (element: FreeElement) => void;
     onInvalidDrop: (reason: string) => void;
     onSelectElement: (elementId: string) => void;
@@ -163,6 +170,9 @@
           element={el}
           selected={selectedElementId === el.id}
           bandLabel={bandLabel[band.type]}
+          {unit}
+          {contentWidthPx}
+          bandHeightPx={band.height}
           onSelect={() => onSelectElement(el.id)}
           onChange={(patch) => onElementLiveChange(el.id, patch)}
           onDragStart={onElementDragStart}

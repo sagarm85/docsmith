@@ -17,6 +17,7 @@
 
   let {
     element,
+    unit = 'px',
     onChange,
     onDelete,
     onDuplicate,
@@ -24,12 +25,20 @@
     onSendBack,
   }: {
     element: FreeElement;
+    /** Template-global layout unit (memory.md D-028) — changes the Position/
+     * Size field labels and numeric ranges; the values themselves are always
+     * already in this unit (DocDesigner converts the whole template up front
+     * when the unit toggles, so this component never converts anything). */
+    unit?: 'px' | '%';
     onChange: (patch: Partial<FreeElement>) => void;
     onDelete: () => void;
     onDuplicate: () => void;
     onBringForward: () => void;
     onSendBack: () => void;
   } = $props();
+
+  const posMax = $derived(unit === '%' ? 100 : undefined);
+  const posStep = $derived(unit === '%' ? 0.5 : 1);
 
   const FORMAT_OPTIONS = [
     { value: 'text', label: 'Text' },
@@ -52,18 +61,18 @@
   <h3 class="dd-props-title"><Icon name={ELEMENT_ICON[element.kind]} size={13} />{element.kind} element</h3>
 
   <fieldset class="dd-props-grid">
-    <legend>Position</legend>
+    <legend>Position ({unit})</legend>
     <Field label="X" fieldId="dd-el-x">
-      <NumberInput id="dd-el-x" ariaLabel="X position" min={0} value={element.x} onchange={(v) => onChange({ x: v })} />
+      <NumberInput id="dd-el-x" ariaLabel="X position" min={0} max={posMax} step={posStep} value={element.x} onchange={(v) => onChange({ x: v })} />
     </Field>
     <Field label="Y" fieldId="dd-el-y">
-      <NumberInput id="dd-el-y" ariaLabel="Y position" min={0} value={element.y} onchange={(v) => onChange({ y: v })} />
+      <NumberInput id="dd-el-y" ariaLabel="Y position" min={0} max={posMax} step={posStep} value={element.y} onchange={(v) => onChange({ y: v })} />
     </Field>
     <Field label="Width" fieldId="dd-el-w">
-      <NumberInput id="dd-el-w" ariaLabel="Width" min={1} value={element.w} onchange={(v) => onChange({ w: v })} />
+      <NumberInput id="dd-el-w" ariaLabel="Width" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.w} onchange={(v) => onChange({ w: v })} />
     </Field>
     <Field label="Height" fieldId="dd-el-h">
-      <NumberInput id="dd-el-h" ariaLabel="Height" min={1} value={element.h} onchange={(v) => onChange({ h: v })} />
+      <NumberInput id="dd-el-h" ariaLabel="Height" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.h} onchange={(v) => onChange({ h: v })} />
     </Field>
   </fieldset>
 

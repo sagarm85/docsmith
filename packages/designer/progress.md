@@ -162,6 +162,31 @@
   after the fixes. 106 tests pass (unchanged — this was markup/CSS only, one
   test's stale `{label}` assertion updated); lint/typecheck/build all green
   (`dist/doc-designer.js` ~281KB / ~69KB gzip).
+- **Now — percentage-based layout, a global px/% toggle (D-028).** User
+  feedback: an element positioned at a fixed pixel offset physically stays
+  there when the page size/orientation changes (px is ~96/inch, identical in
+  the canvas and the real PDF), which can crowd the margin or overflow on a
+  narrower page — asked for elements to "realign based on the outer box"
+  instead, as one global per-template setting (not per-element, when asked).
+  New `Template.layoutUnit?: 'px' | '%'` (absent = 'px', fully backward-
+  compatible); `core.renderToHtml` emits the matching CSS unit; new
+  `core.convertLayoutUnit(template, targetUnit, contentWidthPx)` migrates
+  every element in one pass (x/w against the band's full content width, y/h
+  against the band's own height — bands span edge-to-edge, margins are a
+  print-only `@page` concept, never a box-model inset). `FreeElement.svelte`'s
+  drag/resize/keyboard-nudge math is now unit-aware (`unit`/`contentWidthPx`/
+  `bandHeightPx` props threaded down through `Canvas.svelte`→`Band.svelte`),
+  including a corrected *true visual* aspect-ratio calc for the image
+  shift-lock (x/w and y/h use different bases in `%` mode, so the naive
+  ratio would have silently distorted images). New toggle in
+  `PrintSetup.svelte`'s Page tab (same "lives elsewhere, grouped here"
+  pattern as `keepRowTogether`); `ElementProps.svelte`'s Position/Size fields
+  relabel and re-range (0–100, 0.5 step) in `%` mode. Verified with unit
+  tests (core conversion + render output, canvas drag/resize/keyboard math,
+  a full DocDesigner integration test) **and** a real-browser screenshot
+  confirming a template converted to `%` renders pixel-identical to its `px`
+  original. 22 core tests pass (was 16); 113 designer tests pass (was 106);
+  lint/typecheck/build all green (`dist/doc-designer.js` ~287KB / ~70KB gzip).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -366,6 +391,20 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Percentage-based layout (D-028).** New `Template.layoutUnit?:
+  'px' | '%'` (absent = 'px', backward-compatible); `core.renderToHtml` emits
+  the matching CSS unit; new `core.convertLayoutUnit(template, targetUnit,
+  contentWidthPx)` migrates every free-form element's x/y/w/h in one pass
+  (x/w against the band's full content width, y/h against the band's own
+  height). `FreeElement.svelte`'s drag/resize/keyboard-nudge math threads
+  `unit`/`contentWidthPx`/`bandHeightPx` down through `Canvas.svelte`→
+  `Band.svelte` and is fully unit-aware, including a corrected true-visual
+  aspect-ratio calc for the image shift-lock. New toggle in `PrintSetup.svelte`
+  (Page tab); `ElementProps.svelte` relabels/re-ranges Position/Size fields
+  per unit. Verified with core unit tests, canvas drag-math tests, a full
+  DocDesigner integration test, and a real-browser screenshot confirming
+  pixel-identical rendering after conversion. 22 core tests pass (was 16);
+  113 designer tests pass (was 106); lint/typecheck/build all green.
 - **2026-07-28 — Cross-cutting visual redesign (D-025/D-026/D-027).** Full
   design plan + before/after covered in the "Now" note above. Amended
   `design.md` §11 (visual design system revised for approachability, D-025 —

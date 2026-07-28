@@ -488,6 +488,53 @@ dev-only shim is simpler, smaller, and fixes the actual problem without
 touching the component that ships to real hosts at all.
 `[status: locked]`
 
+### D-028 — `Template.layoutUnit` is a global px/% toggle, not a per-element choice; x/w use content width, y/h use band height
+**Decision:** A new optional `Template.layoutUnit?: 'px' | '%'` field (absent
+= `'px'`, fully backward-compatible) switches **every** free-form element's
+x/y/w/h at once — never a per-element unit choice. x/w convert against the
+band's full content width (bands span edge-to-edge; `printSetup.margins` is a
+print-only `@page` concept, never a box-model inset — confirmed by reading
+both `Canvas.svelte`'s markup and `core.renderToHtml`'s output, where bands
+are direct children of the page div with no margin/padding applied for
+`printSetup.margins`). y/h convert against each band's own `height` (always
+px — the outer box, never itself relative to something else). `core`'s new
+`convertLayoutUnit(template, targetUnit, contentWidthPx)` performs the
+one-time migration when the toggle flips (in the same undo step, via
+`DocDesigner.handleLayoutUnitChange`); `core.renderToHtml` emits the matching
+CSS unit; the canvas (`FreeElement.svelte`'s drag/resize math, threaded
+`unit`/`contentWidthPx`/`bandHeightPx` props down through
+`Canvas.svelte`→`Band.svelte`) converts mouse-pixel deltas into the active
+unit so dragging/resizing/keyboard-nudging all feel native regardless of
+mode. The image aspect-lock (shift-drag a corner) computes the *true visual*
+aspect ratio (converting both w and h to a common px-equivalent basis first)
+rather than the raw stored-unit ratio, since x/w and y/h use different bases
+in `%` mode and a naive `w/h` ratio would silently distort images.
+**Why:** The user asked specifically for a **global per-template** setting
+(not per-element) when offered the choice, and for "elements to realign
+based on the outer box" when switching page size/orientation — `x:100px` on
+an A4 page physically stays at 100px on a narrower A5 page today (px is a
+fixed physical unit, ~96px/inch, identical in the canvas and the real PDF),
+which can crowd the margin or overflow; `%` fixes that by construction, via
+plain CSS percentage resolution against the containing block — no manual
+recomputation needed at render time.
+**Verified:** unit tests for `convertLayoutUnit` (px→%, round-trip, DetailBand
+untouched) and `renderToHtml`'s emitted CSS unit in `core`; drag/resize/
+keyboard-nudge percentage math in `FreeElement.test.ts`; a full
+DocDesigner.test.ts integration test toggling the unit and checking migrated
+values plus the ElementProps label update; and a real-browser screenshot
+(Puppeteer against the production build) confirming a template converted to
+`%` renders pixel-identical to its `px` original — proving the CSS
+percentage resolution actually matches the assumed content-width basis, not
+just that the numbers compute correctly in isolation.
+**Rejected:** a per-element unit (offered as an option, not chosen — would
+let mixed px/% elements coexist, but adds real complexity — every
+drag/resize/render path would need to branch per element instead of once per
+template — for a use case the user didn't ask for); converting x/w against
+content-width-minus-margins (an earlier draft of this decision, caught and
+fixed before landing — margins don't actually inset anything in the HTML box
+model here, only in the print/PDF engine's `@page` handling).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

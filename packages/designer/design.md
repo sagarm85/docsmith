@@ -320,14 +320,30 @@ Optional bands (`pageHeader`, `pageFooter`) can be toggled on/off.
 
 ### 8.3 Free-form elements (all bands except detail)
 - **Select:** click. Multi-select: shift-click / marquee.
-- **Move:** pointer-drag. Snaps to a 4px grid and to sibling edges (smart guides).
-- **Resize:** 8 handles. Aspect-locked for images with shift.
-- **Keyboard:** arrows nudge 1px (shift = 10px); Delete removes; Cmd/Ctrl-D duplicates.
+- **Move:** pointer-drag. Snaps to a 4px grid (or 0.5% in `%` layout mode — see
+  below) and to sibling edges (smart guides).
+- **Resize:** 8 handles. Aspect-locked for images with shift (the *true*
+  visual aspect ratio, not the raw stored-unit ratio — see memory.md D-028).
+- **Keyboard:** arrows nudge 1px/0.1%-equivalent (shift = 10px/1%-equivalent);
+  Delete removes; Cmd/Ctrl-D duplicates.
 - **Z-order:** bring-forward/send-back in Properties and via `]` / `[`.
 - Element kinds: `text` (static, editable inline on double-click), `field` (bound,
-  shows `{label}` token in design, real value in preview), `image`, `line`, `box`.
+  renders as a visible chip in design per D-025 — icon + label, never bare
+  `{label}` text — and its real value in preview/PDF), `image`, `line`, `box`.
 - Reuse the pointer-drag math pattern from unidb-studio's `SchemaVisualizer` (drag
   delta divided by zoom); do not pull in a library.
+
+**Layout unit — px vs. % (memory.md D-028).** `Template.layoutUnit` is a
+template-global toggle (Properties → Page tab), not per-element: `'px'`
+(default, absent on older templates) keeps every free-form element's x/y/w/h
+as a fixed pixel offset; `'%'` makes x/w relative to the band's full content
+width and y/h relative to the band's own height, so elements rescale when the
+page size/orientation changes instead of staying at a fixed physical spot
+(and potentially overflowing a narrower page). Toggling migrates every
+existing element's coordinates in one undo step via
+`core.convertLayoutUnit()`. `core.renderToHtml` emits the matching CSS unit
+(`left:{x}%` vs `left:{x}px`) — both the canvas and the real
+preview/PDF output honor whichever unit the template is in.
 
 ### 8.4 Drop handling
 - Palette chip dragover a **valid** band → band highlights, insertion ghost shown.
@@ -413,9 +429,12 @@ Context-sensitive. Tabs: **Selection** and **Page**.
 - **Band:** height (except detail), visibility (optional bands), background.
 
 **Page tab (Print Setup):** page size, orientation, margins (mm, four inputs +
-presets), and the toggles: repeat page header, repeat page footer, show page
-numbers, keep rows together. Editing any of these updates `printSetup` and the
-preview live.
+presets), the element position/size unit (px/%, §8.3, D-028 — grouped here
+since it's a template-wide layout concern even though it lives on `Template`,
+not `PrintSetup`, same pattern `keepRowTogether` already uses), and the
+toggles: repeat page header, repeat page footer, show page numbers, keep rows
+together. Editing any of these updates `printSetup` (or, for the layout unit,
+`Template.layoutUnit` + a migration) and the preview live.
 
 All numeric inputs are typed, min/max-clamped, and reflect the model immediately
 (two-way). No apply button — direct manipulation.

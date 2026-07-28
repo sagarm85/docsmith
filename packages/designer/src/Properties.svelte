@@ -35,6 +35,7 @@
     onPageHeaderToggle,
     pageFooterEnabled,
     onPageFooterToggle,
+    onLayoutUnitChange,
   }: {
     template: Template;
     selection: Selection;
@@ -54,6 +55,10 @@
     onPageHeaderToggle: (enabled: boolean) => void;
     pageFooterEnabled: boolean;
     onPageFooterToggle: (enabled: boolean) => void;
+    /** Template.layoutUnit (memory.md D-028) migration — DocDesigner performs
+     * the actual px<->% conversion via core.convertLayoutUnit before
+     * committing. */
+    onLayoutUnitChange: (unit: 'px' | '%') => void;
   } = $props();
 
   let activeTab = $state<'selection' | 'page'>('selection');
@@ -124,6 +129,7 @@
         {@const elementId = selection.elementId}
         <ElementProps
           element={selectedElement}
+          unit={template.layoutUnit ?? 'px'}
           onChange={(patch) => onElementChange(bandId, elementId, patch)}
           onDelete={() => onElementDelete(bandId, elementId)}
           onDuplicate={() => onElementDuplicate(bandId, elementId)}
@@ -156,6 +162,8 @@
         {onPageHeaderToggle}
         {pageFooterEnabled}
         {onPageFooterToggle}
+        layoutUnit={template.layoutUnit ?? 'px'}
+        {onLayoutUnitChange}
       />
     {/if}
   </div>

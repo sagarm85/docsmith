@@ -9,6 +9,7 @@ import type {
   Template,
   TemplateDataset,
 } from './types.js';
+import { isDetailBand } from './types.js';
 
 const DEFAULT_PRINT_SETUP: PrintSetup = {
   pageSize: 'A4',
@@ -111,4 +112,56 @@ export function isValidTemplate(t: unknown): t is Template {
 /** Find a band by type (first match). */
 export function findBand(t: Template, type: Band['type']): Band | undefined {
   return t.bands.find((b) => b.type === type);
+}
+
+/**
+ * Convert every free-form element's x/y/w/h between 'px' and '%' (designer
+ * memory.md D-028: a global per-template setting, not per-element). x/w
+ * convert against `contentWidthPx` (the page's FULL width — bands span
+ * edge-to-edge in both the canvas and `renderToHtml`'s real output;
+ * `printSetup.margins` is a print-only `@page` concept, never a box-model
+ * inset — the caller computes this from `printSetup.pageSize`/`orientation`
+ * via mm→px geometry math that's design-canvas-only, per
+ * `packages/designer/src/geometry.ts`'s own comment on why `core` doesn't
+ * otherwise need it); y/h convert against each
+ * band's own `height` (always px — the outer box, never itself relative to
+ * something else). No-op (returns the same template reference) if already
+ * in the target unit. Values are rounded (2 decimals for '%', whole px)
+ * since sub-pixel/sub-0.01% precision has no visual meaning here and the
+ * designer's own drag-snap will requantize on the next edit anyway.
+ */
+export function convertLayoutUnit(
+  template: Template,
+  targetUnit: 'px' | '%',
+  contentWidthPx: number,
+): Template {
+  const currentUnit = template.layoutUnit ?? 'px';
+  if (currentUnit === targetUnit) return template;
+
+  const convert = (value: number, basisPx: number): number => {
+    const raw =
+      currentUnit === 'px'
+        ? (basisPx > 0 ? (value / basisPx) * 100 : 0) // px -> %
+        : (value / 100) * basisPx; // % -> px
+    const rounded = targetUnit === '%' ? Math.round(raw * 100) / 100 : Math.round(raw);
+    return rounded;
+  };
+
+  return {
+    ...template,
+    layoutUnit: targetUnit,
+    bands: template.bands.map((band): Band => {
+      if (isDetailBand(band)) return band;
+      return {
+        ...band,
+        elements: band.elements.map((el) => ({
+          ...el,
+          x: convert(el.x, contentWidthPx),
+          y: convert(el.y, band.height),
+          w: convert(el.w, contentWidthPx),
+          h: convert(el.h, band.height),
+        })),
+      };
+    }),
+  };
 }

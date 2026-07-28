@@ -114,6 +114,15 @@
 
   const page = $derived(pageDimensionsPx(template.printSetup));
   const margins = $derived(marginsPx(template.printSetup));
+  const layoutUnit = $derived(template.layoutUnit ?? 'px');
+  // The content box every free-form element's x/w is relative to in '%' mode
+  // (memory.md D-028) is the FULL page width, not page width minus margins:
+  // bands are direct children of `.page`/`.dd-page` in both core.renderToHtml
+  // and this canvas, spanning edge-to-edge — `printSetup.margins` is a
+  // print-only `@page` concept (applied by the browser's print/PDF engine),
+  // never a CSS padding/margin on the HTML box model itself. The `.dd-margins`
+  // guide div below is purely a visual overlay, not a real content inset.
+  const contentWidthPx = $derived(page.width);
 
   // pageHeader/pageFooter are optional (design.md §2) — absent from a fresh
   // template until enabled from the Page tab. Shown here whenever they exist
@@ -163,6 +172,8 @@
         <div class="dd-optional-band" class:dd-optional-band--disabled={pageHeader.enabled === false}>
           <Band
             band={pageHeader}
+          unit={layoutUnit}
+          {contentWidthPx}
             selectedElementId={selection?.kind === 'element' && selection.bandId === 'pageHeader' ? selection.elementId : undefined}
             bandSelected={selection?.kind === 'band' && selection.bandId === 'pageHeader'}
             onAddElement={(el) => onAddElement('pageHeader', el)}
@@ -184,6 +195,8 @@
       {#if reportHeader}
         <Band
           band={reportHeader}
+          unit={layoutUnit}
+          {contentWidthPx}
           selectedElementId={selection?.kind === 'element' && selection.bandId === 'reportHeader' ? selection.elementId : undefined}
           bandSelected={selection?.kind === 'band' && selection.bandId === 'reportHeader'}
           onAddElement={(el) => onAddElement('reportHeader', el)}
@@ -218,6 +231,8 @@
       {#if totals}
         <Band
           band={totals}
+          unit={layoutUnit}
+          {contentWidthPx}
           selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
           bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}
           onAddElement={(el) => onAddElement('totals', el)}
@@ -239,6 +254,8 @@
         <div class="dd-optional-band" class:dd-optional-band--disabled={pageFooter.enabled === false}>
           <Band
             band={pageFooter}
+          unit={layoutUnit}
+          {contentWidthPx}
             selectedElementId={selection?.kind === 'element' && selection.bandId === 'pageFooter' ? selection.elementId : undefined}
             bandSelected={selection?.kind === 'band' && selection.bandId === 'pageFooter'}
             onAddElement={(el) => onAddElement('pageFooter', el)}

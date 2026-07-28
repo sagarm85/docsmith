@@ -80,8 +80,9 @@ function renderFreeElement(
   el: FreeElement,
   data: DocumentData,
   fmtOpts: FormatOptions,
+  layoutUnit: 'px' | '%',
 ): string {
-  const pos = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;overflow:hidden`;
+  const pos = `position:absolute;left:${el.x}${layoutUnit};top:${el.y}${layoutUnit};width:${el.w}${layoutUnit};height:${el.h}${layoutUnit};overflow:hidden`;
   const st = styleToCss(el.style);
   const style = `${pos};${st}`;
 
@@ -110,11 +111,15 @@ function renderFreeBand(
   band: FreeBand,
   data: DocumentData,
   fmtOpts: FormatOptions,
+  layoutUnit: 'px' | '%',
   extraClass = '',
 ): string {
   if (band.enabled === false) return '';
-  const els = band.elements.map((e) => renderFreeElement(e, data, fmtOpts)).join('');
+  const els = band.elements.map((e) => renderFreeElement(e, data, fmtOpts, layoutUnit)).join('');
   const st = styleToCss(band.style);
+  // Band height always stays px (design.md: it's the outer box for its own
+  // elements, not content relative to something else — see core/types.ts's
+  // Template.layoutUnit doc comment).
   return `<div class="band band-${band.type} ${extraClass}" data-band="${band.type}" style="position:relative;height:${band.height}px;${st}">${els}</div>`;
 }
 
@@ -171,11 +176,16 @@ function renderDetailBand(
   return `<table class="detail" data-band="detail">${thead}${tfoot}${tbody}</table>`;
 }
 
-function renderBand(band: Band, data: DocumentData, fmtOpts: FormatOptions): string {
+function renderBand(
+  band: Band,
+  data: DocumentData,
+  fmtOpts: FormatOptions,
+  layoutUnit: 'px' | '%',
+): string {
   if (isDetailBand(band)) return renderDetailBand(band, data, fmtOpts);
   // pageHeader/pageFooter are handled separately (fixed); here we render the
   // in-flow bands: reportHeader and totals.
-  return renderFreeBand(band as FreeBand, data, fmtOpts);
+  return renderFreeBand(band as FreeBand, data, fmtOpts, layoutUnit);
 }
 
 // ── base stylesheet ──────────────────────────────────────────────────────────────
@@ -216,6 +226,7 @@ export function renderToHtml(template: Template, data: DocumentData): RenderResu
     locale: template.printSetup.locale,
     currency: template.printSetup.currency,
   };
+  const layoutUnit = template.layoutUnit ?? 'px';
 
   const bands = template.bands;
   const pageHeader = bands.find(
@@ -232,12 +243,12 @@ export function renderToHtml(template: Template, data: DocumentData): RenderResu
   const flowOrder: Band['type'][] = ['reportHeader', 'detail', 'totals'];
   const flowHtml = flowOrder
     .flatMap((type) => bands.filter((b) => b.type === type))
-    .map((b) => renderBand(b, data, fmtOpts))
+    .map((b) => renderBand(b, data, fmtOpts, layoutUnit))
     .join('\n');
 
   const runningHtml =
-    (pageHeader ? renderFreeBand(pageHeader, data, fmtOpts, 'running running-top') : '') +
-    (pageFooter ? renderFreeBand(pageFooter, data, fmtOpts, 'running running-bottom') : '');
+    (pageHeader ? renderFreeBand(pageHeader, data, fmtOpts, layoutUnit, 'running running-top') : '') +
+    (pageFooter ? renderFreeBand(pageFooter, data, fmtOpts, layoutUnit, 'running running-bottom') : '');
 
   const css = `${pageCss(template.printSetup)}\n${baseCss(runningTop, runningBottom)}`;
   const html = `${runningHtml}\n<div class="page"><div class="doc-flow">${flowHtml}</div></div>`;

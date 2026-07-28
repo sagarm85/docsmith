@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { renderToHtml } from './render.js';
-import { newTemplate } from './schema.js';
+import { newTemplate, convertLayoutUnit } from './schema.js';
 import { formatValue } from './format.js';
-import type { DocumentData, Template } from './types.js';
+import type { DocumentData, FreeBand, Template } from './types.js';
 
 function invoiceTemplate(): Template {
   const t = newTemplate('invoice', 'invoice');
@@ -89,6 +89,61 @@ describe('renderToHtml — pagination primitives', () => {
   it('produces a standalone document string for Puppeteer', () => {
     expect(out.document.startsWith('<!doctype html>')).toBe(true);
     expect(out.document).toContain('INVOICE');
+  });
+});
+
+describe('renderToHtml — layoutUnit (px vs %)', () => {
+  it('defaults to px when layoutUnit is absent (existing templates unaffected)', () => {
+    const out = renderToHtml(invoiceTemplate(), fatDocument(1));
+    expect(out.html).toContain('left:12px');
+    expect(out.html).toContain('top:8px');
+  });
+
+  it('emits % instead of px for every free-form element when layoutUnit is "%"', () => {
+    const t = { ...invoiceTemplate(), layoutUnit: '%' as const };
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('left:12%');
+    expect(out.html).toContain('top:8%');
+    expect(out.html).not.toContain('left:12px');
+    // Band height is always px regardless of layoutUnit — it's the outer box.
+    expect(out.html).toContain('height:120px');
+  });
+});
+
+describe('convertLayoutUnit', () => {
+  it('is a no-op (same reference) when already in the target unit', () => {
+    const t = invoiceTemplate();
+    expect(convertLayoutUnit(t, 'px', 800)).toBe(t);
+  });
+
+  it('converts px -> % using contentWidthPx for x/w and band height for y/h', () => {
+    const t = invoiceTemplate();
+    const next = convertLayoutUnit(t, '%', 800);
+    expect(next.layoutUnit).toBe('%');
+    const reportHeader = next.bands.find((b) => b.id === 'reportHeader') as FreeBand;
+    // e1: x=12,y=8,w=200,h=28 against contentWidthPx=800, band.height=120
+    const e1 = reportHeader.elements.find((e) => e.id === 'e1')!;
+    expect(e1.x).toBe(1.5); // 12/800*100
+    expect(e1.w).toBe(25); // 200/800*100
+    expect(e1.y).toBeCloseTo(6.67, 1); // 8/120*100
+    expect(e1.h).toBeCloseTo(23.33, 1); // 28/120*100
+  });
+
+  it('round-trips px -> % -> px back to (approximately) the original values', () => {
+    const t = invoiceTemplate();
+    const asPercent = convertLayoutUnit(t, '%', 800);
+    const backToPx = convertLayoutUnit(asPercent, 'px', 800);
+    const original = (t.bands.find((b) => b.id === 'reportHeader') as FreeBand).elements[0]!;
+    const roundTripped = (backToPx.bands.find((b) => b.id === 'reportHeader') as FreeBand).elements[0]!;
+    expect(roundTripped.x).toBe(original.x);
+    expect(roundTripped.w).toBe(original.w);
+  });
+
+  it('never converts the DetailBand (it has no free-form elements)', () => {
+    const t = invoiceTemplate();
+    const next = convertLayoutUnit(t, '%', 800);
+    const detail = next.bands.find((b) => b.id === 'detail');
+    expect(detail).toStrictEqual(t.bands.find((b) => b.id === 'detail'));
   });
 });
 

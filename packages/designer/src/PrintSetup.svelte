@@ -14,6 +14,8 @@
     onPageHeaderToggle,
     pageFooterEnabled,
     onPageFooterToggle,
+    layoutUnit,
+    onLayoutUnitChange,
   }: {
     printSetup: PrintSetup;
     onPrintSetupChange: (next: PrintSetup) => void;
@@ -28,6 +30,11 @@
     onPageHeaderToggle: (enabled: boolean) => void;
     pageFooterEnabled: boolean;
     onPageFooterToggle: (enabled: boolean) => void;
+    /** `Template.layoutUnit` (memory.md D-028) — a template-level field, not
+     * part of `PrintSetup`, same "lives elsewhere but grouped in this tab"
+     * pattern as `keepRowTogether` above. */
+    layoutUnit: 'px' | '%';
+    onLayoutUnitChange: (unit: 'px' | '%') => void;
   } = $props();
 
   const PAGE_SIZE_OPTIONS = [
@@ -39,6 +46,10 @@
   const ORIENTATION_OPTIONS = [
     { value: 'portrait', label: 'Portrait' },
     { value: 'landscape', label: 'Landscape' },
+  ];
+  const LAYOUT_UNIT_OPTIONS = [
+    { value: 'px', label: 'Fixed (px)' },
+    { value: '%', label: 'Relative (%)' },
   ];
 
   function patch(next: Partial<PrintSetup>) {
@@ -110,6 +121,24 @@
       />
     </Field>
   </fieldset>
+
+  <Field label="Element position/size unit" fieldId="dd-layout-unit">
+    <Select
+      id="dd-layout-unit"
+      ariaLabel="Element position/size unit"
+      value={layoutUnit}
+      options={LAYOUT_UNIT_OPTIONS}
+      onchange={(v) => onLayoutUnitChange(v as 'px' | '%')}
+    />
+  </Field>
+  <p class="dd-layout-unit-hint">
+    {#if layoutUnit === '%'}
+      Elements resize with the page — switching page size or orientation
+      rescales every element instead of leaving it at a fixed spot.
+    {:else}
+      Elements stay at a fixed pixel position regardless of page size.
+    {/if}
+  </p>
 
   <fieldset class="dd-toggle-group">
     <legend><Icon name="repeat" size={11} />Print behaviour</legend>
@@ -186,6 +215,12 @@
     border-radius: var(--dd-radius);
     padding: 8px;
     margin: 0;
+  }
+
+  .dd-layout-unit-hint {
+    margin: -4px 0 0;
+    font-size: 11px;
+    color: var(--dd-muted);
   }
 
   .dd-toggle-group legend {
