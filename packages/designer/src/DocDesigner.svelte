@@ -22,7 +22,12 @@
     type Template,
   } from '@docsmith/core';
   import type { DocDesignerConfig, Selection } from './types.js';
-  import { saveTemplateToLocalStorage } from './persistence.js';
+  import {
+    deleteTemplateFromLocalStorage,
+    listTemplatesFromLocalStorage,
+    loadTemplateFromLocalStorage,
+    saveTemplateToLocalStorage,
+  } from './persistence.js';
   import { createFieldElement, createDetailColumn, createBlockElement, type BlockKind } from './template-edits.js';
   import ErrorInline from './ui/ErrorInline.svelte';
   import Toast from './ui/Toast.svelte';
@@ -53,6 +58,20 @@
   let docId = $state('');
   let exporting = $state(false);
   let exportToast = $state<{ variant: 'success' | 'error'; message: string } | null>(null);
+
+  // design.md §13: onChange(template) fires (debounced) on every edit — distinct
+  // from onSave, which only fires on an explicit Save click. 800ms is long enough
+  // to coalesce a burst of edits (typing, a drag's live updates) into one call
+  // without feeling laggy for a "just landed" autosave indicator elsewhere.
+  const ON_CHANGE_DEBOUNCE_MS = 800;
+  let onChangeTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    const current = template;
+    if (!config?.onChange) return;
+    clearTimeout(onChangeTimer);
+    onChangeTimer = setTimeout(() => config.onChange?.(current), ON_CHANGE_DEBOUNCE_MS);
+    return () => clearTimeout(onChangeTimer);
+  });
 
   // Host-page theme overrides (design.md §13 `theme`) are applied as inline custom
   // properties on the shadow-root's own top-level element, so they cascade to every
@@ -308,6 +327,7 @@
         await config.onSave(template);
       } else {
         saveTemplateToLocalStorage(template);
+        refreshSavedTemplates();
       }
       saveToast = { variant: 'success', message: 'Template saved.' };
     } catch (err) {
@@ -318,6 +338,36 @@
     } finally {
       saving = false;
     }
+  }
+
+  // Template list/rename/delete (design.md §4's "[Template name ▾]"). Rename is
+  // just editing the name field + Save, already fully supported — this adds
+  // list/switch/delete/new. Only meaningful in standalone mode (memory.md
+  // D-010): when a host supplies `onSave`, IT owns storage and this browser's
+  // localStorage isn't authoritative — the control disables itself rather than
+  // showing a possibly stale/irrelevant list.
+  let savedTemplates = $state<Array<{ id: string; name: string }>>([]);
+  const templateListDisabled = $derived(Boolean(config?.onSave));
+
+  function refreshSavedTemplates() {
+    savedTemplates = listTemplatesFromLocalStorage();
+  }
+  refreshSavedTemplates();
+
+  function handleSelectTemplate(id: string) {
+    const found = savedTemplates.find((t) => t.id === id);
+    if (!found) return;
+    const loaded = loadTemplateFromLocalStorage(id);
+    if (loaded) setTemplate(loaded);
+  }
+
+  function handleDeleteTemplate(id: string) {
+    deleteTemplateFromLocalStorage(id);
+    refreshSavedTemplates();
+  }
+
+  function handleNewTemplate() {
+    setTemplate(newTemplate());
   }
 
   // claude.md §10: the frontend's only interop with the backend beyond the
@@ -399,6 +449,12 @@
       <Toolbar
         templateName={template.name}
         onNameChange={handleNameChange}
+        templateId={template.id}
+        {savedTemplates}
+        {templateListDisabled}
+        onSelectTemplate={handleSelectTemplate}
+        onDeleteTemplate={handleDeleteTemplate}
+        onNewTemplate={handleNewTemplate}
         {mode}
         onModeChange={(next) => (mode = next)}
         canUndo={undoAvailable}

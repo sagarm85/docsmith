@@ -55,12 +55,35 @@
   rule as header fields (no "selected band" concept for a plain click).
   74 tests pass (was 67); lint/typecheck/build green (`dist/doc-designer.js`
   ~246KB / ~61KB gzip).
-- **Next:** template list/rename/delete; `onChange` autosave (debounced); the
-  keyboard drag-alternative (pick up chip → arrow to band → drop — the "+"
-  button already covers the keyboard-parity *requirement*, per D-018, so this
-  closes the gap to the *literal* interaction design.md §12 describes). Also
-  still carried forward: wiring `doc-save`/`doc-change` `CustomEvent` dispatch
-  (see Phase 1 notes below).
+- **Now (4):** Template list/rename/delete + debounced `onChange` autosave are
+  done. New `TemplateList.svelte` is the "[Template name ▾]" dropdown from
+  `design.md` §4's toolbar mockup: lists every `erpdoc.templates.*` entry
+  (standalone/localStorage mode only — disabled with an explanatory `title`
+  when the host supplies `onSave`, since then the host owns storage and this
+  browser's list isn't authoritative, per D-010), click to load
+  (`setTemplate`, resets undo history same as any host-driven replacement),
+  a delete button per entry, and "+ New template". Rename was already fully
+  working (the existing name input + Save) — this adds list/switch/delete/new.
+  `persistence.ts` gained `listTemplatesFromLocalStorage`/
+  `deleteTemplateFromLocalStorage`. `DocDesigner` now also debounces
+  `config.onChange(template)` at 800ms behind any edit (design.md §13),
+  distinct from the explicit-click `onSave`.
+  **Found and fixed a real Shadow DOM bug, not a test artifact:** the
+  popover's "click outside to close" handler used
+  `triggerEl.contains(e.target)` from a `window`-level listener — but Shadow
+  DOM event retargeting rewrites `e.target` to the shadow host once an event
+  crosses the shadow boundary, so this closed the popover on *every* click,
+  including the trigger's own. Fixed with `e.composedPath()`, which isn't
+  retargeted. Recorded as D-022 in `memory.md` — applies to any future
+  dropdown/popover in this codebase. 89 tests pass (was 74); lint/typecheck/
+  build green (`dist/doc-designer.js` ~256KB / ~63KB gzip).
+- **Next:** the keyboard drag-alternative (pick up chip → arrow to band →
+  drop — the "+" button already covers the keyboard-parity *requirement*, per
+  D-018, so this closes the gap to the *literal* interaction design.md §12
+  describes). Also still carried forward: wiring `doc-save`/`doc-change`
+  `CustomEvent` dispatch (see Phase 1 notes below — `onChange` now has a
+  real callback-based path via `config.onChange`, but the DOM `CustomEvent`
+  variant for host frameworks that prefer events isn't wired yet).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -218,7 +241,7 @@
       still open (memory.md O-1: asset storage API isn't decided yet)
 - [x] Undo/redo command stack (≥50 steps, `core.DEFAULT_MAX_HISTORY`) wired
       through all mutations
-- [ ] Template list / rename / delete; `onChange` autosave (debounced)
+- [x] Template list / rename / delete; `onChange` autosave (debounced)
 - [ ] Keyboard drag-alternative (pick up chip → arrow to band → drop)
 
 ## Phase 3 — ERP-grade
@@ -253,6 +276,22 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Template list/rename/delete + debounced `onChange` autosave.**
+  New `TemplateList.svelte`: the "[Template name ▾]" dropdown from `design.md`
+  §4, listing `erpdoc.templates.*` (standalone-mode only — disabled when the
+  host supplies `onSave`, per D-010), with click-to-load, per-entry delete,
+  and "+ New template". `persistence.ts` gained
+  `listTemplatesFromLocalStorage`/`deleteTemplateFromLocalStorage` (+ tests).
+  `DocDesigner` debounces `config.onChange(template)` at 800ms on every edit
+  (design.md §13), separate from the explicit `onSave` click. **Found and
+  fixed a real Shadow DOM bug** (not a test artifact): the popover's
+  click-outside-to-close handler used `triggerEl.contains(e.target)` from a
+  `window`-level listener, but Shadow DOM event retargeting rewrites
+  `e.target` to the shadow host once an event crosses the shadow boundary —
+  so it closed the popover on *every* click, including the trigger's own.
+  Fixed with `e.composedPath()`. Recorded as D-022 in `memory.md` — applies to
+  any future dropdown/popover in this codebase. 89 tests pass (was 74);
+  lint/typecheck/build green.
 - **2026-07-28 — Blocks palette group (Text/Image/Line/Box).** Added the static
   "Blocks" group to `Palette.svelte` (design.md §5), shown unconditionally since
   blocks aren't data-bound. Each is a draggable chip (`application/x-doc-block`

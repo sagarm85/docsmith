@@ -432,4 +432,103 @@ describe('<doc-designer>', () => {
 
     el.remove();
   });
+
+  it('template list: Save adds an entry, the list shows it, and selecting another loads it', async () => {
+    const el = mountWithAdapter();
+    await nextTick();
+    const firstId = el.getTemplate!()!.id;
+
+    findButton(el, 'Save')?.click();
+    await waitFor(() => expect(el.shadowRoot?.textContent).toContain('Template saved.'));
+
+    const trigger = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Saved templates"]');
+    expect(trigger?.disabled).toBe(false);
+    trigger?.click();
+    await nextTick();
+    expect(el.shadowRoot?.querySelector('[role="option"]')).toBeTruthy();
+
+    // Rename + save again so there are two distinguishable saved templates.
+    const nameInput = el.shadowRoot!.querySelector<HTMLInputElement>('#dd-template-name');
+    nameInput!.value = 'Second Template';
+    nameInput!.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+    findButton(el, '+ New template')?.click();
+    await nextTick();
+    expect(el.getTemplate?.()?.id).not.toBe(firstId);
+
+    trigger?.click();
+    await nextTick();
+    const firstOption = Array.from(el.shadowRoot!.querySelectorAll('[role="option"]')).find((o) =>
+      o.getAttribute('aria-label') !== 'Second Template',
+    ) as HTMLElement;
+    firstOption.click();
+    await nextTick();
+    expect(el.getTemplate?.()?.id).toBe(firstId);
+
+    el.remove();
+  });
+
+  it('template list is disabled when the host supplies onSave (D-010: host owns storage)', async () => {
+    const el = document.createElement('doc-designer') as DocDesignerEl;
+    el.config = { adapter: new StaticAdapter({ entities: [] }), onSave: vi.fn() };
+    document.body.appendChild(el);
+    await nextTick();
+
+    const trigger = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Saved templates"]');
+    expect(trigger?.disabled).toBe(true);
+
+    el.remove();
+  });
+
+  it('deleting a saved template removes it from the list', async () => {
+    const el = mountWithAdapter();
+    await nextTick();
+    findButton(el, 'Save')?.click();
+    await waitFor(() => expect(el.shadowRoot?.textContent).toContain('Template saved.'));
+
+    const trigger = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Saved templates"]');
+    trigger?.click();
+    await nextTick();
+    expect(el.shadowRoot?.querySelector('[role="option"]')).toBeTruthy();
+
+    const deleteBtn = Array.from(el.shadowRoot!.querySelectorAll('button')).find((b) =>
+      b.getAttribute('aria-label')?.startsWith('Delete '),
+    ) as HTMLButtonElement;
+    deleteBtn.click();
+    await nextTick();
+
+    // The popover's own Delete button stopPropagation()s the click, so it
+    // never triggers the "click outside closes it" handler — it's still open.
+    expect(el.shadowRoot?.textContent).toContain('No saved templates yet.');
+
+    el.remove();
+  });
+
+  it('calls config.onChange (debounced) after an edit, not on every keystroke', async () => {
+    vi.useFakeTimers();
+    try {
+      const onChange = vi.fn();
+      const el = document.createElement('doc-designer') as DocDesignerEl;
+      el.config = { adapter: new StaticAdapter({ entities: [] }), onChange };
+      document.body.appendChild(el);
+      await nextTick();
+
+      const nameInput = el.shadowRoot!.querySelector<HTMLInputElement>('#dd-template-name');
+      nameInput!.value = 'A';
+      nameInput!.dispatchEvent(new Event('input', { bubbles: true }));
+      await nextTick();
+      nameInput!.value = 'Ab';
+      nameInput!.dispatchEvent(new Event('input', { bubbles: true }));
+      await nextTick();
+
+      expect(onChange).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(800);
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ name: 'Ab' }));
+
+      el.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

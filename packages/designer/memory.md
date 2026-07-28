@@ -300,6 +300,33 @@ entirely (out of scope for a designer-only change — those fields are part of
 the shipped backend contract; simply no longer written to by this UI).
 `[status: locked]`
 
+### D-022 — "Click outside to close" must use `composedPath()`, never `event.target`, inside the shadow root
+**Decision:** Any future dropdown/popover/menu that closes on an outside click
+must detect "outside" via `e.composedPath().includes(anchorEl)`, never
+`anchorEl.contains(e.target)`, for a `window`-level (or any listener attached
+outside the component's own shadow subtree) click handler.
+**Why:** Found while building `TemplateList.svelte`'s popover: a `<svelte:window
+onclick>` handler checking `triggerEl.contains(e.target)` closed the popover on
+*every* click, including clicks on the trigger button itself that was supposed
+to open it. Root cause is Shadow DOM **event retargeting**: `doc-designer` is a
+shadow-DOM custom element (design.md §3), and per spec, once an event that
+originated inside a shadow root crosses the shadow boundary, `event.target` as
+seen by listeners *outside* that shadow root is rewritten to the shadow host
+element — never the actual element the user clicked. So `.contains(e.target)`
+is structurally unable to recognize "the click was inside my own popover" once
+the listener lives above the shadow boundary (which a `window` listener always
+does). `composedPath()` returns the true, un-retargeted path through the
+shadow tree and isn't affected. This is a correctness bug that would have
+shipped to production (not a jsdom-only artifact) — jsdom happened to be what
+surfaced it, via `DocDesigner.test.ts`'s real custom-element integration tests
+that other unit tests (rendering `TemplateList` standalone, outside a shadow
+root) couldn't catch.
+**Rejected:** scoping the listener to the component's own root via
+`getRootNode()` instead of `window` (works, but `composedPath()` is simpler,
+is the standard fix cited in web-components accessibility guides, and doesn't
+require plumbing the root node through).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

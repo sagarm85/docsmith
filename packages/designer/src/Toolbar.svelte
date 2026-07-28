@@ -1,11 +1,18 @@
 <script lang="ts">
   import Button from './ui/Button.svelte';
+  import TemplateList from './TemplateList.svelte';
 
   type Mode = 'design' | 'preview';
 
   let {
     templateName,
     onNameChange,
+    templateId,
+    savedTemplates,
+    templateListDisabled = false,
+    onSelectTemplate,
+    onDeleteTemplate,
+    onNewTemplate,
     mode,
     onModeChange,
     canUndo = false,
@@ -20,6 +27,12 @@
   }: {
     templateName: string;
     onNameChange: (name: string) => void;
+    templateId: string;
+    savedTemplates: Array<{ id: string; name: string }>;
+    templateListDisabled?: boolean;
+    onSelectTemplate: (id: string) => void;
+    onDeleteTemplate: (id: string) => void;
+    onNewTemplate: () => void;
     mode: Mode;
     onModeChange: (mode: Mode) => void;
     canUndo?: boolean;
@@ -48,6 +61,14 @@
       type="text"
       value={templateName}
       oninput={handleNameInput}
+    />
+    <TemplateList
+      templates={savedTemplates}
+      currentId={templateId}
+      disabled={templateListDisabled}
+      onSelect={onSelectTemplate}
+      onDelete={onDeleteTemplate}
+      onNew={onNewTemplate}
     />
   </div>
 
