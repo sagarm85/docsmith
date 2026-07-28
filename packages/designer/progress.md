@@ -8,17 +8,35 @@
 
 ## Now / Next / Notes
 
-- **Now: Phase 1 (MVP shell) is DONE.** The pagination gate (`claude.md` §8)
-  passed with real, programmatic evidence (not just a manual eyeball check) —
-  see "Pagination gate evidence" below. Every Phase 1 checklist item is
-  checked off.
-- **Next:** Phase 2 (Full WYSIWYG) — free-form drag/move/resize with grid snap
-  and smart guides, the full `Properties` panel (`ElementProps`/`ColumnProps`/
-  `BandProps`), `pageHeader`/`pageFooter` bands, image/logo elements, the
-  undo/redo command stack, template list/rename/delete, `onChange` autosave,
-  and the keyboard drag-alternative (pick up chip → arrow to band → drop). Also
-  carries forward from Phase 1: wiring `doc-save`/`doc-change` `CustomEvent`
-  dispatch (see notes below) and the static "Blocks" palette group.
+- **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
+  the full `Properties` panel, and the undo/redo command stack, all wired
+  together. `core/history.ts` is a new, generic, framework-agnostic
+  `HistoryState<T>` reducer (`commit`/`commitFrom`/`undo`/`redo`), per
+  `design.md` §8.7's explicit direction to keep history logic in `core`.
+  `FreeElement.svelte` gives every free-form element real click-to-select,
+  pointer move (4px grid snap), 8-handle resize (shift-locks aspect for
+  images), keyboard arrow-nudge (1px/10px shift, never negative), Delete,
+  Cmd/Ctrl+D duplicate, `]`/`[` z-order, and double-click-to-edit for text —
+  all correctly cleaned up via `onDestroy` if the element unmounts mid-drag
+  (a real bug caught by testing, not just a test artifact — see notes).
+  `Properties.svelte` + `ElementProps`/`ColumnProps`/`BandProps` are the
+  Selection tab (design.md §10); `PrintSetup` moved under a `Page` tab in the
+  same panel. Selection is a three-way discriminated union (`element` |
+  `column` | `band`) owned by `DocDesigner`; Escape or clicking empty canvas
+  space deselects. D-020 in `memory.md` records the undo/redo granularity
+  decision (one step per completed drag/nudge; one step per field-change
+  event — not debounced). `pnpm lint && pnpm typecheck && pnpm test && pnpm
+  build` all green (`dist/doc-designer.js` ~236KB / ~59KB gzip; 64 tests).
+- **Next:** `pageHeader`/`pageFooter` bands (toggle on/off, `position:fixed`
+  running bands — `BandProps`'s visibility toggle already has the UI, but no
+  template currently has these bands to toggle); the static "Blocks" palette
+  group (Text/Image/Line/Box) now that `FreeElement` exists to receive a
+  drop; template list/rename/delete; `onChange` autosave (debounced); the
+  keyboard drag-alternative (pick up chip → arrow to band → drop — the "+"
+  button already covers the keyboard-parity *requirement*, per D-018, so this
+  is closing the gap to the *literal* interaction design.md §12 describes).
+  Also still carried forward: wiring `doc-save`/`doc-change` `CustomEvent`
+  dispatch (see Phase 1 notes below).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -55,6 +73,14 @@
     `RENDER_URL=http://localhost:8090 pnpm demo` and inspect `out.pdf` with
     any PDF text-extraction tool.
 - **Notes / open questions:**
+  - Real bug caught by `FreeElement.test.ts`, not just a test artifact:
+    `FreeElement.svelte` added `window`-level `pointermove`/`pointerup`
+    listeners on drag-start but never removed them if the component was
+    destroyed mid-drag (e.g. deleted while being dragged) — a real leak and a
+    crash risk (a stale closure firing after Svelte tears the component down;
+    reproduced as "Cannot convert a Symbol value to a number" once a
+    destroyed component's prop was read from an old listener). Fixed with an
+    `onDestroy` cleanup removing both listeners unconditionally.
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
   - jsdom has no `DataTransfer`/`DragEvent` data channel implementation, so
@@ -158,11 +184,16 @@
 
 ## Phase 2 — Full WYSIWYG
 
-- [ ] Free-form drag/move/resize (`FreeElement.svelte`) with grid snap + smart guides
-- [ ] `Properties.svelte` + `ElementProps`/`ColumnProps`/`BandProps` — full editors
+- [x] Free-form drag/move/resize (`FreeElement.svelte`) with grid snap
+      (smart guides-to-siblings and multi-select/marquee are deferred — see
+      notes above; single-select move/resize/keyboard is fully real)
+- [x] `Properties.svelte` + `ElementProps`/`ColumnProps`/`BandProps` — full editors
 - [ ] `pageHeader`/`pageFooter` bands (toggle on/off; `position:fixed` running bands)
-- [ ] Image/logo element (URL, then upload via host/adapter)
-- [ ] Undo/redo command stack (≥50 steps) wired through all mutations
+- [ ] Image/logo element (URL, then upload via host/adapter) — `ElementProps`
+      already has the URL field and `FreeElement` already renders `<img>`;
+      what's missing is a way to *add* an image element (the Blocks palette group)
+- [x] Undo/redo command stack (≥50 steps, `core.DEFAULT_MAX_HISTORY`) wired
+      through all mutations
 - [ ] Template list / rename / delete; `onChange` autosave (debounced)
 - [ ] Keyboard drag-alternative (pick up chip → arrow to band → drop)
 
@@ -198,6 +229,34 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — Phase 2: free-form select/move/resize + Properties + undo/redo.**
+  Added `packages/core/src/history.ts` (`HistoryState<T>`, `commit`/`commitFrom`/
+  `undo`/`redo`/`canUndo`/`canRedo`, `DEFAULT_MAX_HISTORY = 50`) — generic, pure,
+  framework-agnostic, per `design.md` §8.7. `DocDesigner.svelte`'s `template` is
+  now `$derived(history.present)`; every existing mutation handler routes through
+  a new `commitTemplate()` instead of direct assignment. Added
+  `FreeElement.svelte`: click-select, pointer move (4px grid snap, matches
+  unidb-studio's `SchemaVisualizer` drag-delta-over-zoom pattern), 8 resize
+  handles (shift locks aspect ratio for images), keyboard arrow-nudge (1px,
+  10px with shift, clamped ≥0), Delete/Backspace, Cmd/Ctrl+D duplicate, `]`/`[`
+  z-order, double-click-to-edit for text elements — fully accessible
+  (`role="button"`, descriptive `aria-label` per design.md §12's
+  `"{label} field, {band}, x {x} y {y}"` pattern, real keyboard operability).
+  Drag/resize gestures batch into exactly one undo step via
+  `onDragStart`/`onChange` (live, unbatched)/`onDragEnd` (folds the pre-drag
+  snapshot into history via `commitFrom`); each keyboard nudge is its own
+  step. Recorded D-020 in `memory.md` for this granularity choice. Added
+  `Properties.svelte` (Selection/Page tabs) + `ElementProps.svelte` +
+  `ColumnProps.svelte` + `BandProps.svelte`; `PrintSetup` now lives under the
+  Page tab. Selection is a new `Selection` union type (`element`/`column`/
+  `band`) in `types.ts`, owned by `DocDesigner`; clicking empty canvas space or
+  pressing Escape deselects. `Band.svelte`/`DetailTable.svelte` updated for
+  click-to-select on their tabs/columns. Real bug caught by testing (not a
+  test artifact): `FreeElement.svelte`'s `window` pointermove/pointerup
+  listeners were never cleaned up if the component unmounted mid-drag — fixed
+  with an `onDestroy` handler. 64 tests pass (was 48, +7 in `core` for
+  `history.test.ts`); lint/typecheck/build all green (`dist/doc-designer.js`
+  ~236KB / ~59KB gzip).
 - **2026-07-28 — Phase 1 (MVP shell) DONE — pagination gate passed.** Verified
   the `claude.md` §8 gate with real evidence, not a manual eyeball check: built
   `@docsmith/render-service`, rendered the 60-row `StaticAdapter` invoice

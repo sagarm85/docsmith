@@ -12,3 +12,12 @@ export type DocDesignerConfig = {
   renderServiceUrl?: string;
   theme?: Record<string, string>;
 };
+
+/** What's currently selected on the canvas — drives the Properties panel's
+ * Selection tab (design.md §10). Owned by DocDesigner, read by Canvas/Band/
+ * DetailTable (to render a selected outline) and Properties (to edit it). */
+export type Selection =
+  | { kind: 'element'; bandId: string; elementId: string }
+  | { kind: 'band'; bandId: string }
+  | { kind: 'column'; columnIndex: number }
+  | null;

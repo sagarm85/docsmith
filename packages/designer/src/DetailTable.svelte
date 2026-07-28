@@ -19,16 +19,24 @@
     band,
     adapter,
     entity,
+    selectedColumnIndex,
+    bandSelected,
     onAddColumn,
     onUpdateColumns,
     onInvalidDrop,
+    onSelectColumn,
+    onSelectBand,
   }: {
     band: DetailBand;
     adapter: DataSourceAdapter;
     entity: string;
+    selectedColumnIndex?: number;
+    bandSelected?: boolean;
     onAddColumn: (column: DetailColumn) => void;
     onUpdateColumns: (columns: DetailColumn[]) => void;
     onInvalidDrop: (reason: string) => void;
+    onSelectColumn: (index: number) => void;
+    onSelectBand: () => void;
   } = $props();
 
   let dragOver = $state(false);
@@ -153,7 +161,14 @@
 </script>
 
 <div class="dd-band dd-detail">
-  <div class="dd-band-tab">Detail (line items)</div>
+  <button
+    type="button"
+    class="dd-band-tab"
+    class:dd-band-tab--selected={bandSelected}
+    onclick={onSelectBand}
+  >
+    Detail (line items)
+  </button>
   <div
     class="dd-detail-body"
     class:dd-detail-body--dragover={dragOver}
@@ -173,10 +188,12 @@
           <tr>
             {#each band.columns as col, i (col.column)}
               <th
+                class:dd-col--selected={selectedColumnIndex === i}
                 draggable="true"
                 ondragstart={(e) => handleColumnDragStart(e, i)}
                 ondragover={(e) => e.preventDefault()}
                 ondrop={(e) => handleColumnDrop(e, i)}
+                onclick={() => onSelectColumn(i)}
               >
                 <div class="dd-col-header">
                   <span class="dd-col-title">{col.header}</span>
@@ -258,13 +275,33 @@
   }
 
   .dd-band-tab {
+    display: block;
+    width: 100%;
+    text-align: left;
     padding: 3px 8px;
+    font: inherit;
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--dd-muted);
     background: var(--dd-panel-alt);
+    border: none;
+    cursor: pointer;
+  }
+
+  .dd-band-tab--selected {
+    color: var(--dd-accent);
+    box-shadow: inset 0 0 0 1px var(--dd-accent);
+  }
+
+  .dd-band-tab:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: -2px;
+  }
+
+  .dd-col--selected {
+    box-shadow: inset 0 0 0 2px var(--dd-accent);
   }
 
   .dd-detail-body {

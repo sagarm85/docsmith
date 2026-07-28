@@ -142,8 +142,14 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
-  it('PrintSetup in the properties rail edits the live template', async () => {
+  it('PrintSetup in the properties rail (Page tab) edits the live template', async () => {
     const el = mountWithAdapter();
+    await nextTick();
+
+    const pageTab = Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Page',
+    );
+    pageTab?.click();
     await nextTick();
     expect(el.shadowRoot?.textContent).toContain('Margins (mm)');
 
@@ -262,6 +268,121 @@ describe('<doc-designer>', () => {
     expect(el.shadowRoot?.textContent).toContain('Print');
 
     vi.unstubAllGlobals();
+    el.remove();
+  });
+
+  function adapterWithHeaderField() {
+    return new StaticAdapter({
+      entities: [
+        {
+          meta: { name: 'invoice', label: 'Invoice' },
+          headerFields: [
+            { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
+          ],
+          datasets: [],
+          documents: {},
+        },
+      ],
+    });
+  }
+
+  async function mountWithEntitySelected(): Promise<DocDesignerEl> {
+    const el = document.createElement('doc-designer') as DocDesignerEl;
+    el.config = { adapter: adapterWithHeaderField() };
+    document.body.appendChild(el);
+    await nextTick();
+
+    const t = el.getTemplate!();
+    el.setTemplate!({ ...t, dataSource: { ...t.dataSource, entity: 'invoice' } });
+    // Let SourceConfig/Palette/FieldGroup's async listEntities/getFields chain
+    // resolve and render the field chip.
+    for (let i = 0; i < 5; i++) await nextTick();
+    return el;
+  }
+
+  it('adding an element via a FieldChip "+" is undoable and redoable', async () => {
+    const el = await mountWithEntitySelected();
+
+    const addBtn = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '[aria-label="Add Invoice # to report header"]',
+    );
+    expect(addBtn).toBeTruthy();
+    expect(addBtn!.disabled).toBe(false);
+
+    addBtn!.click();
+    await nextTick();
+    const reportHeader = () =>
+      el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as { elements: unknown[] };
+    expect(reportHeader().elements).toHaveLength(1);
+
+    const undoBtn = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Undo"]');
+    expect(undoBtn?.disabled).toBe(false);
+    undoBtn!.click();
+    await nextTick();
+    expect(reportHeader().elements).toHaveLength(0);
+
+    const redoBtn = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Redo"]');
+    expect(redoBtn?.disabled).toBe(false);
+    redoBtn!.click();
+    await nextTick();
+    expect(reportHeader().elements).toHaveLength(1);
+
+    el.remove();
+  });
+
+  it('selecting an element shows ElementProps, and editing its position is one undo step', async () => {
+    const el = await mountWithEntitySelected();
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Invoice # to report header"]')!
+      .click();
+    await nextTick();
+
+    const elementBtn = Array.from(el.shadowRoot!.querySelectorAll('[role="button"]')).find((b) =>
+      b.getAttribute('aria-label')?.startsWith('Invoice # field'),
+    ) as HTMLElement;
+    expect(elementBtn).toBeTruthy();
+    elementBtn.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await nextTick();
+
+    expect(el.shadowRoot?.textContent).toContain('field element');
+    const xInput = el.shadowRoot!.querySelector<HTMLInputElement>('[aria-label="X position"]');
+    expect(xInput).toBeTruthy();
+
+    xInput!.value = '40';
+    xInput!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    const bandEl = () =>
+      (el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+        elements: Array<{ x: number }>;
+      }).elements[0];
+    expect(bandEl()?.x).toBe(40);
+
+    const undoBtn = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Undo"]');
+    undoBtn!.click();
+    await nextTick();
+    // One undo step undoes the whole position edit, back to x: 0 — the element
+    // itself must still exist (undoing the edit, not the earlier add).
+    expect(bandEl()?.x).toBe(0);
+
+    el.remove();
+  });
+
+  it('selecting a band (its tab) shows BandProps with a height field', async () => {
+    const el = await mountWithEntitySelected();
+
+    // Query all band tabs and click the one labelled "Totals".
+    const tabs = Array.from(el.shadowRoot!.querySelectorAll('button')).filter((b) =>
+      ['Report Header', 'Totals'].includes(b.textContent?.trim() ?? ''),
+    );
+    const totals = tabs.find((b) => b.textContent?.trim() === 'Totals');
+    expect(totals).toBeTruthy();
+    totals!.click();
+    await nextTick();
+
+    expect(el.shadowRoot?.textContent).toContain('Totals band');
+    expect(el.shadowRoot!.querySelector('[aria-label="Band height"]')).toBeTruthy();
+
     el.remove();
   });
 });

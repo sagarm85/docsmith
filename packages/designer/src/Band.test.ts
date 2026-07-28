@@ -14,9 +14,32 @@ function emptyBand(type: FreeBand['type'] = 'reportHeader'): FreeBand {
   return { id: type, type, height: 140, elements: [] };
 }
 
+function selectionCallbacks() {
+  return {
+    onSelectElement: vi.fn(),
+    onSelectBand: vi.fn(),
+    onDeselect: vi.fn(),
+    onElementLiveChange: vi.fn(),
+    onElementDragStart: vi.fn(),
+    onElementDragEnd: vi.fn(),
+    onElementDelete: vi.fn(),
+    onElementDuplicate: vi.fn(),
+    onElementBringForward: vi.fn(),
+    onElementSendBack: vi.fn(),
+    onElementEditText: vi.fn(),
+  };
+}
+
 describe('Band', () => {
   it('shows the empty hint when it has no elements', () => {
-    render(Band, { props: { band: emptyBand(), onAddElement: vi.fn(), onInvalidDrop: vi.fn() } });
+    render(Band, {
+      props: {
+        band: emptyBand(),
+        onAddElement: vi.fn(),
+        onInvalidDrop: vi.fn(),
+        ...selectionCallbacks(),
+      },
+    });
     expect(screen.getByText(/Drag header fields here/)).toBeTruthy();
   });
 
@@ -38,13 +61,22 @@ describe('Band', () => {
         },
       ],
     };
-    render(Band, { props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn() } });
+    render(Band, {
+      props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...selectionCallbacks() },
+    });
     expect(screen.getByText('{Invoice #}')).toBeTruthy();
   });
 
   it('accepts a header-field drop and appends a bound element', async () => {
     const onAddElement = vi.fn();
-    render(Band, { props: { band: emptyBand(), onAddElement, onInvalidDrop: vi.fn() } });
+    render(Band, {
+      props: {
+        band: emptyBand(),
+        onAddElement,
+        onInvalidDrop: vi.fn(),
+        ...selectionCallbacks(),
+      },
+    });
 
     const dropzone = screen.getByRole('group', { name: 'Report Header band' });
     await fireEvent.drop(dropzone, {
@@ -70,7 +102,9 @@ describe('Band', () => {
   it('rejects a dataset-field drop with an explanatory reason', async () => {
     const onAddElement = vi.fn();
     const onInvalidDrop = vi.fn();
-    render(Band, { props: { band: emptyBand(), onAddElement, onInvalidDrop } });
+    render(Band, {
+      props: { band: emptyBand(), onAddElement, onInvalidDrop, ...selectionCallbacks() },
+    });
 
     const dropzone = screen.getByRole('group', { name: 'Report Header band' });
     await fireEvent.drop(dropzone, {
@@ -98,8 +132,46 @@ describe('Band', () => {
         { id: 'e2', kind: 'field', x: 0, y: 24, w: 200, h: 18, label: 'B' },
       ],
     };
-    render(Band, { props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn() } });
+    render(Band, {
+      props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...selectionCallbacks() },
+    });
     expect(screen.getByText('{A}')).toBeTruthy();
     expect(screen.getByText('{B}')).toBeTruthy();
+  });
+
+  it('selecting an element and pressing Delete removes it', async () => {
+    const band: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 140,
+      elements: [{ id: 'e1', kind: 'field', x: 0, y: 0, w: 200, h: 18, label: 'A' }],
+    };
+    const callbacks = selectionCallbacks();
+    render(Band, { props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...callbacks } });
+
+    const el = screen.getByRole('button', { name: /A field, Report Header/ });
+    await fireEvent.pointerDown(el);
+    expect(callbacks.onSelectElement).toHaveBeenCalledWith('e1');
+
+    await fireEvent.keyDown(el, { key: 'Delete' });
+    expect(callbacks.onElementDelete).toHaveBeenCalledWith('e1');
+  });
+
+  it('clicking the band tab selects the band', async () => {
+    const callbacks = selectionCallbacks();
+    render(Band, {
+      props: { band: emptyBand(), onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...callbacks },
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Report Header' }));
+    expect(callbacks.onSelectBand).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicking empty band space deselects', async () => {
+    const callbacks = selectionCallbacks();
+    render(Band, {
+      props: { band: emptyBand(), onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...callbacks },
+    });
+    await fireEvent.click(screen.getByRole('group', { name: 'Report Header band' }));
+    expect(callbacks.onDeselect).toHaveBeenCalledTimes(1);
   });
 });

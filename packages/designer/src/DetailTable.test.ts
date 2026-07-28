@@ -59,6 +59,8 @@ describe('DetailTable', () => {
         onAddColumn: vi.fn(),
         onUpdateColumns: vi.fn(),
         onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
       },
     });
     expect(screen.getByText(/Drag line-item fields here/)).toBeTruthy();
@@ -75,6 +77,8 @@ describe('DetailTable', () => {
         onAddColumn,
         onUpdateColumns: vi.fn(),
         onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
       },
     });
 
@@ -111,6 +115,8 @@ describe('DetailTable', () => {
         onAddColumn,
         onUpdateColumns: vi.fn(),
         onInvalidDrop,
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
       },
     });
     const dropzone = screen.getByRole('group', { name: 'Detail band' });
@@ -154,6 +160,8 @@ describe('DetailTable', () => {
         onAddColumn: vi.fn(),
         onUpdateColumns,
         onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
       },
     });
 
@@ -174,6 +182,8 @@ describe('DetailTable', () => {
         onAddColumn: vi.fn(),
         onUpdateColumns,
         onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
       },
     });
 
@@ -196,6 +206,8 @@ describe('DetailTable', () => {
         onAddColumn: vi.fn(),
         onUpdateColumns: vi.fn(),
         onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
       },
     });
 
@@ -217,6 +229,8 @@ describe('DetailTable', () => {
         onAddColumn: vi.fn(),
         onUpdateColumns: vi.fn(),
         onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
       },
     });
 

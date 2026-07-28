@@ -243,6 +243,37 @@ including the `StaticAdapter` demo/dev path); adding a second render-service
 endpoint (unnecessary — push mode already exists and is simpler).
 `[status: locked]`
 
+### D-020 — Undo/redo granularity: one step per drag/nudge, one step per field change
+**Decision:** `core/history.ts` (`HistoryState<T>`, `commit`/`commitFrom`/`undo`/
+`redo`) is the generic reducer, per `design.md` §8.7's explicit direction to keep
+it in `core`. On top of it, `DocDesigner` batches granularity per interaction
+type:
+- A pointer drag (move or resize, via `FreeElement`'s `onDragStart`/`onChange`/
+  `onDragEnd`) is **one** undo step for the whole gesture — `onChange` updates
+  `history.present` directly (no push) on every tick; `onDragEnd` folds the
+  pre-drag snapshot into `past` once via `commitFrom`.
+- A keyboard arrow nudge is **one** undo step **per key press** (wrapped in its
+  own synchronous `onDragStart`→`onChange`→`onDragEnd`), since each press is
+  already a discrete action, not a continuous gesture.
+- Text/number field edits (template name, margins, column width/format/align,
+  band height, element position via `Properties`) commit **on every
+  change/input event**, same as Phase 1 — i.e. typing produces multiple undo
+  steps, one per change event.
+**Why:** Design.md §8.7 only says "every mutation is an undoable command," not
+how finely to batch continuous gestures — left as an implementation judgment
+call under `claude.md` §9. Drag/resize pointer events fire on every pixel of
+movement; committing history on every tick would make undo require dozens of
+presses to undo one visual move, which fails the actual intent of "undo my last
+action." Key presses and form-field changes are already discrete, bounded
+events, so no batching is needed there — the literal per-event granularity
+already matches "one action, one undo step" for those.
+**Rejected:** committing on every drag tick (technically "every mutation is
+undoable" but makes undo useless for drags); debouncing/blur-committing text
+inputs too (adds meaningful complexity — a controlled-input/live-value split —
+for a UX nicety that isn't required by any doc; can reconsider if it becomes a
+real pain point once used).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)
