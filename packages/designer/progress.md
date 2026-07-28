@@ -8,33 +8,22 @@
 
 ## Now / Next / Notes
 
-- **Now:** `Canvas.svelte` + `Band.svelte` + `DetailTable.svelte` are done and
-  green — Phase 1's core authoring loop is now real end-to-end: drag a field chip
-  (or click its "+") from the Palette and it lands in the template. `Canvas`
-  draws the page at real px dimensions from `printSetup` (`src/geometry.ts`,
-  design-time-only mm→px conversion — never used by `core.renderToHtml`, which
-  stays in real `mm`) with a margins guide, and stacks `reportHeader` → `detail`
-  → `totals` in fixed order. `Band` accepts native-DnD header-field drops
-  (rejects dataset fields with a toast, per `design.md` §8.4) and renders
-  existing elements as `{label}` tokens, stacked automatically. `DetailTable`
-  accepts dataset-field drops scoped to its own `datasetId` (rejects header
-  fields and other datasets' fields), renders real add/remove/reorder(drag
-  column headers)/format+align+width controls, and shows real sample rows via
-  `listSampleIds`→`fetchDocument` (honest hints when the adapter can't or the
-  sample set is empty). `DocDesigner`'s `handlePaletteAddField` finally wires
-  `Palette`'s `onAddField` for real (D-018: header-field "+" defaults to
-  `reportHeader`; dataset-field "+" always targets `detail`, its only legal
-  destination). Shared, tested pure helpers in `src/template-edits.ts`
-  (`createFieldElement`/`createDetailColumn`) keep the click-add and drag-drop
-  paths consistent. `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all
-  green (`dist/doc-designer.js` ~164KB / ~44KB gzip; 33 tests).
-- **Next:** `PrintSetup.svelte` (page size/orientation/margins + repeat/keep
-  toggles bound to `template.printSetup`, live-updating `Canvas`'s geometry), then
-  `Preview.svelte` (doc-id control + iframe via `core.renderToHtml`) and wiring
-  Export PDF for real (POST `{template, entity, id}` to `renderServiceUrl`/render
-  per `claude.md` §10 — plain `fetch`, NOT importing `@docsmith/sdk`, which isn't
-  on the designer's approved dependency list). Phase 1 is done only when the
-  pagination gate (`claude.md` §8) passes against a ≥40-row document.
+- **Now:** `PrintSetup.svelte` is done and green — page size, orientation, all
+  four margins, and the repeat-header/repeat-footer/show-page-numbers/keep-rows-
+  together toggles all live-edit `template.printSetup` (and, for keep-rows-
+  together, the `detail` band's own `keepRowTogether` — that field lives on the
+  band, not `printSetup`, in the data model even though `design.md` §10 groups it
+  into the same UI tab). Rendered in a right-rail `<aside>` in `DocDesigner`,
+  design-mode-only per `design.md` §4. Editing any field patches `template` live,
+  which `Canvas` already re-renders from (page geometry, margins guide).
+  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
+  (`dist/doc-designer.js` ~173KB / ~45KB gzip; 39 tests).
+- **Next:** `Preview.svelte` (doc-id control + iframe via `core.renderToHtml`),
+  then wiring Export PDF for real (POST `{template, entity, id}` to
+  `renderServiceUrl`/render per `claude.md` §10 — plain `fetch`, NOT importing
+  `@docsmith/sdk`, which isn't on the designer's approved dependency list) and
+  browser Print. Phase 1 is done only when the pagination gate (`claude.md` §8)
+  passes against a ≥40-row document.
 - **Notes / open questions:**
   - `pnpm` was not preinstalled in this environment; installed globally via
     `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
@@ -131,7 +120,7 @@
 - [x] `Band.svelte` — report/totals bands accept header fields via add-list (drag optional in P1)
 - [x] `DetailTable.svelte` — add/reorder/resize/format columns from dataset fields;
       real sample rows via `listSampleIds`→`fetchDocument`
-- [ ] `PrintSetup.svelte` — page size/orientation/margins + repeat/keep toggles → `printSetup`
+- [x] `PrintSetup.svelte` — page size/orientation/margins + repeat/keep toggles → `printSetup`
 - [ ] `Preview.svelte` — doc-id control; iframe renders `core.renderToHtml(template,data)`
 - [ ] Browser **Print** works; **Export PDF** posts to render service and downloads
 - [ ] **Pagination gate passed** (claude.md §8): ≥40-row doc, header repeats, no split row
@@ -179,6 +168,15 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — `PrintSetup.svelte`.** Page size/orientation `<Select>`s, four
+  margin `NumberInput`s, and four toggles (repeat page header/footer, show page
+  numbers, keep rows together) all patch `template.printSetup` live via
+  `onPrintSetupChange`; keep-rows-together patches the `detail` band's own
+  `keepRowTogether` via a separate `onKeepRowTogetherChange` (it's a per-band
+  field in the data model, not part of `PrintSetup`, even though `design.md` §10
+  groups it into the same tab). Wired into `DocDesigner` as a design-mode-only
+  right rail. 39 tests pass (was 33); lint/typecheck/build green
+  (`dist/doc-designer.js` ~173KB / ~45KB gzip).
 - **2026-07-28 — `Canvas.svelte` + `Band.svelte` + `DetailTable.svelte`.** The
   authoring loop is now real: drag a chip (or click its "+") and it becomes a
   template element/column. Added `src/geometry.ts` (page-size mm→px, design-time

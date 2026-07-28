@@ -9,6 +9,7 @@
     type FieldMeta,
     type FreeBand,
     type FreeElement,
+    type PrintSetup as PrintSetupType,
     type Template,
   } from '@docsmith/core';
   import type { DocDesignerConfig } from './types.js';
@@ -19,6 +20,7 @@
   import Toolbar from './Toolbar.svelte';
   import Palette from './Palette.svelte';
   import Canvas from './Canvas.svelte';
+  import PrintSetup from './PrintSetup.svelte';
 
   let { config }: { config?: DocDesignerConfig } = $props();
 
@@ -76,6 +78,22 @@
       bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, columns } : b)),
     };
   }
+
+  function handlePrintSetupChange(next: PrintSetupType) {
+    template = { ...template, printSetup: next };
+  }
+
+  function handleKeepRowTogetherChange(next: boolean) {
+    template = {
+      ...template,
+      bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, keepRowTogether: next } : b)),
+    };
+  }
+
+  const keepRowTogether = $derived(
+    (template.bands.find((b) => isDetailBand(b)) as { keepRowTogether?: boolean } | undefined)
+      ?.keepRowTogether ?? false,
+  );
 
   // The click-to-add "+" on a FieldChip has no "selected band" concept in Phase 1
   // (no free-form selection yet — that's Phase 2). Header fields default to
@@ -166,6 +184,14 @@
             onAddColumn={handleAddColumn}
             onUpdateColumns={handleUpdateColumns}
           />
+          <aside class="dd-properties" aria-label="Properties">
+            <PrintSetup
+              printSetup={template.printSetup}
+              onPrintSetupChange={handlePrintSetupChange}
+              {keepRowTogether}
+              onKeepRowTogetherChange={handleKeepRowTogetherChange}
+            />
+          </aside>
         {:else}
           <div class="dd-canvas-placeholder">
             <p>Preview lands later in Phase 1.</p>
@@ -221,5 +247,14 @@
   .dd-canvas-placeholder p {
     margin: 0;
     color: var(--dd-muted);
+  }
+
+  .dd-properties {
+    width: 260px;
+    flex: none;
+    height: 100%;
+    overflow-y: auto;
+    border-left: 1px solid var(--dd-border);
+    background: var(--dd-panel);
   }
 </style>

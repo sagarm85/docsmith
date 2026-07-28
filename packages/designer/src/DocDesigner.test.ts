@@ -139,4 +139,21 @@ describe('<doc-designer>', () => {
     expect(localStorage.getItem(`erpdoc.templates.${template?.id}`)).toBeNull();
     el.remove();
   });
+
+  it('PrintSetup in the properties rail edits the live template', async () => {
+    const el = mountWithAdapter();
+    await nextTick();
+    expect(el.shadowRoot?.textContent).toContain('Margins (mm)');
+
+    const pageSize = el.shadowRoot?.querySelector<HTMLSelectElement>(
+      '[aria-label="Page size"]',
+    );
+    expect(pageSize).toBeTruthy();
+    pageSize!.value = 'Letter';
+    pageSize!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    expect(el.getTemplate?.()?.printSetup.pageSize).toBe('Letter');
+    el.remove();
+  });
 });
