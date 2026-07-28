@@ -17,11 +17,16 @@
     <div id="host"></div>
 
     <!--
-      This is how an ERP embeds the designer once the `designer` package (built in
-      Antigravity IDE) is compiled to a custom element and bundled with the SDK.
+      This is how an ERP embeds the designer once the `designer` package is compiled
+      to a custom element and bundled with the SDK.
 
-      Until the designer bundle exists, this page shows the wiring only; the backend
-      (core + adapters + render-service) is already runnable via `pnpm demo`.
+      The designer package now exists (packages/designer, Phase 0 scaffold) but this
+      static page isn't wired to import its dev-server output — for a live local run
+      against the same 60-line StaticAdapter fixture used by `pnpm demo`, use:
+        pnpm --filter @docsmith/designer dev
+      which serves packages/designer/dev (imports this directory's fixtures.mjs
+      directly). The backend (core + adapters + render-service) is runnable via
+      `pnpm demo` at the repo root.
     -->
     <script type="module">
       // In a real build these come from the published bundles:

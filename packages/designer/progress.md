@@ -8,17 +8,39 @@
 
 ## Now / Next / Notes
 
-- **Now:** backend is ready. `@docsmith/core` (`renderToHtml`, `types.ts`, `schema.ts`,
-  `format.ts`), `@docsmith/adapters` (Static/Rest/Unidb), `@docsmith/sdk`, and
-  `@docsmith/render-service` are built and passing tests (8/8) + an end-to-end demo that
-  renders a 60-line invoice to a 3-page PDF with a repeating header. The frontend
-  (`packages/designer`) is unblocked and can start P0/P1.
-- **Next:** P1 MVP shell — custom element + SDK mount → Source picker → fixed bands
-  → detail column picker → Preview iframe via `core.renderToHtml` → Export PDF
-  (POST to render-service at `/render`).
+- **Now:** Phase 0 scaffold is done and green. `packages/designer` joined the pnpm
+  workspace, builds `<doc-designer>` as one custom-element bundle
+  (`dist/doc-designer.js`, ~80KB / ~24KB gzip — svelte + `@docsmith/core` +
+  `@docsmith/adapters` all bundled, zero extra runtime deps), and
+  `pnpm lint && pnpm typecheck && pnpm test && pnpm build` are all green for the
+  package. `DocDesigner.svelte` mounts, reads `{ adapter, template, onSave,
+  onChange, renderServiceUrl, theme }`, exposes `getTemplate`/`setTemplate` for the
+  SDK, and shows an honest empty state when no adapter is configured — no fabricated
+  data. `pnpm --filter @docsmith/designer dev` serves a local harness
+  (`packages/designer/dev`) against the same `StaticAdapter` 60-line invoice fixture
+  the backend `pnpm demo` uses.
+- **Next:** P1 MVP shell — Toolbar → Palette/SourceConfig → FieldGroup/FieldChip →
+  Canvas (fixed bands from `printSetup`) → DetailTable (real sample rows via
+  `listSampleIds`→`fetchDocument`) → PrintSetup → Preview (iframe via
+  `core.renderToHtml`) → Export PDF. Build in the `design.md` §14 order; Phase 1 is
+  done only when the pagination gate (`claude.md` §8) passes.
 - **Notes / open questions:**
-  - Repo not yet created on GitHub (see root plan "repo authorization"). The whole
-    project currently lives locally at `/home/user/erp-doc-designer`.
+  - `pnpm` was not preinstalled in this environment; installed globally via
+    `npm install -g pnpm@9.12.0` (matches the repo's pinned `packageManager`).
+  - Doc-update ritual applied: `svelte-check` and `jsdom` added to the approved
+    dev-dependency list (dev-only; zero runtime/bundle impact) to unblock TS
+    type-checking of `.svelte` files and vitest's DOM environment for
+    `@testing-library/svelte`. See `memory.md` D-016, `claude.md` §3, `design.md` §3.
+  - `$host()` hit a real typing issue against the installed Svelte 5.56.8 (`svelte-check`
+    reported "used before its declaration" / implicit `any`). Sidestepped it: the
+    `theme` config option is applied as inline CSS custom properties on the
+    shadow-root's top-level `<div>` instead of via `$host()`, which cascades to every
+    `--dd-*` consumer just the same. Revisit if a later Svelte version fixes `$host()`
+    typings, but no behavior is lost with the current approach.
+  - Pre-existing, not touched (out of scope for this frontend-only change):
+    `pnpm -r test` fails on `@docsmith/adapters` — it declares a `test` script but
+    has no test files yet, so `vitest run` exits 1. `packages/designer`'s own
+    `pnpm test` is unaffected and green.
   - Import types from `@docsmith/core` — do NOT redefine `Template`, `FieldMeta`,
     `DataSourceAdapter`. Preview/PDF MUST call `core.renderToHtml` (single renderer).
   - Reference the runnable backend: `pnpm demo` at repo root → `examples/invoice-demo/out.html`.
@@ -27,13 +49,15 @@
 
 ## Phase 0 — Scaffold
 
-- [ ] pnpm workspace joined; `packages/designer` builds a `doc-designer` custom element
-- [ ] TypeScript strict, ESLint, Prettier, Vitest configured; `pnpm lint/typecheck/test` green
-- [ ] `src/ui/tokens.css` with the full `--dd-*` token set (light + dark)
-- [ ] `src/ui/` primitives: `Button`, `Select`, `NumberInput`, `Field`, `Toast`,
+- [x] pnpm workspace joined; `packages/designer` builds a `doc-designer` custom element
+- [x] TypeScript strict, ESLint, Prettier, Vitest configured; `pnpm lint/typecheck/test` green
+- [x] `src/ui/tokens.css` with the full `--dd-*` token set (light + dark)
+- [x] `src/ui/` primitives: `Button`, `Select`, `NumberInput`, `Field`, `Toast`,
       `Skeleton`, `ErrorInline`, `Collapsible`
-- [ ] `DocDesigner.svelte` root mounts, reads `{ adapter, template, onSave, ... }`
-- [ ] `StaticAdapter` wired in `examples/invoice-demo` for local dev
+- [x] `DocDesigner.svelte` root mounts, reads `{ adapter, template, onSave, ... }`
+- [x] `StaticAdapter` wired for local dev — `pnpm --filter @docsmith/designer dev`
+      serves `packages/designer/dev`, which imports the same
+      `examples/invoice-demo/fixtures.mjs` (60-line invoice) the backend demo uses
 
 ## Phase 1 — MVP shell (end-to-end, real data, multi-page PDF)
 
@@ -94,4 +118,18 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
-- _(none yet — scaffold pending repo creation)_
+- **2026-07-28 — Phase 0 scaffold landed.** `packages/designer` joined the pnpm
+  workspace: Vite lib build compiling `DocDesigner.svelte` to the single
+  `doc-designer` custom element (Shadow DOM, `<svelte:options customElement=...>`,
+  `compilerOptions.customElement: true` in both `vite.config.ts` and
+  `svelte.config.js` — svelte-check reads the latter independently); TS strict,
+  ESLint (flat config) + Prettier, Vitest (jsdom) all configured and green;
+  `src/ui/tokens.css` (full `--dd-*` set, light/dark + host theme-override
+  variants); 8 `src/ui/` primitives; `DocDesigner.svelte` reads `config` (adapter,
+  template, onSave, onChange, renderServiceUrl, theme), exposes
+  `getTemplate`/`setTemplate`, shows an honest empty state with no adapter, and
+  applies `theme` overrides as inline custom properties (not `$host()` — see notes
+  above). Added `packages/designer/dev/` as a local harness reusing the backend's
+  `StaticAdapter` fixture. Recorded D-016 in `memory.md` (added `svelte-check` +
+  `jsdom` to the approved dev-dependency list) per the `claude.md` §9 doc-update
+  ritual. Toolbar/Palette/Canvas/Preview are Phase 1, not yet started.

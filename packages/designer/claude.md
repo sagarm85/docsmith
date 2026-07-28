@@ -72,7 +72,11 @@ silently deviate.
 
 Runtime: `svelte`, `@docsmith/core`, `@docsmith/adapters` (interface types).
 Dev: `vite`, `typescript`, `@sveltejs/vite-plugin-svelte`, `vitest`,
-`@testing-library/svelte`, `eslint` + plugins, `prettier`, `@playwright/test`.
+`@testing-library/svelte`, `eslint` + plugins, `prettier`, `@playwright/test`,
+`svelte-check` (the only way to type-check `<script lang="ts">` inside `.svelte`
+files — `tsc` alone can't parse them), `jsdom` (vitest DOM environment required by
+`@testing-library/svelte`). Both are dev-only, zero runtime/bundle impact. See
+`memory.md` D-016.
 
 **Anything else is forbidden without the doc-update ritual in §0.4.** Specifically
 forbidden: Tailwind/any CSS framework, dnd-kit/interact.js/SortableJS, Redux/Pinia/

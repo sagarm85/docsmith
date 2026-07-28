@@ -105,6 +105,9 @@ and repeating headers work natively (§9).
   so print CSS (`@page`, `position:fixed`) cannot leak into the editor chrome.
 
 Forbidden without a doc update: any runtime npm dependency not in the above list.
+Dev-only tooling required to actually run that stack — `svelte-check` (type-checks
+`.svelte` files; `tsc` alone can't) and `jsdom` (vitest's DOM environment for
+`@testing-library/svelte`) — is approved; see `claude.md` §3 and `memory.md` D-016.
 
 ---
 

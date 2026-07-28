@@ -158,6 +158,23 @@ business data as if it came from a real ERP in production.
 the no-fabrication rule for real deployments.
 `[status: locked]`
 
+### D-016 — `svelte-check` and `jsdom` approved as dev-only tooling
+**Decision:** Add `svelte-check` and `jsdom` to the approved dev dependency list
+(`claude.md` §3), scoped strictly to dev-only tooling — never runtime/bundle deps.
+**Why:** Phase 0 scaffold hit a gap `design.md`/`claude.md` didn't cover: `tsc` alone
+cannot type-check `<script lang="ts">` inside `.svelte` files (it has no `.svelte`
+parser), so `pnpm typecheck` needs `svelte-check` (the official Svelte tool, itself
+built on `typescript`). Likewise the approved-list choice `@testing-library/svelte`
+requires a DOM implementation for vitest to mount components against — `jsdom` is
+the standard companion. Both are devDependencies only; they never ship in the
+`doc-designer` custom-element bundle, so D-008 (zero extra *runtime* deps) is
+unaffected. Recorded per the `claude.md` §9 rule: fill genuine doc gaps and log the
+decision rather than guessing silently.
+**Rejected:** skipping `.svelte` type-checking entirely (defeats "TS strict mode");
+`happy-dom` instead of `jsdom` (jsdom is the more established/complete choice and
+already implied by testing-library's own docs as the default pairing).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

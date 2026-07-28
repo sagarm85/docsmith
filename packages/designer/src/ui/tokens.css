@@ -1,0 +1,89 @@
+/* Design tokens for <doc-designer>. Every color in every component must come from
+   one of these custom properties — never a raw hex in a component <style> block.
+   Applied on :host so they penetrate the shadow root; the host page may override
+   any of them (design.md §13 theme option). */
+
+:host {
+  color-scheme: light dark;
+
+  --dd-bg: #f5f6f8;
+  --dd-panel: #ffffff;
+  --dd-panel-alt: #eceef1;
+  --dd-border: #d8dbe0;
+  --dd-text: #16181d;
+  --dd-muted: #5b6270;
+  --dd-accent: #2563eb;
+  --dd-accent-weak: #dbe6fd;
+  --dd-danger: #b3261e;
+  --dd-warn: #9a6700;
+  --dd-ok: #1a7f37;
+  --dd-radius: 6px;
+  --dd-shadow: 0 1px 2px rgba(16, 18, 22, 0.08), 0 4px 12px rgba(16, 18, 22, 0.06);
+  --dd-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --dd-font:
+    system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --dd-bg: #0f1115;
+    --dd-panel: #191c22;
+    --dd-panel-alt: #14161b;
+    --dd-border: #2c3038;
+    --dd-text: #e7e9ec;
+    --dd-muted: #9198a6;
+    --dd-accent: #5b8def;
+    --dd-accent-weak: #1c2942;
+    --dd-danger: #ff6b64;
+    --dd-warn: #e0a83f;
+    --dd-ok: #3fb964;
+    --dd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Host page can force a theme regardless of OS preference. */
+:host([data-dd-theme='light']) {
+  color-scheme: light;
+  --dd-bg: #f5f6f8;
+  --dd-panel: #ffffff;
+  --dd-panel-alt: #eceef1;
+  --dd-border: #d8dbe0;
+  --dd-text: #16181d;
+  --dd-muted: #5b6270;
+  --dd-accent: #2563eb;
+  --dd-accent-weak: #dbe6fd;
+  --dd-danger: #b3261e;
+  --dd-warn: #9a6700;
+  --dd-ok: #1a7f37;
+  --dd-shadow: 0 1px 2px rgba(16, 18, 22, 0.08), 0 4px 12px rgba(16, 18, 22, 0.06);
+}
+
+:host([data-dd-theme='dark']) {
+  color-scheme: dark;
+  --dd-bg: #0f1115;
+  --dd-panel: #191c22;
+  --dd-panel-alt: #14161b;
+  --dd-border: #2c3038;
+  --dd-text: #e7e9ec;
+  --dd-muted: #9198a6;
+  --dd-accent: #5b8def;
+  --dd-accent-weak: #1c2942;
+  --dd-danger: #ff6b64;
+  --dd-warn: #e0a83f;
+  --dd-ok: #3fb964;
+  --dd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
