@@ -21,6 +21,7 @@
   import Palette from './Palette.svelte';
   import Canvas from './Canvas.svelte';
   import PrintSetup from './PrintSetup.svelte';
+  import Preview from './Preview.svelte';
 
   let { config }: { config?: DocDesignerConfig } = $props();
 
@@ -193,9 +194,7 @@
             />
           </aside>
         {:else}
-          <div class="dd-canvas-placeholder">
-            <p>Preview lands later in Phase 1.</p>
-          </div>
+          <Preview {template} {adapter} />
         {/if}
       </div>
     </div>
@@ -237,16 +236,6 @@
     display: flex;
     flex: 1;
     min-height: 0;
-  }
-
-  .dd-canvas-placeholder {
-    flex: 1;
-    padding: 16px;
-  }
-
-  .dd-canvas-placeholder p {
-    margin: 0;
-    color: var(--dd-muted);
   }
 
   .dd-properties {

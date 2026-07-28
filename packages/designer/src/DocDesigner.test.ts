@@ -82,9 +82,10 @@ describe('<doc-designer>', () => {
     await nextTick();
 
     // Preview mode hides the Palette (Design-mode-only per design.md §4) and shows
-    // its own placeholder instead of the Canvas one.
-    expect(el.shadowRoot?.textContent).toContain('Preview lands later in Phase 1.');
-    expect(el.shadowRoot?.textContent).not.toContain('Entity');
+    // the real Preview component instead of Canvas. No entity chosen yet on a
+    // fresh template, so Preview shows its honest "choose an entity" hint.
+    expect(el.shadowRoot?.textContent).toContain('Choose an entity');
+    expect(el.shadowRoot?.textContent).not.toContain('Report Header');
     el.remove();
   });
 

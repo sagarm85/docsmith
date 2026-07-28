@@ -8,18 +8,23 @@
 
 ## Now / Next / Notes
 
-- **Now:** `PrintSetup.svelte` is done and green — page size, orientation, all
-  four margins, and the repeat-header/repeat-footer/show-page-numbers/keep-rows-
-  together toggles all live-edit `template.printSetup` (and, for keep-rows-
-  together, the `detail` band's own `keepRowTogether` — that field lives on the
-  band, not `printSetup`, in the data model even though `design.md` §10 groups it
-  into the same UI tab). Rendered in a right-rail `<aside>` in `DocDesigner`,
-  design-mode-only per `design.md` §4. Editing any field patches `template` live,
-  which `Canvas` already re-renders from (page geometry, margins guide).
+- **Now:** `Preview.svelte` is done and green — Preview mode is real. A doc-id
+  control (a `<Select>` from `listSampleIds` when the adapter implements it,
+  auto-selecting the first result; a free-text `<input>` fallback otherwise)
+  drives `adapter.fetchDocument(entity, id)`, and the fetched `DocumentData` is
+  fed straight into `core.renderToHtml(template, data)` — the SAME renderer
+  Design mode's Canvas conceptually mirrors and the render service will use for
+  PDF (D-009, single renderer). The resulting standalone HTML document string is
+  bound to an `<iframe srcdoc=...>` (same-origin, print CSS never leaks into the
+  editor chrome, per `claude.md` §4). Because `previewDocument` is a `$derived`
+  over both `template` and the fetched data, any Design-mode edit is reflected
+  the next time you switch to Preview — no extra wiring needed. Full
+  loading/error+Retry/honest-empty-id states. Verified against the 60-line
+  `StaticAdapter` fixture that the iframe's `srcdoc` really does contain
+  `<thead>`/`@page`/real row data (test: `Preview.test.ts`).
   `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green
-  (`dist/doc-designer.js` ~173KB / ~45KB gzip; 39 tests).
-- **Next:** `Preview.svelte` (doc-id control + iframe via `core.renderToHtml`),
-  then wiring Export PDF for real (POST `{template, entity, id}` to
+  (`dist/doc-designer.js` ~185KB / ~49KB gzip; 44 tests).
+- **Next:** Wiring Export PDF for real (POST `{template, entity, id}` to
   `renderServiceUrl`/render per `claude.md` §10 — plain `fetch`, NOT importing
   `@docsmith/sdk`, which isn't on the designer's approved dependency list) and
   browser Print. Phase 1 is done only when the pagination gate (`claude.md` §8)
@@ -121,7 +126,7 @@
 - [x] `DetailTable.svelte` — add/reorder/resize/format columns from dataset fields;
       real sample rows via `listSampleIds`→`fetchDocument`
 - [x] `PrintSetup.svelte` — page size/orientation/margins + repeat/keep toggles → `printSetup`
-- [ ] `Preview.svelte` — doc-id control; iframe renders `core.renderToHtml(template,data)`
+- [x] `Preview.svelte` — doc-id control; iframe renders `core.renderToHtml(template,data)`
 - [ ] Browser **Print** works; **Export PDF** posts to render service and downloads
 - [ ] **Pagination gate passed** (claude.md §8): ≥40-row doc, header repeats, no split row
 - [x] localStorage default persistence when no `onSave` supplied
@@ -168,6 +173,18 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-28 — `Preview.svelte`.** Preview mode calls the real
+  `core.renderToHtml(template, data)` — the single-renderer requirement (D-009)
+  — and injects the result into a same-origin `<iframe srcdoc>`. Doc-id control:
+  `<Select>` from `listSampleIds` (auto-selects the first result) when the
+  adapter implements it, free-text `<input>` fallback otherwise. Loading/error
+  (+Retry)/honest-empty-id states throughout; a missing document id renders an
+  honest empty table via the adapter's own `{header:{}, datasets:{}}` fallback,
+  never a fabricated row. `previewDocument` is `$derived` from both `template`
+  and the fetched data, so Design-mode edits show up next time you switch to
+  Preview with no extra plumbing. Wired into `DocDesigner`'s preview-mode
+  branch, replacing the placeholder. 44 tests pass (was 39); lint/typecheck/build
+  green (`dist/doc-designer.js` ~185KB / ~49KB gzip).
 - **2026-07-28 — `PrintSetup.svelte`.** Page size/orientation `<Select>`s, four
   margin `NumberInput`s, and four toggles (repeat page header/footer, show page
   numbers, keep rows together) all patch `template.printSetup` live via
