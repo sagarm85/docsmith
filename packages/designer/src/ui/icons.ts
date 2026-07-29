@@ -26,7 +26,14 @@ export type IconName =
   | 'palette'
   | 'plus'
   | 'close'
-  | 'search';
+  | 'search'
+  | 'alignLeft'
+  | 'alignCenter'
+  | 'alignRight'
+  | 'layers'
+  | 'trash'
+  | 'grip'
+  | 'sparkle';
 
 export const ICONS: Record<IconName, string[]> = {
   doc: ['M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M14 3v6h6'],
@@ -53,4 +60,11 @@ export const ICONS: Record<IconName, string[]> = {
   plus: ['M12 5v14', 'M5 12h14'],
   close: ['M6 6l12 12', 'M18 6L6 18'],
   search: ['M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z', 'M21 21l-4.3-4.3'],
+  alignLeft: ['M4 6h16', 'M4 12h10', 'M4 18h13'],
+  alignCenter: ['M4 6h16', 'M7 12h10', 'M5.5 18h13'],
+  alignRight: ['M4 6h16', 'M10 12h10', 'M7 18h13'],
+  layers: ['M12 3l9 5-9 5-9-5 9-5z', 'M3 13l9 5 9-5', 'M3 17l9 5 9-5'],
+  trash: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13', 'M10 11v6', 'M14 11v6'],
+  grip: ['M9 6h.01', 'M15 6h.01', 'M9 12h.01', 'M15 12h.01', 'M9 18h.01', 'M15 18h.01'],
+  sparkle: ['M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z'],
 };

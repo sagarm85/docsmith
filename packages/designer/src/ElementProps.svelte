@@ -5,6 +5,7 @@
   import Select from './ui/Select.svelte';
   import Button from './ui/Button.svelte';
   import Icon from './ui/Icon.svelte';
+  import Collapsible from './ui/Collapsible.svelte';
   import type { IconName } from './ui/icons.js';
   import ConditionalRulesEditor from './ConditionalRulesEditor.svelte';
 
@@ -57,10 +58,24 @@
     { value: 'date', label: 'Date' },
     { value: 'words', label: 'Words (e.g. amount in words)' },
   ];
-  const ALIGN_OPTIONS = [
-    { value: 'left', label: 'Left' },
-    { value: 'center', label: 'Center' },
-    { value: 'right', label: 'Right' },
+
+  // Icon buttons instead of a dropdown (v2 simplification) — same three
+  // values design.md/core have always supported, just a visual picker.
+  const ALIGN_BUTTONS: Array<{ value: Align; icon: IconName; label: string }> = [
+    { value: 'left', icon: 'alignLeft', label: 'Align left' },
+    { value: 'center', icon: 'alignCenter', label: 'Align center' },
+    { value: 'right', icon: 'alignRight', label: 'Align right' },
+  ];
+
+  // Theme-token swatches (never a hardcoded hex — claude.md §2) so presets
+  // stay correct in dark mode automatically; "Custom" opens the native
+  // color picker for anything else.
+  const COLOR_PRESETS: Array<{ value: string; label: string }> = [
+    { value: 'var(--dd-text)', label: 'Default text' },
+    { value: 'var(--dd-accent)', label: 'Accent' },
+    { value: 'var(--dd-ok)', label: 'Green' },
+    { value: 'var(--dd-danger)', label: 'Red' },
+    { value: 'var(--dd-warn)', label: 'Amber' },
   ];
 
   function patchStyle(patch: Partial<NonNullable<FreeElement['style']>>) {
@@ -84,19 +99,18 @@
       {/if}
     </fieldset>
   {:else if arrangement === 'grid'}
-    <fieldset class="dd-props-grid">
-      <legend>Cell</legend>
-      <Field label="Column span" fieldId="dd-el-colspan">
+    <Collapsible title="Position & layout" icon="layers" open={false}>
+      <Field label="Width across columns" fieldId="dd-el-colspan" hint="How many of this section's columns this element spans">
         <NumberInput
           id="dd-el-colspan"
-          ariaLabel="Column span"
+          ariaLabel="Width across columns"
           min={1}
           max={12}
           value={element.colSpan ?? 1}
           onchange={(v) => onChange({ colSpan: v })}
         />
       </Field>
-    </fieldset>
+    </Collapsible>
   {:else}
     <fieldset class="dd-props-grid">
       <legend>Position ({unit})</legend>
@@ -116,52 +130,91 @@
   {/if}
 
   {#if element.kind === 'text' || element.kind === 'field'}
-    <fieldset class="dd-props-grid">
-      <legend>Typography</legend>
-      <Field label="Size" fieldId="dd-el-fontsize">
-        <NumberInput
-          id="dd-el-fontsize"
-          ariaLabel="Font size"
-          min={6}
-          max={96}
+    {@const currentAlign = element.style?.align ?? 'left'}
+    <div class="dd-group-label">Alignment</div>
+    <div class="dd-align-row" role="group" aria-label="Text alignment">
+      {#each ALIGN_BUTTONS as btn (btn.value)}
+        <button
+          type="button"
+          class="dd-icon-toggle"
+          class:active={currentAlign === btn.value}
+          aria-label={btn.label}
+          aria-pressed={currentAlign === btn.value}
+          title={btn.label}
+          onclick={() => patchStyle({ align: btn.value })}
+        >
+          <Icon name={btn.icon} size={15} />
+        </button>
+      {/each}
+    </div>
+
+    <div class="dd-group-label">Text style</div>
+    <div class="dd-style-row">
+      <div class="dd-size-stepper">
+        <button
+          type="button"
+          aria-label="Decrease font size"
+          onclick={() => patchStyle({ fontSize: Math.max(6, (element.style?.fontSize ?? 12) - 1) })}
+        >−</button>
+        <input
+          class="dd-size-value"
+          type="number"
+          aria-label="Font size"
+          min="6"
+          max="96"
           value={element.style?.fontSize ?? 12}
-          onchange={(v) => patchStyle({ fontSize: v })}
+          onchange={(e) => patchStyle({ fontSize: Number((e.currentTarget as HTMLInputElement).value) || 12 })}
         />
-      </Field>
-      <Field label="Align" fieldId="dd-el-align">
-        <Select
-          id="dd-el-align"
-          ariaLabel="Text align"
-          value={element.style?.align ?? 'left'}
-          options={ALIGN_OPTIONS}
-          onchange={(v) => patchStyle({ align: v as Align })}
+        <button
+          type="button"
+          aria-label="Increase font size"
+          onclick={() => patchStyle({ fontSize: Math.min(96, (element.style?.fontSize ?? 12) + 1) })}
+        >+</button>
+      </div>
+      <button
+        type="button"
+        class="dd-icon-toggle dd-style-toggle dd-style-toggle--bold"
+        class:active={element.style?.bold ?? false}
+        aria-label="Bold"
+        aria-pressed={element.style?.bold ?? false}
+        title="Bold"
+        onclick={() => patchStyle({ bold: !(element.style?.bold ?? false) })}
+      >B</button>
+      <button
+        type="button"
+        class="dd-icon-toggle dd-style-toggle dd-style-toggle--italic"
+        class:active={element.style?.italic ?? false}
+        aria-label="Italic"
+        aria-pressed={element.style?.italic ?? false}
+        title="Italic"
+        onclick={() => patchStyle({ italic: !(element.style?.italic ?? false) })}
+      >I</button>
+    </div>
+
+    <div class="dd-group-label">Color</div>
+    <div class="dd-swatch-row" role="group" aria-label="Text color">
+      {#each COLOR_PRESETS as preset (preset.value)}
+        <button
+          type="button"
+          class="dd-swatch"
+          class:active={(element.style?.color ?? 'var(--dd-text)') === preset.value}
+          style="background:{preset.value}"
+          aria-label={preset.label}
+          aria-pressed={(element.style?.color ?? 'var(--dd-text)') === preset.value}
+          title={preset.label}
+          onclick={() => patchStyle({ color: preset.value })}
+        ></button>
+      {/each}
+      <label class="dd-swatch dd-swatch--custom" title="Custom color">
+        <Icon name="plus" size={12} />
+        <input
+          type="color"
+          aria-label="Custom color"
+          value={element.style?.color?.startsWith('#') ? element.style.color : '#111111'}
+          oninput={(e) => patchStyle({ color: (e.currentTarget as HTMLInputElement).value })}
         />
-      </Field>
-    </fieldset>
-    <label class="dd-toggle">
-      <input
-        type="checkbox"
-        checked={element.style?.bold ?? false}
-        onchange={(e) => patchStyle({ bold: (e.currentTarget as HTMLInputElement).checked })}
-      />
-      Bold
-    </label>
-    <label class="dd-toggle">
-      <input
-        type="checkbox"
-        checked={element.style?.italic ?? false}
-        onchange={(e) => patchStyle({ italic: (e.currentTarget as HTMLInputElement).checked })}
-      />
-      Italic
-    </label>
-    <Field label="Color" fieldId="dd-el-color">
-      <input
-        id="dd-el-color"
-        type="color"
-        value={element.style?.color ?? '#111111'}
-        oninput={(e) => patchStyle({ color: (e.currentTarget as HTMLInputElement).value })}
-      />
-    </Field>
+      </label>
+    </div>
   {/if}
 
   {#if element.kind === 'text'}
@@ -233,14 +286,24 @@
   {/if}
 
   {#if arrangement === 'free'}
-    <div class="dd-props-actions">
-      <Button variant="secondary" onclick={onSendBack}>Send Back [</Button>
-      <Button variant="secondary" onclick={onBringForward}>Bring Forward ]</Button>
-    </div>
+    <Collapsible title="Layer order" icon="layers" open={false}>
+      <div class="dd-props-actions">
+        <Button variant="secondary" onclick={onSendBack}>
+          <span title="Send back (keyboard: [)">Send backward</span>
+        </Button>
+        <Button variant="secondary" onclick={onBringForward}>
+          <span title="Bring forward (keyboard: ])">Bring forward</span>
+        </Button>
+      </div>
+    </Collapsible>
   {/if}
   <div class="dd-props-actions">
-    <Button variant="secondary" onclick={onDuplicate}>Duplicate ⌘D</Button>
-    <Button variant="destructive" onclick={onDelete}>Delete</Button>
+    <Button variant="secondary" onclick={onDuplicate}>
+      <Icon name="doc" size={13} /> <span title="Duplicate (keyboard: ⌘D)">Duplicate</span>
+    </Button>
+    <Button variant="destructive" onclick={onDelete}>
+      <Icon name="trash" size={13} /> Delete
+    </Button>
   </div>
 </div>
 
@@ -282,16 +345,161 @@
     padding: 0 4px;
   }
 
-  .dd-toggle {
+  .dd-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--dd-muted);
+    margin: 2px 0 -2px;
+  }
+
+  .dd-align-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .dd-icon-toggle {
+    flex: 1;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius-sm);
+    background: var(--dd-panel);
+    color: var(--dd-muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .dd-icon-toggle:hover {
+    background: var(--dd-panel-alt);
+  }
+
+  .dd-icon-toggle:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+  }
+
+  .dd-icon-toggle.active {
+    border-color: var(--dd-accent);
+    background: var(--dd-accent-weak);
+    color: var(--dd-accent-strong);
+  }
+
+  .dd-style-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
-    color: var(--dd-text);
   }
 
-  .dd-toggle input {
-    accent-color: var(--dd-accent);
+  .dd-size-stepper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius-sm);
+    overflow: hidden;
+  }
+
+  .dd-size-stepper button {
+    width: 26px;
+    height: 32px;
+    border: none;
+    background: var(--dd-panel-alt);
+    color: var(--dd-text);
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .dd-size-stepper button:hover {
+    background: var(--dd-border);
+  }
+
+  .dd-size-value {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    text-align: center;
+    border: none;
+    background: var(--dd-panel);
+    color: var(--dd-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .dd-size-value::-webkit-outer-spin-button,
+  .dd-size-value::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .dd-style-toggle {
+    flex: none;
+    width: 34px;
+  }
+
+  .dd-style-toggle--italic {
+    font-style: italic;
+  }
+
+  .dd-swatch-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .dd-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--dd-panel);
+    box-shadow: 0 0 0 1px var(--dd-border);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .dd-swatch:hover {
+    box-shadow: 0 0 0 1px var(--dd-accent);
+  }
+
+  .dd-swatch:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 2px;
+  }
+
+  .dd-swatch.active {
+    box-shadow: 0 0 0 2px var(--dd-accent);
+  }
+
+  .dd-swatch--custom {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dd-panel-alt);
+    color: var(--dd-muted);
+    border: 1.5px dashed var(--dd-border);
+    box-shadow: none;
+  }
+
+  .dd-swatch--custom:hover {
+    color: var(--dd-accent-strong);
+    border-color: var(--dd-accent);
+    box-shadow: none;
+  }
+
+  .dd-swatch--custom input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
   }
 
   .dd-el-textarea {
