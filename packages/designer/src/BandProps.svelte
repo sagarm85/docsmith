@@ -10,6 +10,7 @@
     band,
     onChange,
     onArrangementChange,
+    onCellBorderChange,
   }: {
     band: Band;
     onChange: (patch: Partial<FreeBand>) => void;
@@ -20,6 +21,13 @@
      * to reserve `.doc-flow` padding for their fixed position, which a
      * 'stack'/'grid' band's intrinsic/auto height can't guarantee. */
     onArrangementChange?: (arrangement: 'free' | 'stack' | 'grid') => void;
+    /** detail-band-only (`DetailBand.cellBorder`) — a separate prop rather
+     * than reusing `onChange` since that one is `Partial<FreeBand>`-typed
+     * and DocDesigner's generic band-patch handler explicitly excludes the
+     * detail band (its patches go through dedicated handlers, same
+     * precedent as `keepRowTogether`). undefined = row borders on
+     * (today's default); 'none' = borderless. */
+    onCellBorderChange?: (cellBorder: string | undefined) => void;
   } = $props();
 
   const ARRANGEMENT_OPTIONS = [
@@ -88,6 +96,17 @@
     <p class="dd-props-hint">
       Dataset: <strong>{detail.datasetId || '(none)'}</strong> · Columns: {detail.columns.length}
     </p>
+    {#if onCellBorderChange}
+      <label class="dd-toggle">
+        <input
+          type="checkbox"
+          checked={detail.cellBorder !== 'none'}
+          onchange={(e) =>
+            onCellBorderChange?.((e.currentTarget as HTMLInputElement).checked ? undefined : 'none')}
+        />
+        Row borders
+      </label>
+    {/if}
   {:else}
     {@const free = band as FreeBand}
     {#if onArrangementChange}

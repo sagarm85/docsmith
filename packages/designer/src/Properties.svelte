@@ -29,6 +29,7 @@
     onColumnCarryForwardChange,
     onBandChange,
     onBandArrangementChange,
+    onDetailCellBorderChange,
     printSetup,
     onPrintSetupChange,
     keepRowTogether,
@@ -54,6 +55,8 @@
     /** Free<->stack migration (memory.md D-029), offered only for
      * reportHeader/totals — see BandProps.svelte's onArrangementChange doc. */
     onBandArrangementChange: (bandId: string, arrangement: 'free' | 'stack' | 'grid') => void;
+    /** `DetailBand.cellBorder` — see BandProps.svelte's onCellBorderChange doc. */
+    onDetailCellBorderChange: (cellBorder: string | undefined) => void;
     printSetup: PrintSetupType;
     onPrintSetupChange: (next: PrintSetupType) => void;
     keepRowTogether: boolean;
@@ -177,6 +180,7 @@
           onArrangementChange={selectedBand.type === 'reportHeader' || selectedBand.type === 'totals'
             ? (arrangement) => onBandArrangementChange(bandId, arrangement)
             : undefined}
+          onCellBorderChange={isDetailBand(selectedBand) ? onDetailCellBorderChange : undefined}
         />
       {:else}
         <p class="dd-empty-hint">

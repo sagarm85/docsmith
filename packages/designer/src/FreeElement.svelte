@@ -275,43 +275,110 @@
   onkeydown={handleKeydown}
   ondblclick={handleDblClick}
 >
-  {#if element.kind === 'field'}
-    <span class="dd-el-token">
-      <Icon name="field" size={10} />
-      {displayLabel}
-    </span>
-  {:else if element.kind === 'text'}
-    {#if editingText}
-      <!-- onclick only stops the click bubbling into the parent's drag/select
-           handler; the element's own keyboard editing comes from
-           contenteditable + tabindex, not from this click handler. -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <span
-        class="dd-el-text-edit"
-        role="textbox"
-        aria-label={`Edit text for ${bandLabel} element`}
-        tabindex="0"
-        contenteditable="true"
-        onblur={commitTextEdit}
-        onclick={(e) => e.stopPropagation()}
-      >{element.text}</span>
-    {:else}
-      <span>{element.text}</span>
-    {/if}
-  {:else if element.kind === 'image'}
-    {#if element.src?.value}
-      <img class="dd-el-image" src={element.src.value} alt="" />
-    {:else}
-      <span class="dd-el-placeholder">
-        <Icon name="image" size={16} />
-        Image
+  <!-- Inline hover/focus/selected toolbar — the four most common actions
+       (already all wired via props for Properties panel buttons/keyboard
+       shortcuts) right at the cursor instead of only in the right rail.
+       Mirrors StackBand.svelte/GridBand.svelte's existing hover-reveal
+       element actions, extended here to free-form elements. -->
+  <div class="dd-el-toolbar" class:dd-el-toolbar--visible={selected}>
+    <button
+      type="button"
+      class="dd-el-toolbar-btn"
+      aria-label="Send back"
+      title="Send back ["
+      onpointerdown={(e) => e.stopPropagation()}
+      onclick={(e) => {
+        e.stopPropagation();
+        onSendBack();
+      }}
+    >
+      <Icon name="chevronDown" size={12} />
+    </button>
+    <button
+      type="button"
+      class="dd-el-toolbar-btn"
+      aria-label="Bring forward"
+      title="Bring forward ]"
+      onpointerdown={(e) => e.stopPropagation()}
+      onclick={(e) => {
+        e.stopPropagation();
+        onBringForward();
+      }}
+    >
+      <Icon name="chevronUp" size={12} />
+    </button>
+    <span class="dd-el-toolbar-sep"></span>
+    <button
+      type="button"
+      class="dd-el-toolbar-btn"
+      aria-label="Duplicate"
+      title="Duplicate ⌘D"
+      onpointerdown={(e) => e.stopPropagation()}
+      onclick={(e) => {
+        e.stopPropagation();
+        onDuplicate();
+      }}
+    >
+      <Icon name="doc" size={12} />
+    </button>
+    <button
+      type="button"
+      class="dd-el-toolbar-btn dd-el-toolbar-btn--danger"
+      aria-label="Delete"
+      title="Delete"
+      onpointerdown={(e) => e.stopPropagation()}
+      onclick={(e) => {
+        e.stopPropagation();
+        onDelete();
+      }}
+    >
+      <Icon name="close" size={12} />
+    </button>
+  </div>
+
+  <!-- Content lives in its own overflow:hidden layer so long text/oversized
+       images clip to the element's box without also clipping the toolbar
+       (top:-34px, outside the box) or the resize handles (small negative
+       offsets) — both siblings of this, direct children of .dd-el itself. -->
+  <div class="dd-el-body">
+    {#if element.kind === 'field'}
+      <span class="dd-el-token">
+        <Icon name="field" size={10} />
+        {displayLabel}
       </span>
+    {:else if element.kind === 'text'}
+      {#if editingText}
+        <!-- onclick only stops the click bubbling into the parent's drag/select
+             handler; the element's own keyboard editing comes from
+             contenteditable + tabindex, not from this click handler. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <span
+          class="dd-el-text-edit"
+          role="textbox"
+          aria-label={`Edit text for ${bandLabel} element`}
+          tabindex="0"
+          contenteditable="true"
+          onblur={commitTextEdit}
+          onclick={(e) => e.stopPropagation()}
+        >{element.text}</span>
+      {:else}
+        <span>{element.text}</span>
+      {/if}
+    {:else if element.kind === 'image'}
+      {#if element.src?.value}
+        <img class="dd-el-image" src={element.src.value} alt="" />
+      {:else}
+        <span class="dd-el-placeholder">
+          <Icon name="image" size={16} />
+          Image
+        </span>
+      {/if}
+    {:else if element.kind === 'line'}
+      <span class="dd-el-line"></span>
+    {:else if element.kind === 'box'}
+      <span class="dd-el-box"></span>
     {/if}
-  {:else if element.kind === 'line'}
-    <span class="dd-el-line"></span>
-  {:else if element.kind === 'box'}
-    <span class="dd-el-box"></span>
-  {/if}
+  </div>
 
   {#if selected}
     {#each HANDLES as handle (handle)}
@@ -329,11 +396,16 @@
 <style>
   .dd-el {
     position: absolute;
-    overflow: hidden;
     font-size: 12px;
     color: #222;
     white-space: pre-wrap;
     cursor: grab;
+  }
+
+  .dd-el-body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
   }
 
   .dd-el:active {
@@ -411,6 +483,74 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+
+  .dd-el-toolbar {
+    position: absolute;
+    top: -34px;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: #1a1c22;
+    border-radius: 8px;
+    padding: 3px;
+    box-shadow: var(--dd-shadow);
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 6;
+    cursor: default;
+  }
+
+  .dd-el:hover .dd-el-toolbar,
+  .dd-el:focus-within .dd-el-toolbar,
+  .dd-el-toolbar--visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dd-el-toolbar {
+      transition: none;
+    }
+  }
+
+  .dd-el-toolbar-sep {
+    width: 1px;
+    height: 16px;
+    background: #35383f;
+    margin: 0 2px;
+  }
+
+  .dd-el-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: #b7bcc6;
+    cursor: pointer;
+  }
+
+  .dd-el-toolbar-btn:hover {
+    background: #2b2e36;
+    color: #fff;
+  }
+
+  .dd-el-toolbar-btn:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+  }
+
+  .dd-el-toolbar-btn--danger:hover {
+    background: #4a1f1d;
+    color: #ff8a83;
   }
 
   .dd-handle {

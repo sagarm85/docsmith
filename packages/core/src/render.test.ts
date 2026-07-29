@@ -398,6 +398,29 @@ describe('styleToCss — borderRadius', () => {
   });
 });
 
+describe('renderToHtml — DetailBand.cellBorder', () => {
+  it('leaves the table unstyled (default CSS border) when cellBorder is unset', () => {
+    const out = renderToHtml(invoiceTemplate(), fatDocument(1));
+    expect(out.html).not.toContain('--dd-cell-border');
+  });
+
+  it('sets the --dd-cell-border custom property to the given value, including "none"', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) => (b.type === 'detail' ? { ...(b as DetailBand), cellBorder: 'none' } : b));
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('style="--dd-cell-border:none"');
+  });
+
+  it('accepts a custom border value', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.type === 'detail' ? { ...(b as DetailBand), cellBorder: '2px dashed #999' } : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('style="--dd-cell-border:2px dashed #999"');
+  });
+});
+
 describe('matchesConditionalRule / resolveConditionalStyle (memory.md D-031)', () => {
   it('evaluates every operator', () => {
     expect(matchesConditionalRule({ operator: 'eq', value: 'x', style: {} }, 'x')).toBe(true);

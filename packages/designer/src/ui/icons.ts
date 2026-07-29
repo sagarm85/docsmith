@@ -12,6 +12,7 @@ export type IconName =
   | 'save'
   | 'export'
   | 'chevronDown'
+  | 'chevronUp'
   | 'text'
   | 'image'
   | 'line'
@@ -36,6 +37,7 @@ export const ICONS: Record<IconName, string[]> = {
   save: ['M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 'M17 21v-8H7v8', 'M7 3v5h8'],
   export: ['M12 3v12', 'M7 10l5 5 5-5', 'M5 21h14'],
   chevronDown: ['M6 9l6 6 6-6'],
+  chevronUp: ['M6 15l6-6 6 6'],
   text: ['M5 5h14', 'M12 5v14'],
   image: ['M3 4h18v16H3z', 'M9 10a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z', 'M21 16l-5.5-5.5L7 19'],
   line: ['M4 12h16'],

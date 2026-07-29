@@ -842,6 +842,67 @@ structural change for a need `FreeBand.arrangement` already covers, same
 reasoning D-029 used against a parallel `rows: FreeElement[][]` field).
 `[status: locked]`
 
+### D-035 — `DetailBand.cellBorder` overrides the line-items table's row border via a CSS custom property, not a full table-style system
+**Decision:** `DetailBand` gains `cellBorder?: string` (a CSS `border-bottom`
+shorthand, e.g. `"none"` or a custom color/weight). `core`'s base stylesheet
+changes `table.detail th, table.detail td { border-bottom: 1px solid
+#e2e5e9; }` to `border-bottom: var(--dd-cell-border, 1px solid #e2e5e9);`,
+and `renderDetailBand` sets `style="--dd-cell-border:{value}"` on the
+`<table>` only when `cellBorder` is set — absent leaves the existing default
+completely untouched (no output change for any existing template). The
+header row's own divider (`table.detail thead th`'s separate, more specific
+rule) is intentionally NOT governed by this — a borderless body still reads
+better with a visible header edge, matching every borderless-table reference
+image shown in the design-review conversation. Designer: a single "Row
+borders" checkbox in `BandProps.svelte` when the detail band is selected
+(on/undefined = today's default border; off = `cellBorder: 'none'`), wired
+through a dedicated `onCellBorderChange` handler — not the generic
+`onBandChange`, since `DocDesigner`'s `handleBandChange` explicitly excludes
+the detail band (same precedent as `keepRowTogether`'s own dedicated
+handler, since `DetailBand` isn't a `FreeBand`).
+**Why:** Asked directly ("product table without table border") against
+several reference invoice templates. A CSS custom property is the smallest
+change that fully satisfies it — no new render branch, no risk to the
+existing default look, and the value is free-form so an author isn't
+limited to on/off (a custom border weight/color works too, just not
+surfaced as a separate designer control in v1).
+**Rejected:** a full per-cell/per-column border style system (the reference
+images only ever needed "on" vs "off," not per-column variation — YAGNI for
+v1); also removing the header's border when the body goes borderless
+(every reference image that went borderless in the body still kept a clear
+header divider).
+`[status: locked]`
+
+### D-036 — Inline hover toolbar on free-form elements, reusing existing action callbacks; found and fixed a real overflow-clipping bug while building it
+**Decision:** `FreeElement.svelte` gained a floating toolbar (send-back,
+bring-forward, duplicate, delete) shown on hover/focus/selected — the exact
+same visual treatment and reveal behavior `StackBand.svelte`/
+`GridBand.svelte` already use for their own per-cell actions, extended to
+free-form elements. It calls the same `onSendBack`/`onBringForward`/
+`onDuplicate`/`onDelete` props already wired to the Properties panel's
+buttons and the existing `]`/`[`/⌘D/Delete keyboard shortcuts — purely a new
+surface for actions that already existed, not new behavior. Two new icons
+(`chevronUp` alongside the existing `chevronDown`) for the z-order buttons,
+matching house SVG-path style.
+**Why real work, not styling:** Building it surfaced a genuine layout bug:
+`.dd-el` had `overflow:hidden` (clipping oversized text/images to the
+element's box), which would have silently clipped the new toolbar
+(`top:-34px`, entirely outside the box) and — on inspection — the *existing*
+resize handles too (small negative offsets like `-4px`), since CSS
+`overflow:hidden` clips all descendants positioned relative to that
+containing block, including already-shipped absolutely-positioned children.
+Fixed by splitting element content into an inner `.dd-el-body` (owns the
+clip) and leaving the outer `.dd-el` unclipped for its decorations (toolbar
++ handles) — verified with a real-browser screenshot showing both the
+toolbar and resize handles rendering fully, not just passing tests (jsdom
+doesn't lay out real box geometry, so this class of clipping bug is
+invisible to the existing test suite).
+**Rejected:** a drag-handle icon in the toolbar (offered no value — the
+whole element is already draggable via pointerdown, unlike
+`StackBand`/`GridBand` rows which need an explicit grip since dragging the
+row itself would conflict with selecting individual cells inside it).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

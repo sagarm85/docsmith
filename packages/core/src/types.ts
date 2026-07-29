@@ -248,6 +248,13 @@ export type DetailBand = {
   keepRowTogether?: boolean;
   aggregates?: Aggregate[];
   style?: ElementStyle;
+  /** CSS `border-bottom` shorthand for each row's cells (e.g. `"none"` for a
+   * borderless table, or a custom color/weight) — absent keeps today's
+   * default (`"1px solid #e2e5e9"`). Scoped to body-row cells only; the
+   * header's divider and the alternating-row look some templates want stay
+   * governed separately (header border is intentionally always kept — a
+   * borderless body still needs a visible column-header edge). */
+  cellBorder?: string;
 };
 
 export type Band = FreeBand | DetailBand;

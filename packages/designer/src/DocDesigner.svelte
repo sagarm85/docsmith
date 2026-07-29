@@ -240,6 +240,15 @@
     });
   }
 
+  // DetailBand.cellBorder — same "dedicated handler, not the generic
+  // FreeBand-typed onBandChange" precedent as keepRowTogether above.
+  function handleDetailCellBorderChange(cellBorder: string | undefined) {
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, cellBorder } : b)),
+    });
+  }
+
   const keepRowTogether = $derived(
     (template.bands.find((b) => isDetailBand(b)) as { keepRowTogether?: boolean } | undefined)
       ?.keepRowTogether ?? false,
@@ -767,6 +776,7 @@
               onColumnCarryForwardChange={handleColumnCarryForwardChange}
               onBandChange={handleBandChange}
               onBandArrangementChange={handleBandArrangementChange}
+              onDetailCellBorderChange={handleDetailCellBorderChange}
               printSetup={template.printSetup}
               onPrintSetupChange={handlePrintSetupChange}
               {keepRowTogether}

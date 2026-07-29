@@ -325,7 +325,12 @@ function renderDetailBand(
   }
 
   // thead is display:table-header-group (default) → repeats on every printed page.
-  return `<table class="detail" data-band="detail">${thead}${tfoot}${tbody}</table>`;
+  // cellBorder overrides the default row-cell border via a CSS custom
+  // property (baseCss's `var(--dd-cell-border, 1px solid #e2e5e9)`) —
+  // absent leaves today's default untouched; the header's own border stays
+  // fixed regardless (table.detail thead th's separate, more specific rule).
+  const tableStyle = band.cellBorder != null ? ` style="--dd-cell-border:${band.cellBorder}"` : '';
+  return `<table class="detail" data-band="detail"${tableStyle}>${thead}${tfoot}${tbody}</table>`;
 }
 
 function renderBand(
@@ -357,7 +362,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helve
 table.grid-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.grid-table td { padding: 8px 10px; vertical-align: top; word-wrap: break-word; }
 table.detail { width: 100%; border-collapse: collapse; table-layout: fixed; }
-table.detail th, table.detail td { padding: 6px 8px; border-bottom: 1px solid #e2e5e9; vertical-align: top; word-wrap: break-word; }
+table.detail th, table.detail td { padding: 6px 8px; border-bottom: var(--dd-cell-border, 1px solid #e2e5e9); vertical-align: top; word-wrap: break-word; }
 table.detail thead th { border-bottom: 1.5px solid #333; font-weight: 700; background: #f6f7f9; }
 /* thead repeats on each printed page; keep the default group display. */
 table.detail thead { display: table-header-group; }

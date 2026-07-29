@@ -577,13 +577,24 @@ already done. Tracked here with the same rigor as a phase checklist.
       table, rendered as a real `<table>` (D-034). New `GridBand.svelte`
       designer component; `BandProps.svelte` column-width editor + cell-
       borders toggle; `ElementProps.svelte` column-span field.
-- [ ] Element-level hover toolbar (duplicate/delete/bring-forward/send-back
-      at the cursor, not only the right-rail Properties panel) — mocked,
-      not yet built.
+- [x] Element-level hover toolbar (duplicate/delete/bring-forward/send-back
+      at the cursor, not only the right-rail Properties panel) —
+      `FreeElement.svelte` gained a floating dark toolbar (hover/focus/
+      selected reveal, same visual language as StackBand/GridBand's
+      existing hover actions), reusing the exact same callbacks the
+      Properties panel buttons and keyboard shortcuts already call. Found
+      and fixed a real layout bug while building it: `.dd-el` had
+      `overflow:hidden`, which would have clipped both the new toolbar
+      (`top:-34px`) and the existing resize handles (small negative
+      offsets) — split element content into an inner `.dd-el-body` that
+      owns the clip, leaving `.dd-el` itself unclipped for its decorations.
 - [ ] Alignment guides while dragging (snap lines + gap distance against
       sibling elements) — mocked, not yet built.
-- [ ] Borderless/styled detail table option (`DetailBand` border-style
-      toggle) — mocked, not yet built; distinct from grid-band borders,
+- [x] Borderless/styled detail table option — new `DetailBand.cellBorder`
+      (a CSS `border-bottom` shorthand override via a `--dd-cell-border`
+      custom property in `core`'s base stylesheet; the header's own border
+      stays fixed regardless), a "Row borders" toggle in `BandProps.svelte`
+      when the detail band is selected. Distinct from grid-band borders,
       which only apply to free-form bands, not the line-items table.
 - [ ] Categorized/icon-forward palette groups — mocked, not yet built.
 - [ ] Product image per line item (`DetailColumn.format:'image'` or similar)
@@ -618,6 +629,27 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Borderless detail table (D-035) + element hover toolbar
+  (D-036), post-Phase-3.** Two more items from the design-review thread.
+  `DetailBand.cellBorder` (a CSS `border-bottom` override via a
+  `--dd-cell-border` custom property, absent = today's unchanged default)
+  + a "Row borders" toggle in `BandProps.svelte` for the detail band.
+  `FreeElement.svelte` gained a floating hover/focus/selected toolbar
+  (send-back/bring-forward/duplicate/delete) reusing the exact callbacks
+  already wired to the Properties panel and keyboard shortcuts — same
+  visual language `StackBand`/`GridBand` already use for their own actions.
+  Building the toolbar surfaced a real bug: `.dd-el`'s `overflow:hidden`
+  would have clipped both the new toolbar and the *existing* resize
+  handles (small negative offsets); fixed by moving the clip onto a new
+  inner `.dd-el-body`, leaving `.dd-el` itself unclipped for decorations.
+  Two new icons (`chevronUp` alongside `chevronDown`). 49 core tests pass
+  (was 46); 162 designer tests pass (was 161, including a new
+  `FreeElement.test.ts` toolbar test and a `DocDesigner.test.ts`
+  cell-border-toggle integration test); lint/typecheck/build all green.
+  Verified with a real-browser screenshot confirming the toolbar and
+  resize handles both render fully, uncropped (the clipping bug would
+  have been invisible to jsdom-based tests, which don't lay out real box
+  geometry).
 - **2026-07-29 — Grid arrangement + borderRadius (D-034, post-Phase-3).** A
   design-review conversation (reference invoice/shipping-document templates
   shared by the user — a bordered sales-contract metadata grid, a rounded-

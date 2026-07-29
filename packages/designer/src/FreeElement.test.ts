@@ -145,6 +145,25 @@ describe('FreeElement', () => {
     expect(cb.onSendBack).toHaveBeenCalledTimes(1);
   });
 
+  it('inline hover toolbar buttons call the same callbacks as the keyboard shortcuts, without also selecting/dragging the element', async () => {
+    const cb = callbacks();
+    render(FreeElementView, {
+      props: { element: fieldElement(), selected: false, bandLabel: 'Report Header', ...cb },
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Send back' }));
+    expect(cb.onSendBack).toHaveBeenCalledTimes(1);
+    await fireEvent.click(screen.getByRole('button', { name: 'Bring forward' }));
+    expect(cb.onBringForward).toHaveBeenCalledTimes(1);
+    await fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+    expect(cb.onDuplicate).toHaveBeenCalledTimes(1);
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(cb.onDelete).toHaveBeenCalledTimes(1);
+    // Clicking a toolbar button must not also select/start-drag the element
+    // underneath it (each button stops pointerdown/click propagation).
+    expect(cb.onSelect).not.toHaveBeenCalled();
+    expect(cb.onDragStart).not.toHaveBeenCalled();
+  });
+
   it('double-click on a text element enters edit mode; blur commits via onEditText', async () => {
     const onEditText = vi.fn();
     const textEl: FreeElement = { id: 'e2', kind: 'text', x: 0, y: 0, w: 100, h: 20, text: 'Hello' };

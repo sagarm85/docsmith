@@ -852,6 +852,35 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('toggling "Row borders" off on the detail band sets DetailBand.cellBorder to "none"', async () => {
+    const el = await mountWithEntitySelected();
+
+    const detailTab = Array.from(el.shadowRoot!.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Detail (line items)',
+    );
+    expect(detailTab).toBeTruthy();
+    detailTab!.click();
+    await nextTick();
+
+    const toggle = el.shadowRoot!.querySelector<HTMLInputElement>(
+      '.dd-band-props input[type="checkbox"]',
+    );
+    expect(toggle).toBeTruthy();
+    expect(toggle!.checked).toBe(true); // on by default (today's row-border look)
+
+    toggle!.click();
+    await nextTick();
+
+    const detail = () => el.getTemplate?.()?.bands.find((b) => b.type === 'detail') as { cellBorder?: string };
+    expect(detail().cellBorder).toBe('none');
+
+    toggle!.click();
+    await nextTick();
+    expect(detail().cellBorder).toBeUndefined();
+
+    el.remove();
+  });
+
   it('theme editor: editing a brand color applies it live, and saving/re-applying round-trips it (memory.md D-032)', async () => {
     const el = mountWithAdapter();
     await nextTick();
