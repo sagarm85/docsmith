@@ -52,6 +52,31 @@ const PAGE_SIZES_MM: Record<string, { width: number; height: number }> = {
   Legal: { width: 215.9, height: 355.6 },
 };
 
+/** The printable content width in px (page width minus left/right margins,
+ * orientation-aware) — the SAME "true print content width" already computed
+ * by `packages/render-service/src/pagination.ts`'s `printableAreaPx` (its own
+ * comment: text wrapping/row heights must match "what page.pdf() will
+ * actually produce"). `.page` gets this as an explicit CSS `width` (below)
+ * rather than "auto"/100%-of-an-unconstrained-parent, so on-screen Preview
+ * shows a properly bounded, correctly-proportioned page (matching the real
+ * printable area) instead of stretching edge-to-edge to fill whatever
+ * container it's embedded in.
+ *
+ * NOTE: this does NOT make Chromium's print/PDF output itself use this exact
+ * width — measured directly against a real generated PDF's content stream,
+ * `page.pdf()`'s effective content scale still varies per document (observed
+ * moving with the rightmost `position:absolute` element's extent), regardless
+ * of any CSS width set here. That is a deeper, separate Chromium print-layout
+ * behavior investigated but not resolved in this pass — worth a focused
+ * follow-up (see memory.md) rather than a wider risky change made under time
+ * pressure. This fix's real, verified win is the on-screen Preview sizing.
+ */
+function pageWidthPx(p: PrintSetup): number {
+  const size = PAGE_SIZES_MM[p.pageSize] ?? PAGE_SIZES_MM.A4!;
+  const pw = p.orientation === 'landscape' ? Math.max(size.width, size.height) : Math.min(size.width, size.height);
+  return (pw - p.margins.left - p.margins.right) * MM_TO_PX;
+}
+
 /** The printable content height in px (page height minus top/bottom
  * margins, orientation-aware) — only used for `fillPage`'s `min-height`. */
 function printableContentHeightPx(p: PrintSetup): number {
@@ -362,7 +387,20 @@ function renderFreeBand(
   // Band height always stays px (design.md: it's the outer box for its own
   // elements, not content relative to something else — see core/types.ts's
   // Template.layoutUnit doc comment).
-  return `<div class="band band-${band.type} ${extraClass}" data-band="${band.type}" style="position:relative;height:${band.height}px;${st}">${els}</div>`;
+  //
+  // `position` must NOT be forced to `relative` here for a running
+  // (pageHeader/pageFooter) band: an inline style always wins specificity
+  // over the `.running { position: fixed }` class rule below, so a bare
+  // `position:relative` inline silently defeated `position:fixed` — the
+  // element was still absolutely-positioned-child-anchoring-capable, but
+  // never actually fixed to the viewport. It instead rendered once, in
+  // normal document flow, whichever DOM position `runningHtml` placed it in
+  // (before `.page` — i.e. at the very top) — which is exactly why a
+  // pageFooter (bank on `bottom:0`) was appearing above the reportHeader
+  // instead of at the foot of the page.
+  const isRunning = extraClass.includes('running');
+  const posCss = isRunning ? '' : 'position:relative;';
+  return `<div class="band band-${band.type} ${extraClass}" data-band="${band.type}" style="${posCss}height:${band.height}px;${st}">${els}</div>`;
 }
 
 // ── detail band (the flowing, paginating line-item table) ───────────────────────
@@ -472,16 +510,21 @@ function renderBand(
 // `margin-top:auto`, pushing it to the bottom of the page. `:last-child` is
 // a pure CSS selector, so this needs no JS knowledge of which band is
 // actually last (some templates omit `totals`, e.g.).
-function baseCss(runningTop: number, runningBottom: number, fillPageMinHeight?: number): string {
+function baseCss(p: PrintSetup, runningTop: number, runningBottom: number, fillPageMinHeight?: number): string {
   const fillPageCss =
     fillPageMinHeight != null
       ? `.doc-flow { display: flex; flex-direction: column; min-height: ${fillPageMinHeight}px; }
 .doc-flow > *:last-child { margin-top: auto; }`
       : '';
+  const pageWidth = Math.round(pageWidthPx(p));
   return `
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #111; }
+/* Fixed, deterministic content width (see pageWidthPx doc comment above) —
+   applies on screen AND in print, so Preview shows exactly the same
+   available width free-form elements are actually laid out against. */
+.page { width: ${pageWidth}px; }
 .doc-flow { padding-top: ${runningTop}px; padding-bottom: ${runningBottom}px; }
 ${fillPageCss}
 .band { position: relative; }
@@ -553,7 +596,7 @@ export function renderToHtml(template: Template, data: DocumentData): RenderResu
   const fillPageMinHeight = template.printSetup.fillPage
     ? printableContentHeightPx(template.printSetup)
     : undefined;
-  const css = `${pageCss(template.printSetup)}\n${baseCss(runningTop, runningBottom, fillPageMinHeight)}`;
+  const css = `${pageCss(template.printSetup)}\n${baseCss(template.printSetup, runningTop, runningBottom, fillPageMinHeight)}`;
   const html = `${runningHtml}\n<div class="page"><div class="doc-flow">${flowHtml}</div></div>`;
 
   const document = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}</body></html>`;

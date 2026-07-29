@@ -12,12 +12,24 @@
   entries below), followed by two post-Phase-3 rounds not tracked in this
   journal — see the dedicated "Post-Phase-3 (design-review-driven)" and
   "v2 — usability redesign" sections further down for what's shipped since
-  (D-034 through D-051). Work is currently on the `v2` branch (off `main`
+  (D-034 through D-053). Work is currently on the `v2` branch (off `main`
   after D-046); `main` itself is fully caught up through D-046 and pushed.
-  Next: none queued — the approved v2 mockup's scope (Properties/Palette
-  simplification, click-to-add picker, per-section columns, section hover
-  toolbar, split handle) is fully implemented and green. The rest of this
-  section (below) is historical Phase 0–3 journal, kept for reference.
+  Latest: a real-PDF review of the Invoice (Orange) reference template
+  (user-reported: backgrounds/right-alignment inconsistent, wanted a
+  sub-table look for the totals, footer fields rendering above the
+  header, PDF margin not visible in Preview) surfaced two genuine
+  `core/render.ts` bugs — see D-052 (pageHeader/pageFooter silently
+  `position:relative`, never actually fixed) and D-053 (`.page` had no
+  explicit width, so Preview stretched edge-to-edge and Chromium's print
+  auto-fit scale was content-dependent) — both fixed, plus the Invoice
+  totals block and the Purchase Order pageHeader text repositioned to
+  match the real 673px printable width. Next: none queued — offered to
+  also right-align the Purchase Order (Blue/Peach) totals to match the
+  invoice's new look; not yet confirmed by the user. D-052 also flagged a
+  known, not-yet-fixed follow-up: a repeating pageHeader overlaps page
+  2+'s content (outside the official pagination gate's scope — see D-052
+  for why). The rest of this section (below) is historical Phase 0–3
+  journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -792,6 +804,46 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Two real `core/render.ts` bugs found and fixed via a
+  live-PDF review of the Invoice (Orange) template (D-052, D-053).** User
+  reported 5 specific complaints on a Preview screenshot: header/summary
+  backgrounds not aligned, line-items/summary right-alignment off, wanted
+  the totals block to read as a sub-table aligned with the line-item
+  table, footer fields (phone/website/address) rendering ABOVE the
+  header, and the PDF not looking like it had a print margin. Investigated
+  by generating real PDFs and inspecting their content streams directly
+  (inflating the FlateDecode stream, reading `cm`/`re` operators) rather
+  than guessing. Found (D-052) `renderFreeBand`'s inline
+  `style="position:relative"` was silently overriding the
+  `.running{position:fixed}` CSS class needed for pageHeader/pageFooter —
+  they were never actually fixed, which is exactly why the footer
+  rendered above everything else, and (verified with a real 40-row
+  multi-page PDF) why a repeating pageHeader never repeated past page 1.
+  Fixed the specificity bug. Found (D-053) `.page` had no explicit CSS
+  width at all, so on-screen Preview stretched edge-to-edge with no
+  visible page boundary, and Chromium's print auto-fit scale was silently
+  content-dependent (two different documents printed at two different
+  effective px-to-pt scales). Gave `.page` an explicit width matching the
+  real printable area (verified: Preview's `.page` now measures exactly
+  673px for an A4/16mm-margins template, was previously stretching to
+  fill its container) — this is a real, checked win for Preview even
+  though it does not fully control Chromium's print-time auto-fit (tried
+  and reverted an `overflow:hidden` + invisible-marker experiment that
+  didn't help and risked new clipping bugs — flagged as a known
+  follow-up in D-053 rather than solved under time pressure). Fixing
+  D-052 correctly exposed a second, previously-hidden bug: the Purchase
+  Order (Blue/Peach) pageHeader's "PURCHASE ORDER" text was always wider
+  than the true printable width, previously masked by the D-052 bug
+  itself (fixed as unintended in-flow content, it "fit" by coincidence);
+  narrowed the text element to fit. Repositioned the Invoice (Orange)
+  totals block (SUB TOTAL/TAX & VAT/DISCOUNT/GRAND TOTAL) to align
+  exactly with the detail table's real rendered "Total" (values) and
+  "Price"+"Qty." (labels) column boundaries at the true 673px width,
+  directly addressing complaints #1–#3. All 5 reference templates
+  re-rendered to real PDFs and screenshotted after every change to catch
+  regressions — the Purchase Order fix above was found this way, not
+  reported by the user. Verified: 61 core + 191 designer tests, `pnpm -r
+  typecheck`, designer `pnpm lint`, all green.
 - **2026-07-29 — v2 usability redesign: simplified Properties/Palette,
   click-to-add picker, per-section columns, section hover toolbar, split
   handle (D-047–D-051).** Direct feedback that the Properties panel was

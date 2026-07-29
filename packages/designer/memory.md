@@ -1636,6 +1636,128 @@ purely additive/optional.
 
 ---
 
+### D-052 — Fixed a real `position:fixed` regression in `core/render.ts`: pageHeader/pageFooter were silently `position:relative`, never actually fixed
+**Decision:** `renderFreeBand`'s non-grid/non-stack branch unconditionally
+put `position:relative` in the returned `<div>`'s inline `style`, even for
+a `pageHeader`/`pageFooter` band (`extraClass` containing `running`/
+`running-top`/`running-bottom`). An inline style always wins specificity
+over a class rule, so the `.running { position: fixed }` CSS (further
+down the same stylesheet) was silently dead — the band still LOOKED
+correctly positioned on a single-page document by coincidence (it's the
+first thing in the DOM, rendering at normal-flow position (0,0) which
+happens to equal where a `top:0` fixed header would sit too), but a
+`pageFooter` (`bottom:0`) rendered in normal flow at the very TOP of the
+document instead of the bottom — reported by the user as "phone/website/
+address" (the invoice's pageFooter fields) appearing above the header —
+and neither pageHeader nor pageFooter actually repeated on page 2+ of a
+multi-page document (verified via a real generated PDF: a 40-row Sales
+Contract's "SALES CONTRACT" pageHeader was present on page 1 only).
+Fixed: `posCss` is only `'position:relative'` for non-running bands; a
+running band gets no inline `position` at all, letting `.running`'s
+`position:fixed` apply.
+**Why:** Found while investigating the user's screenshot-based complaint
+about the Invoice (Orange) template ("phone/website and address come at
+the above header"). Confirmed via `page.pdf()` content-stream inspection
+(inflating the PDF's FlateDecode stream and reading the raw `cm`/`re`
+operators) and a real multi-page PDF screenshot — not guessed.
+**Known follow-up (not fixed this pass):** after this fix, a repeating
+pageHeader visually OVERLAPS the top of page 2+'s in-flow content (e.g.
+the detail table's repeating `<thead>`) — `.doc-flow`'s
+`padding-top:${runningTop}px` only reserves that space once, at the very
+start of the whole (unbroken) flow box, i.e. only on page 1; there's no
+per-physical-page equivalent for a one-time CSS padding property. Tried
+widening `@page`'s CSS margin by the header/footer height + a matching
+negative offset on the running band to compensate — made it WORSE (the
+repeating header ended up misplaced near the bottom of page 1 instead of
+the top of page 2) and was reverted; not chased further given `claude.md`
+§8's own pagination gate does NOT actually require pageHeader/pageFooter
+to repeat (only the detail `<thead>`, `reportHeader` once, `totals`
+once) — this is a real but lower-severity gap in a separate, optional
+feature. The architecturally correct fix is almost certainly Puppeteer's
+native `page.pdf({ headerTemplate, footerTemplate })` (already used for
+page numbers in `render-service/src/pdf.ts`) instead of the CSS
+`position:fixed` trick, since that mechanism is guaranteed to repeat
+per-physical-page without any margin/overlap ambiguity — worth a focused
+follow-up, not attempted here given the risk of a wider change under time
+pressure.
+`[status: locked]`
+
+---
+
+### D-053 — `.page` now has an explicit CSS width (the true printable width); Invoice (Orange) totals repositioned to match the detail table's real column boundaries
+**Decision:** `core/render.ts`'s `.page` had no CSS `width` at all — it
+filled whatever container rendered it. On screen this meant Preview
+stretched `.page` edge-to-edge to fill an arbitrarily wide panel (no
+visible page boundary at all, part of what the user meant by "pdf does
+not look like having default page margin"). In print, measured directly
+off a real generated PDF's content stream: Chromium's headless
+`page.pdf()` auto-fits the ENTIRE page to whichever `position:absolute`
+free-form element's `x + w` happens to be largest — a completely
+content-dependent, silently-varying scale with no fixed reference width
+at all (two test documents with different rightmost elements printed at
+two different effective CSS-px-to-pt ratios). Added `pageWidthPx()`
+(page width minus left+right margins — the SAME "true print content
+width" `render-service/src/pagination.ts`'s `printableAreaPx` already
+computes for its own row-height measurement pass) and set `.page { width:
+<that>px }` unconditionally (screen AND print).
+**Verified/limitation:** this makes on-screen Preview show a properly
+bounded, correctly-proportioned page (verified: `.page`'s computed width
+in a real Preview iframe is exactly 673px for an A4/16mm-margins
+template, was previously stretching to fill the panel) — a real, checked
+win. It does NOT, however, make Chromium's print-time auto-fit scale
+itself deterministic — tried `overflow:hidden` on `.page` and a hidden
+`position:absolute` width-marker div to force the auto-fit reference;
+neither changed the measured print scale, and `overflow:hidden`
+introduced new, different unpredictable clipping. Not chased further
+past this point — a real, separate Chromium print-layout behavior,
+flagged here rather than "fixed" under time pressure. `geometry.ts`
+(`pageDimensionsPx`, the Design canvas) was deliberately NOT changed to
+match — it still shows the full, unreduced page width, per its own
+existing design intent (`Canvas.svelte`'s comment: the margin guide is
+"purely a visual overlay, not a real content inset"); changing it would
+also require reworking the margin-guide rendering to not double-inset,
+out of scope here.
+**Fixture fallout, found and fixed in the same pass:** this exposed two
+concrete bugs, both fixed in `examples/reference-templates/fixtures.mjs`:
+1. The Invoice (Orange) totals band's SUB TOTAL/TAX & VAT/DISCOUNT/GRAND
+   TOTAL block was positioned assuming ~794px of available width (the
+   full, unreduced page), not the real 673px. Detail table columns
+   (`table-layout:fixed`, `width:100%`) render as RATIOS of the container,
+   not literal declared pixels, so at 673px the real "Total" column
+   renders at 561–673px and "Price"+"Qty." together at 374–561px.
+   Repositioned the totals value column to x=561/w=112 and the label
+   column to x=374/w=187 — the block now reads as a genuine continuation
+   of the line-item table (values under "Total", labels under "Price"/
+   "Qty.") instead of a floating, independently-sized box, and its right
+   edge lands flush with the header's/table's own right edge — this is
+   what the user asked for as items #1 ("summary/header backgrounds not
+   aligned"), #2 ("line items and summary right side alignment"), and #3
+   ("sub-table... aligned with line item total, labels aligned").
+2. The Purchase Order (Blue/Peach) pageHeader's "PURCHASE ORDER" text (x=
+   260, w=490, ending at 750px) was ALWAYS wider than the true 673px
+   printable width — previously masked because the D-052 bug made it
+   `position:relative` (in normal flow, contributing to whatever the
+   auto-fit measured, so it happened to fit). Fixing D-052 correctly made
+   it `position:fixed` — and Chromium's auto-fit does NOT count
+   `position:fixed` content the same way, so with D-052 fixed alone, this
+   text started getting clipped ("PURCHASE" instead of "PURCHASE ORDER")
+   — a real interaction between two independent, previously-hidden bugs.
+   Fixed by narrowing the text element to w=413 (ends at 673px).
+**Why:** User reported 5 specific complaints on the Invoice (Orange)
+template's Preview screenshot (backgrounds not aligned, line items/
+summary right-alignment, wanted a sub-table look, footer fields above
+the header, and PDF not looking like it had a margin) — all traced to
+real bugs rather than pure taste, verified with real generated PDFs and a
+live Preview screenshot before AND after each fix, not just described.
+**Verified:** 61 core tests, 191 designer tests, `pnpm -r typecheck`, and
+designer `pnpm lint` all green. All 5 reference templates (`examples/
+reference-templates/fixtures.mjs`) re-rendered to real PDFs and
+screenshotted after every change in this pass to confirm no other
+template regressed.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

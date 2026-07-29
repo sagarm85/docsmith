@@ -582,7 +582,15 @@ function purchaseOrderTemplate(id, name, entity, accent, accentText = '#ffffff')
         elements: [
           el('box', 0, 4, 60, 36, { style: { bg: accent, borderRadius: 6 } }),
           el('text', 0, 14, 60, 16, { text: 'LOGO', style: { align: 'center', color: accentText, fontSize: 9, bold: true } }),
-          el('text', 260, 4, 490, 30, { text: 'PURCHASE ORDER', style: { fontSize: 20, bold: true, align: 'right', color: accent } }),
+          // Right edge lands at 673px — the real print content width for this
+          // A4/16mm-margin template (page width minus left+right margins;
+          // see core/render.ts's pageWidthPx doc comment) — not the ~794px
+          // full, unreduced page size. A pageHeader/pageFooter band is
+          // `position:fixed` (painted on every printed sheet), and Chromium's
+          // print auto-fit scale doesn't count fixed-position content the
+          // same way it counts normal content, so anything positioned past
+          // the true printable width here risks getting silently clipped.
+          el('text', 260, 4, 413, 30, { text: 'PURCHASE ORDER', style: { fontSize: 20, bold: true, align: 'right', color: accent } }),
         ],
       },
       {
@@ -820,17 +828,27 @@ export function invoiceOrangeTemplate() {
           el('text', 0, 142, 90, 16, { text: 'Bank Details:', style: { fontSize: 9, bold: true } }),
           el('field', 90, 142, 190, 16, { binding: { source: 'header', column: 'bank_details', format: 'text' }, style: { fontSize: 9 } }),
 
-          // Summary block flush toward the right margin (page content width
-          // ~794px at A4; right edge lands at 730px, safely inside the
-          // 16mm/~60px print margin) rather than sitting mid-page.
-          el('text', 500, 10, 130, 20, { text: 'SUB TOTAL:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
-          el('field', 630, 10, 100, 20, { binding: { source: 'header', column: 'subtotal', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
-          el('text', 500, 32, 130, 20, { text: 'TAX & VAT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
-          el('field', 630, 32, 100, 20, { binding: { source: 'header', column: 'tax_vat', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
-          el('text', 500, 54, 130, 20, { text: 'DISCOUNT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
-          el('field', 630, 54, 100, 20, { binding: { source: 'header', column: 'discount', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
-          el('text', 500, 80, 130, 30, { text: 'GRAND TOTAL', style: { fontSize: 14, bold: true, color: '#fff', bg: dark, padding: 6 } }),
-          el('field', 630, 80, 100, 30, { binding: { source: 'header', column: 'grand_total', format: 'currency' }, style: { fontSize: 14, bold: true, align: 'right', color: '#fff', bg: dark, padding: 6 } }),
+          // Summary block laid out as a "sub-table" continuing the detail
+          // table's last two columns, not just flush-right: the real print
+          // content width for this A4/16mm-margin template is 673px (page
+          // width minus left+right margins — measured directly off a real
+          // generated PDF/Preview, not the ~794px full, unreduced page size),
+          // and the detail table's fixed-px column widths (40/260/90/60/90,
+          // table-layout:fixed) act as RATIOS of that 673px, not literal
+          // pixels — Price+Qty render at 374-561px, Total at 561-673px. The
+          // label column (374-561) and value column (561-673) below match
+          // those exactly, so this block reads as a natural continuation of
+          // the line-item table above it (values under "Total", labels under
+          // "Price"/"Qty.") instead of an unrelated floating box, and its
+          // right edge lands flush with the table's/header's own right edge.
+          el('text', 374, 10, 187, 20, { text: 'SUB TOTAL:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
+          el('field', 561, 10, 112, 20, { binding: { source: 'header', column: 'subtotal', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
+          el('text', 374, 32, 187, 20, { text: 'TAX & VAT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
+          el('field', 561, 32, 112, 20, { binding: { source: 'header', column: 'tax_vat', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
+          el('text', 374, 54, 187, 20, { text: 'DISCOUNT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
+          el('field', 561, 54, 112, 20, { binding: { source: 'header', column: 'discount', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
+          el('text', 374, 80, 187, 30, { text: 'GRAND TOTAL', style: { fontSize: 14, bold: true, color: '#fff', bg: dark, padding: 6 } }),
+          el('field', 561, 80, 112, 30, { binding: { source: 'header', column: 'grand_total', format: 'currency' }, style: { fontSize: 14, bold: true, align: 'right', color: '#fff', bg: dark, padding: 6 } }),
         ],
       },
       {
