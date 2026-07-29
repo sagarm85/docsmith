@@ -568,6 +568,16 @@ DocDesigner.mount(el, {
   `onSave`. A standalone default may persist to `localStorage` (key
   `erpdoc.templates.*`) only when no `onSave` is supplied.
 
+**Saved themes / brand presets (Phase 3, memory.md D-032).** `theme` above is a
+one-shot, host-supplied seed; the Toolbar's **Theme** control lets the
+*author* additionally edit a small set of brand colors (`--dd-accent` and its
+`-strong`/`-weak` shades, `--dd-bg`) live from inside the designer, and
+save/name/re-apply/delete them — same standalone/localStorage scoping as
+templates (`erpdoc.themes.*`, D-010), and disabled when the host supplies
+`theme` directly (the host owns branding then, same precedent as `onSave`
+disabling the template list). This reuses the *exact* token-override
+mechanism above, just made author-editable — no new template-model concept.
+
 ---
 
 ## 14. Component tree (build in this order)

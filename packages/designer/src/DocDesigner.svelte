@@ -31,6 +31,10 @@
     listTemplatesFromLocalStorage,
     loadTemplateFromLocalStorage,
     saveTemplateToLocalStorage,
+    deleteThemeFromLocalStorage,
+    listThemesFromLocalStorage,
+    loadThemeFromLocalStorage,
+    saveThemeToLocalStorage,
   } from './persistence.js';
   import {
     createFieldElement,
@@ -89,14 +93,50 @@
   // Host-page theme overrides (design.md §13 `theme`) are applied as inline custom
   // properties on the shadow-root's own top-level element, so they cascade to every
   // --dd-* consumer beneath while still falling back to the :host defaults in
-  // tokens.css for anything not overridden.
+  // tokens.css for anything not overridden. `activeTheme` seeds from
+  // `config.theme` but is designer-owned state from here on, so the in-app
+  // Theme editor (memory.md D-032) can change it live; when the host supplies
+  // `config.theme` the editor is disabled (host owns branding) and this stays
+  // exactly what the host gave it, same as before.
+  // svelte-ignore state_referenced_locally
+  let activeTheme = $state<Record<string, string>>({ ...(config?.theme ?? {}) });
+  const themeListDisabled = $derived(Boolean(config?.theme));
   const themeStyle = $derived(
-    config?.theme
-      ? Object.entries(config.theme)
+    Object.keys(activeTheme).length
+      ? Object.entries(activeTheme)
           .map(([key, value]) => `${key}: ${value}`)
           .join('; ')
       : undefined,
   );
+
+  let savedThemes = $state<Array<{ id: string; name: string }>>([]);
+  function refreshSavedThemes() {
+    savedThemes = listThemesFromLocalStorage();
+  }
+  refreshSavedThemes();
+
+  function handleThemeTokenChange(key: string, value: string) {
+    activeTheme = { ...activeTheme, [key]: value };
+  }
+
+  function handleSaveTheme(name: string) {
+    saveThemeToLocalStorage({ id: crypto.randomUUID(), name, tokens: { ...activeTheme } });
+    refreshSavedThemes();
+  }
+
+  function handleApplyTheme(id: string) {
+    const saved = loadThemeFromLocalStorage(id);
+    if (saved) activeTheme = { ...saved.tokens };
+  }
+
+  function handleDeleteTheme(id: string) {
+    deleteThemeFromLocalStorage(id);
+    refreshSavedThemes();
+  }
+
+  function handleResetTheme() {
+    activeTheme = {};
+  }
 
   /** Every discrete edit goes through here — one undo step per call. */
   function commitTemplate(next: Template) {
@@ -598,6 +638,14 @@
         onSave={handleSave}
         {exporting}
         onExportPdf={canExportPdf ? handleExportPdf : undefined}
+        {activeTheme}
+        {savedThemes}
+        {themeListDisabled}
+        onThemeTokenChange={handleThemeTokenChange}
+        onSaveTheme={handleSaveTheme}
+        onApplyTheme={handleApplyTheme}
+        onDeleteTheme={handleDeleteTheme}
+        onResetTheme={handleResetTheme}
       />
       {#if saveToast}
         <div class="dd-toast-slot">

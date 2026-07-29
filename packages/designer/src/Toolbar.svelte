@@ -2,6 +2,7 @@
   import Button from './ui/Button.svelte';
   import Icon from './ui/Icon.svelte';
   import TemplateList from './TemplateList.svelte';
+  import ThemeList from './ThemeList.svelte';
 
   type Mode = 'design' | 'preview';
 
@@ -25,6 +26,14 @@
     exporting = false,
     onExportPdf,
     brand,
+    activeTheme,
+    savedThemes,
+    themeListDisabled = false,
+    onThemeTokenChange,
+    onSaveTheme,
+    onApplyTheme,
+    onDeleteTheme,
+    onResetTheme,
   }: {
     templateName: string;
     onNameChange: (name: string) => void;
@@ -45,6 +54,15 @@
     exporting?: boolean;
     onExportPdf?: () => void;
     brand?: import('svelte').Snippet;
+    /** Saved themes / brand presets (memory.md D-032). */
+    activeTheme: Record<string, string>;
+    savedThemes: Array<{ id: string; name: string }>;
+    themeListDisabled?: boolean;
+    onThemeTokenChange: (key: string, value: string) => void;
+    onSaveTheme: (name: string) => void;
+    onApplyTheme: (id: string) => void;
+    onDeleteTheme: (id: string) => void;
+    onResetTheme: () => void;
   } = $props();
 
   function handleNameInput(e: Event) {
@@ -95,6 +113,16 @@
   </div>
 
   <div class="dd-toolbar-section dd-toolbar-actions">
+    <ThemeList
+      {activeTheme}
+      themes={savedThemes}
+      disabled={themeListDisabled}
+      onTokenChange={onThemeTokenChange}
+      onSaveCurrent={onSaveTheme}
+      onApply={onApplyTheme}
+      onDelete={onDeleteTheme}
+      onReset={onResetTheme}
+    />
     <button
       type="button"
       class="dd-icon-btn"

@@ -636,6 +636,43 @@ fighting over which fires first, since they usually touch different style
 properties).
 `[status: locked]`
 
+### D-032 — Saved themes are author-editable, saved sets of the *existing* `theme` token-override mechanism — not a new template-model concept
+**Decision:** "Saved themes / brand presets" reuses design.md §13's already-
+documented `config.theme` mechanism (host-supplied `--dd-*` CSS custom
+property overrides, applied inline on the shadow root) rather than inventing
+a new per-template branding concept. The Toolbar's new **Theme** control lets
+the author live-edit 4 tokens (`--dd-accent`, `--dd-accent-strong`,
+`--dd-accent-weak`, `--dd-bg` — the ones that most visibly read as "brand
+color" in the chrome) and save/name/apply/delete named sets, persisted to
+`localStorage` under `erpdoc.themes.*` (new `SavedTheme = {id, name,
+tokens}`, alongside the existing template persistence functions in the same
+file). `DocDesigner.svelte` now owns `activeTheme` state seeded from
+`config?.theme` (rather than reading `config.theme` directly for the applied
+style), so in-designer edits can change it live; the control disables itself
+when the host supplies `config.theme` (host owns branding then — same
+precedent as `onSave` disabling the template list, D-010).
+**Why:** design.md §13 already fully specced a token-override mechanism for
+exactly this purpose (host-supplied branding); "saved themes" is naturally
+"let the author do what a host script could already do, and remember it,"
+not a request for a second, template-embedded styling system. Reusing it
+keeps the feature small (a persistence layer + a small editor UI, mirroring
+`TemplateList.svelte`'s already-proven list/save/apply/delete pattern)
+instead of inventing new `Template` fields, new render.ts branches, or a
+second place colors can come from.
+**Scope boundary:** only 4 of the full `--dd-*` token set are exposed for
+editing — the highest-value "this is our brand" subset — not a full theme
+editor for every token; other tokens still only change via `config.theme`
+(host) or the fixed light/dark defaults in `tokens.css`.
+**Rejected:** a per-template "brand color" concept embedded in `Template`
+itself, affecting the *printed document's* rendered colors (rejected — the
+`--dd-*` tokens are explicitly the designer chrome's own tokens per
+`tokens.css`'s header comment, never read by `core.renderToHtml`; making
+saved themes affect print output would require a genuinely new template-model
+field and renderer change, which the "saved themes" ask didn't call for and
+`ElementStyle`/`conditionalFormat` (D-031) already cover per-element color
+authoring for the actual document).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

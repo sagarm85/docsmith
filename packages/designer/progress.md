@@ -266,6 +266,24 @@
   Amount cells highlighted green/bold. 38 core tests pass (was 31); 134
   designer tests pass (was 125); lint/typecheck/build all green
   (`dist/doc-designer.js` ~328KB / ~78KB gzip).
+- **Now — Saved themes / brand presets (D-032).** Reuses design.md §13's
+  already-documented `config.theme` token-override mechanism rather than
+  inventing a new template-model concept — the Toolbar's new **Theme**
+  control lets the author live-edit 4 brand-relevant tokens (`--dd-accent`
+  and its `-strong`/`-weak` shades, `--dd-bg`) and save/name/apply/delete
+  named sets, persisted to `localStorage` (`erpdoc.themes.*`, new
+  `SavedTheme` type alongside the existing template persistence functions).
+  `DocDesigner.svelte` now owns `activeTheme` state seeded from
+  `config?.theme` so in-designer edits apply live; disabled when the host
+  supplies `config.theme` directly (host owns branding, same D-010
+  precedent as `onSave` disabling the template list). New
+  `ThemeList.svelte` mirrors `TemplateList.svelte`'s proven list/save/
+  apply/delete pattern. Verified with `persistence.test.ts` additions (10
+  tests, was 5), a dedicated `ThemeList.test.ts` (9 tests), a
+  `DocDesigner.test.ts` integration test (edit → save → reset → re-apply
+  round-trip, plus the host-supplied-theme disabled case), and a
+  real-browser screenshot. 150 designer tests pass (was 134);
+  lint/typecheck/build all green (`dist/doc-designer.js` ~340KB / ~80KB gzip).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -455,7 +473,10 @@
       line (English-only by design — see progress.md's "Now" note/memory.md
       for the reasoning).
 - [ ] Carried-forward subtotals (server-assisted)
-- [ ] Saved themes / brand presets
+- [x] Saved themes / brand presets — reuses the existing `config.theme`
+      token-override mechanism (design.md §13); new `ThemeList.svelte`
+      (Toolbar) lets the author edit/save/apply/delete named sets of 4
+      brand-relevant tokens, `localStorage`-persisted like templates (D-032).
 
 ---
 
@@ -479,6 +500,15 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Saved themes / brand presets (D-032).** Reuses design.md
+  §13's existing `config.theme` token-override mechanism rather than a new
+  template-model concept. New Toolbar **Theme** control (`ThemeList.svelte`,
+  mirrors `TemplateList.svelte`'s pattern) lets the author live-edit 4
+  brand-relevant tokens (`--dd-accent`/`-strong`/`-weak`, `--dd-bg`) and
+  save/name/apply/delete named sets (`erpdoc.themes.*` in `localStorage`,
+  new `SavedTheme` type). Disabled when the host supplies `config.theme`
+  directly (D-010 precedent). 150 designer tests pass (was 134);
+  lint/typecheck/build all green. Verified with a real-browser screenshot.
 - **2026-07-29 — Conditional formatting (D-031).** New `ConditionalRule` type
   (operator/value/style) on `FreeElement` (field kind) and `DetailColumn` —
   declarative only, tests an element/column's own value, never another

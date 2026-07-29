@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { waitFor } from '@testing-library/svelte';
+import { waitFor, fireEvent } from '@testing-library/svelte';
 import { StaticAdapter } from '@docsmith/adapters';
 import type { Template } from '@docsmith/core';
 import './DocDesigner.svelte'; // side effect: registers <doc-designer>
@@ -787,6 +787,73 @@ describe('<doc-designer>', () => {
     await nextTick();
     expect(reportHeader().arrangement).toBe('free');
     expect(reportHeader().elements[0]?.row).toBeUndefined();
+
+    el.remove();
+  });
+
+  it('theme editor: editing a brand color applies it live, and saving/re-applying round-trips it (memory.md D-032)', async () => {
+    const el = mountWithAdapter();
+    await nextTick();
+
+    const themeTrigger = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Brand theme"]');
+    expect(themeTrigger?.disabled).toBe(false);
+    // A plain `.click()` here (the pattern used elsewhere in this file)
+    // doesn't reliably open this particular trigger under jsdom — its
+    // button has an <Icon> SVG child, unlike TemplateList's plain-text
+    // trigger, and jsdom's native `.click()` appears to build a
+    // composedPath that the window-level "close on outside click" handler
+    // then treats as outside, closing the popover it just opened.
+    // `fireEvent.click()` (a real MouseEvent) doesn't hit this.
+    await fireEvent.click(themeTrigger!);
+
+    const accentInput = el.shadowRoot!.querySelector<HTMLInputElement>('[aria-label="Accent"]');
+    expect(accentInput).toBeTruthy();
+    accentInput!.value = '#00ff00';
+    accentInput!.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+
+    // Applied live as an inline style on the shadow root (design.md §13).
+    const root = el.shadowRoot!.querySelector<HTMLElement>('.dd-root');
+    expect(root?.style.getPropertyValue('--dd-accent')).toBe('#00ff00');
+
+    const popover = el.shadowRoot!.querySelector('.dd-theme-list-popover') as HTMLElement;
+    const nameInput = popover.querySelector<HTMLInputElement>('[aria-label="New theme name"]');
+    nameInput!.value = 'My Brand';
+    nameInput!.dispatchEvent(new Event('input', { bubbles: true }));
+    await nextTick();
+    Array.from(popover.querySelectorAll('button'))
+      .find((b) => b.textContent?.trim() === 'Save')
+      ?.click();
+    await nextTick();
+
+    expect(popover.textContent).toContain('My Brand');
+
+    // Reset, then re-apply the saved theme to confirm it round-trips.
+    Array.from(popover.querySelectorAll('button'))
+      .find((b) => b.textContent?.trim() === 'Reset to default')
+      ?.click();
+    await nextTick();
+    expect(root?.style.getPropertyValue('--dd-accent')).toBe('');
+
+    Array.from(popover.querySelectorAll('button'))
+      .find((b) => b.textContent?.trim() === 'My Brand')
+      ?.click();
+    await nextTick();
+    expect(root?.style.getPropertyValue('--dd-accent')).toBe('#00ff00');
+
+    el.remove();
+  });
+
+  it('theme editor is disabled when the host supplies config.theme directly', async () => {
+    const el = document.createElement('doc-designer') as DocDesignerEl;
+    el.config = { adapter: new StaticAdapter({ entities: [] }), theme: { '--dd-accent': '#123456' } };
+    document.body.appendChild(el);
+    await nextTick();
+
+    const trigger = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Brand theme"]');
+    expect(trigger?.disabled).toBe(true);
+    const root = el.shadowRoot!.querySelector<HTMLElement>('.dd-root');
+    expect(root?.style.getPropertyValue('--dd-accent')).toBe('#123456');
 
     el.remove();
   });
