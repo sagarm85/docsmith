@@ -160,6 +160,47 @@ describe('Band', () => {
     expect(onAddElement.mock.calls[0]?.[0]).toMatchObject({ kind: 'box', w: 793.7, h: 60 });
   });
 
+  it('accepts a Sections drop and forwards its columns to onAddSection (memory.md D-043)', async () => {
+    const onAddSection = vi.fn();
+    render(Band, {
+      props: {
+        band: emptyBand(),
+        onAddElement: vi.fn(),
+        onAddSection,
+        onInvalidDrop: vi.fn(),
+        ...selectionCallbacks(),
+      },
+    });
+
+    const dropzone = screen.getByRole('group', { name: 'Report Header band' });
+    await fireEvent.drop(dropzone, {
+      dataTransfer: fakeDataTransfer('application/x-doc-section', { columns: [50, 50] }),
+    });
+
+    expect(onAddSection).toHaveBeenCalledWith([50, 50]);
+  });
+
+  it('rejects a Sections drop with an honest reason when the band has no onAddSection (e.g. pageHeader/pageFooter, memory.md D-043)', async () => {
+    const onAddSection = vi.fn();
+    const onInvalidDrop = vi.fn();
+    render(Band, {
+      props: {
+        band: emptyBand('pageHeader'),
+        onAddElement: vi.fn(),
+        onInvalidDrop,
+        ...selectionCallbacks(),
+      },
+    });
+
+    const dropzone = screen.getByRole('group', { name: 'Page Header band' });
+    await fireEvent.drop(dropzone, {
+      dataTransfer: fakeDataTransfer('application/x-doc-section', { columns: [50, 50] }),
+    });
+
+    expect(onAddSection).not.toHaveBeenCalled();
+    expect(onInvalidDrop).toHaveBeenCalledWith('Sections can only go on the Report Header or Totals band.');
+  });
+
   it('stacks a second added element below the first', () => {
     const band: FreeBand = {
       id: 'reportHeader',

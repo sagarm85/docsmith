@@ -667,6 +667,20 @@ already done. Tracked here with the same rigor as a phase checklist.
       no template/core changes. Verified with real-browser screenshots of
       the top of the Palette and, scrolled down, the Header Fields section,
       both matching the mock.
+- [x] **Four real usability bugs from live dogfooding (D-043):** (1) the
+      element hover toolbar stayed visible while dragging (own element or a
+      neighbor it was dragged onto) — new `suppressToolbar`/`anyDragging`
+      band-wide suppression, enforced with `!important` since a plain class
+      loses the specificity tie against `:hover`; (2) dragging a "Sections"
+      chip onto a band was a silent no-op — `Band.svelte` now handles
+      `application/x-doc-section` (reportHeader/totals only; an honest
+      rejection message elsewhere) via the same `addSectionToBand` the
+      click path already used; (3) a Section's placeholder cells had no
+      delete affordance once added — `GridBand.svelte`'s empty-cell branch
+      gained a Delete button when backed by a real placeholder element; (4)
+      a Text block dropped into a grid cell rendered as an indistinguishable
+      "Drop a field here" ghost — `createGridBlockElement` now defaults new
+      Text blocks to `text:'Text'`, matching the free-form/stack paths.
 
 ---
 
@@ -690,6 +704,34 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Four real usability bugs from live dogfooding (D-043).**
+  The user reported four separate problems while actually using the app:
+  a black hover toolbar staying visible while dragging a field; dragging a
+  "2 columns" Sections chip onto Report Header silently doing nothing;
+  no way to remove a Section once added; and a "Text" block dropped into a
+  grid cell rendering invisibly. All four traced to the same pattern this
+  project has hit before (D-021, D-041) — an affordance that looks
+  functional but silently does nothing. (1) `FreeElement.svelte` gained a
+  `suppressToolbar` prop driven by a new `Band.svelte`-owned `anyDragging`
+  flag (any element dragging suppresses every toolbar in the band, not
+  just its own — the pointer is often hovering a different element it's
+  been dragged onto), enforced with `!important` since dragging state
+  alone loses the CSS specificity tie against `:hover`. (2) `Band.svelte`
+  now handles `application/x-doc-section` drops (reportHeader/totals only,
+  matching D-037's original arrangement scope; an honest rejection message
+  elsewhere) via the same `addSectionToBand` the click-to-add path already
+  used. (3) `GridBand.svelte`'s empty-cell branch gained a Delete button
+  when the cell is backed by a real placeholder element (not a genuinely
+  absent gap cell). (4) `createGridBlockElement` now defaults a new Text
+  block to `text:'Text'` instead of `''`, matching
+  `createBlockElement`/`createStackBlockElement` — an empty string was
+  indistinguishable from a placeholder cell and rendered as an inert ghost
+  with no way to edit it. `Band.test.ts` gained 2 tests; 172 designer
+  tests pass (was 170); lint/typecheck/build all green. Verified with
+  real-browser Puppeteer for all four: computed-style toolbar suppression
+  during a drag, a genuine native DragEvent sequence converting
+  reportHeader to a 2-column grid, a working delete button reducing the
+  element count, and a visible "Text" label rendering in the dropped cell.
 - **2026-07-29 — Palette visual pass (D-042).** The user compared a real
   screenshot of the Palette against the earlier design-review mockup
   ("this is mock" / "I liked mocked one") and flagged the gap directly —

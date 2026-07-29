@@ -776,6 +776,7 @@
             {adapter}
             {selection}
             onAddElement={handleAddElement}
+            onAddSection={addSectionToBand}
             onUpdateElements={handleUpdateElements}
             onAddColumn={handleAddColumn}
             onUpdateColumns={handleUpdateColumns}

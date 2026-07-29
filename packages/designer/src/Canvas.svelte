@@ -13,6 +13,7 @@
     adapter,
     selection,
     onAddElement,
+    onAddSection,
     onUpdateElements,
     onAddColumn,
     onUpdateColumns,
@@ -36,6 +37,11 @@
     adapter: DataSourceAdapter;
     selection: Selection;
     onAddElement: (bandId: string, element: FreeElement) => void;
+    /** Dragging a "Sections" chip directly onto a band (memory.md D-037/
+     * D-043) — only reportHeader/totals accept it (the two bands grid
+     * arrangement is offered on; same scope as the arrangement toggle in
+     * BandProps.svelte). */
+    onAddSection: (bandId: string, columns: number[]) => void;
     /** Stack-arrangement bands replace their whole `elements` array per edit
      * (memory.md D-029), same "whole collection" pattern as `onUpdateColumns`. */
     onUpdateElements: (bandId: string, elements: FreeElement[]) => void;
@@ -235,6 +241,7 @@
             selectedElementId={selection?.kind === 'element' && selection.bandId === 'reportHeader' ? selection.elementId : undefined}
             bandSelected={selection?.kind === 'band' && selection.bandId === 'reportHeader'}
             onAddElement={(el) => onAddElement('reportHeader', el)}
+            onAddSection={(columns) => onAddSection('reportHeader', columns)}
             onInvalidDrop={handleInvalidDrop}
             onSelectElement={(id) => onSelectElement('reportHeader', id)}
             onSelectBand={() => onSelectBand('reportHeader')}
@@ -301,6 +308,7 @@
             selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
             bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}
             onAddElement={(el) => onAddElement('totals', el)}
+            onAddSection={(columns) => onAddSection('totals', columns)}
             onInvalidDrop={handleInvalidDrop}
             onSelectElement={(id) => onSelectElement('totals', id)}
             onSelectBand={() => onSelectBand('totals')}

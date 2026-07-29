@@ -15,6 +15,7 @@
   };
 
   type BlockDragPayload = { kind: BlockKind };
+  type SectionDragPayload = { columns: number[] };
 
   let {
     band,
@@ -23,6 +24,7 @@
     unit = 'px',
     contentWidthPx = 0,
     onAddElement,
+    onAddSection,
     onInvalidDrop,
     onSelectElement,
     onSelectBand,
@@ -45,6 +47,12 @@
     unit?: 'px' | '%';
     contentWidthPx?: number;
     onAddElement: (element: FreeElement) => void;
+    /** Dragging a "Sections" palette chip directly onto this band (memory.md
+     * D-037/D-043) — undefined for pageHeader/pageFooter, which don't accept
+     * grid arrangement, so an application/x-doc-section drop there falls
+     * through to the honest onInvalidDrop rejection below instead of a
+     * silent no-op. */
+    onAddSection?: (columns: number[]) => void;
     onInvalidDrop: (reason: string) => void;
     onSelectElement: (elementId: string) => void;
     onSelectBand: () => void;
@@ -68,6 +76,20 @@
   // drag end. Only one element can be dragging at a time, so one shared
   // slot is enough.
   let guides = $state<{ x: number | null; y: number | null }>({ x: null, y: null });
+
+  // True while ANY element in this band is mid-drag (memory.md D-043) — used
+  // to suppress every element's hover toolbar during a drag, since the
+  // pointer often ends up hovering a DIFFERENT element than the one actually
+  // being dragged (elements overlap while being repositioned).
+  let anyDragging = $state(false);
+  function handleElementDragStart() {
+    anyDragging = true;
+    onElementDragStart();
+  }
+  function handleElementDragEnd() {
+    anyDragging = false;
+    onElementDragEnd();
+  }
 
   const bandLabel: Record<FreeBand['type'], string> = {
     reportHeader: 'Report Header',
@@ -104,6 +126,21 @@
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     dragOver = false;
+
+    const sectionRaw = e.dataTransfer?.getData('application/x-doc-section');
+    if (sectionRaw) {
+      if (!onAddSection) {
+        onInvalidDrop('Sections can only go on the Report Header or Totals band.');
+        return;
+      }
+      try {
+        const payload = JSON.parse(sectionRaw) as SectionDragPayload;
+        onAddSection(payload.columns);
+      } catch {
+        /* malformed payload — ignore, nothing to add */
+      }
+      return;
+    }
 
     const blockRaw = e.dataTransfer?.getData('application/x-doc-block');
     if (blockRaw) {
@@ -182,10 +219,11 @@
           {contentWidthPx}
           bandHeightPx={band.height}
           siblings={band.elements}
+          suppressToolbar={anyDragging}
           onSelect={() => onSelectElement(el.id)}
           onChange={(patch) => onElementLiveChange(el.id, patch)}
-          onDragStart={onElementDragStart}
-          onDragEnd={onElementDragEnd}
+          onDragStart={handleElementDragStart}
+          onDragEnd={handleElementDragEnd}
           onDelete={() => onElementDelete(el.id)}
           onDuplicate={() => onElementDuplicate(el.id)}
           onBringForward={() => onElementBringForward(el.id)}

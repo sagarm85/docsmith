@@ -1171,6 +1171,99 @@ reader to already know a color-coding convention, and matches the badge
 pattern already established for D-034 grid-band controls).
 `[status: locked]`
 
+### D-043 — Four real usability bugs found via live dogfooding: drag toolbar bleed-through, non-functional Sections drag-drop, undeletable grid placeholders, invisible grid Text blocks
+**Decision:** Four independent, real (not cosmetic) bugs surfaced by the user
+actually using the app, fixed together since each was caught in the same
+verification pass:
+1. **Toolbar visible during a drag.** `FreeElement.svelte`'s D-036 hover
+   toolbar reveal (`:hover`/`:focus-within`) doesn't stop applying just
+   because a drag is in progress — the pointer is physically over an element
+   (its own, or a neighbor it's been dragged onto, since elements overlap
+   mid-move) for the whole gesture. New `suppressToolbar` prop, driven by a
+   `Band.svelte`-owned `anyDragging` flag (set by wrapping the existing
+   `onElementDragStart`/`onElementDragEnd` props, one flag per band, not
+   per-element — any element dragging suppresses every toolbar in that
+   band). Enforced via `!important` in CSS (`.dd-el--toolbar-suppressed
+   .dd-el-toolbar`) since a class-specificity fix alone loses the tie
+   against `:hover`'s three-class selector. `FreeElement.svelte`'s
+   `onDestroy` now also fires `onDragEnd` (it previously only cleared
+   guides) so a mid-drag unmount can't leave `anyDragging` stuck true.
+2. **Sections drag-and-drop was a silent no-op.** D-037 explicitly scoped
+   Sections to click-to-add only, but the palette chip was still built
+   `draggable="true"` with a real dataTransfer payload — an honest-looking
+   affordance that did nothing when dropped, the same class of bug as
+   D-021's inert toggle. `Band.svelte` now handles
+   `application/x-doc-section` in its existing `handleDrop`, via a new
+   optional `onAddSection` prop wired only for `reportHeader`/`totals`'s
+   free-arrangement branch in `Canvas.svelte` → `DocDesigner`'s existing
+   `addSectionToBand` (the same function the click path already used — drag
+   and click now converge on one code path). `pageHeader`/`pageFooter`
+   (excluded from grid arrangement, same reasoning as D-029/D-034) reject
+   with an honest `onInvalidDrop` message instead of a silent drop.
+   Dropping onto an already-`'grid'` or `'stack'` band (GridBand.svelte/
+   StackBand.svelte have no band-wide drop target, only per-cell) remains
+   out of scope — same "best-effort" framing D-037 already established, now
+   just true specifically for the free-arrangement case that was reported.
+3. **No way to remove a Section once added.** A placeholder cell
+   (`createGridPlaceholderElement`, `kind:'text', text:''`) is a real,
+   deletable element per D-034's own doc comment — but `GridBand.svelte`
+   only ever rendered its hover delete/duplicate actions on
+   `.dd-grid-cell--filled` cells; a placeholder renders through the
+   "empty cell" branch (`isPlaceholder()`), which had no button at all.
+   Added a Delete action to the empty-cell branch, shown only when the cell
+   is backed by a real element (`placeholderId`, as opposed to a genuinely
+   absent gap cell from a neighboring `colSpan`), matching the filled-cell
+   danger-button style. No "duplicate" — duplicating an empty placeholder
+   has no value. Deleting every cell in a row makes the row disappear on
+   its own (`rows` is derived from remaining elements' `row` values), same
+   as a filled row today — no separate "delete whole row" concept needed.
+4. **A "Text" block dropped into a grid cell was invisible and un-editable.**
+   `createGridBlockElement('text', ...)` defaulted to `text: ''` — identical
+   in shape to a placeholder cell, so `GridBand.svelte`'s `isPlaceholder()`
+   heuristic couldn't tell a genuinely-just-dropped Text block apart from
+   an untouched row placeholder, and rendered it as the same inert "Drop a
+   field here" ghost (no double-click-to-edit, since that only exists on
+   the filled-cell branch). The free-form (`createBlockElement`) and stack
+   (`createStackBlockElement`) equivalents already default new Text blocks
+   to `text: 'Text'` for exactly this reason; `createGridBlockElement` was
+   the one inconsistent path. Fixed to match.
+**Why:** All four were reported directly by the user while actually using
+the app (not found via code review) — "I don't want this black tool[bar]
+while dragging," a screenshot of a "2 columns" Sections chip doing nothing
+when dropped onto Report Header, "how to remove section once added?", and
+"I am not able to add Text in section." Each traces to the same root
+pattern this project has hit before (D-021, D-041): an affordance that
+*looks* functional (draggable, hoverable, droppable) but silently does
+nothing or produces indistinguishable-from-broken output. Bundled into one
+decision because all four were found and fixed in one continuous
+real-browser verification pass, not because they're conceptually related.
+**Verified:** `Band.test.ts` gained two tests (Sections drop forwards to
+`onAddSection`; rejects with the honest message when absent, e.g.
+pageHeader). Designer suite: 172 tests (was 170). Real-browser Puppeteer
+verification for all four: (1) dragging an element mid-gesture — every
+`.dd-el-toolbar` in the band reads `opacity:0`/`pointer-events:none` via
+`getComputedStyle`, confirmed against a screenshot showing no floating
+toolbar; (2) a real native-DragEvent sequence (`dragstart`→`dragover`→
+`drop`, a genuine `DataTransfer`, run in an actual browser rather than
+jsdom's synthetic-only DnD) dropping "2 columns" onto an empty
+`reportHeader` converts it to `arrangement:'grid'`/`gridColumns:[50,50]`
+and appends 2 elements, confirmed via `getTemplate()` and a screenshot;
+(3) after adding a section, both new placeholder cells exposed a working
+"Delete row" button whose click reduced the band's element count from 7 to
+5; (4) dropping a Text block via the same real-DragEvent method produced a
+`{kind:'text', text:'Text', ...}` element that renders as visible text in
+the cell (screenshot), not an indistinguishable ghost cell.
+**Rejected:** persisting an explicit `isPlaceholder: true` flag on the
+element instead of inferring it from empty text (would need a new
+`FreeElement` field that's meaningless outside the designer's own UI logic
+and never read by `core.renderToHtml` — pure authoring-time state living in
+the real template JSON, which D-010 reserves for genuine document
+content); extending Sections drag support to already-`'grid'`/`'stack'`
+bands in this same pass (real added scope — a whole new band-wide drop
+target on components that currently only expose per-cell drop zones —
+deferred as a known, honestly-scoped gap rather than attempted piecemeal).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

@@ -15,6 +15,7 @@
     contentWidthPx = 0,
     bandHeightPx = 0,
     siblings = [],
+    suppressToolbar = false,
     onSelect,
     onChange,
     onDragStart,
@@ -47,6 +48,12 @@
      * (memory.md D-038). Already in the same unit as `element.x/y/w/h`, so
      * no conversion needed to compare edges. */
     siblings?: FreeElement[];
+    /** True while ANY element in the band is being dragged (memory.md
+     * D-043), not just this one — the band's cursor is often hovering over a
+     * neighboring element mid-drag (elements overlap while being repositioned),
+     * which would otherwise reveal THAT element's own hover toolbar even
+     * though nothing about it is selected or being interacted with. */
+    suppressToolbar?: boolean;
     onSelect: () => void;
     /** Called continuously during a move/resize drag — the parent applies this
      * live (no history push) so undo/redo sees the whole drag as one step. */
@@ -148,7 +155,10 @@
         aspect: number;
       };
 
-  let drag: DragState | null = null;
+  // $state (not a plain let) so the toolbar can hide reactively while a
+  // drag is in progress (see dd-el-toolbar--visible below) — it's read
+  // from the template, not just from event-handler closures.
+  let drag: DragState | null = $state(null);
   let editingText = $state(false);
 
   function handlePointerDownMove(e: PointerEvent) {
@@ -252,6 +262,11 @@
   onDestroy(() => {
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
+    // Also close out the drag itself (memory.md D-043) — Band.svelte's
+    // `anyDragging` toolbar-suppression flag would otherwise stay stuck
+    // true forever (no matching onDragEnd) if the dragged element is
+    // destroyed mid-gesture.
+    if (drag) onDragEnd?.();
     if (drag?.kind === 'move') onGuides?.({ x: null, y: null });
   });
 
@@ -335,6 +350,7 @@
 <div
   class="dd-el"
   class:dd-el--selected={selected}
+  class:dd-el--toolbar-suppressed={suppressToolbar}
   style="left:{element.x}{unit};top:{element.y}{unit};width:{element.w}{unit};height:{element.h}{unit}"
   role="button"
   tabindex="0"
@@ -349,7 +365,7 @@
        shortcuts) right at the cursor instead of only in the right rail.
        Mirrors StackBand.svelte/GridBand.svelte's existing hover-reveal
        element actions, extended here to free-form elements. -->
-  <div class="dd-el-toolbar" class:dd-el-toolbar--visible={selected}>
+  <div class="dd-el-toolbar" class:dd-el-toolbar--visible={selected && !suppressToolbar}>
     <button
       type="button"
       class="dd-el-toolbar-btn"
@@ -592,6 +608,17 @@
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
+  }
+
+  /* A `!important` override, not just a class/specificity fight — while
+     ANY element in the band is being dragged, the toolbar must stay hidden
+     even though the pointer is physically hovering the element the whole
+     time (its own drag) or ends up over a DIFFERENT element it was dragged
+     onto (elements overlap mid-move), both of which keep `:hover`/
+     `:focus-within` matching regardless of source order (memory.md D-043). */
+  .dd-el--toolbar-suppressed .dd-el-toolbar {
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   @media (prefers-reduced-motion: reduce) {

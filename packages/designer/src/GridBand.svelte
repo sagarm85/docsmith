@@ -305,6 +305,11 @@
               {@const emptyRow = cell.kind === 'empty' ? cell.row : rowIndex}
               {@const emptyCol = cell.kind === 'empty' ? cell.col : (cell.el.col ?? 0)}
               {@const placeholderId = cell.kind === 'element' ? cell.el.id : null}
+              <!-- A placeholder cell (real `text:''` element, e.g. from "Add
+                   row"/a Sections drop) is deletable like any other element —
+                   a genuinely-absent gap cell (no backing element, from a
+                   neighboring colSpan not reaching this column) has nothing
+                   to delete (memory.md D-043). -->
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="dd-grid-cell dd-grid-cell--empty"
@@ -316,6 +321,21 @@
                 ondrop={(e) => handleCellDrop(e, emptyRow, emptyCol, placeholderId)}
               >
                 Drop a field here
+                {#if placeholderId}
+                  <span class="dd-stack-el-actions">
+                    <button
+                      type="button"
+                      class="dd-stack-el-action dd-stack-el-action--danger"
+                      aria-label="Delete row"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        onElementDelete(placeholderId);
+                      }}
+                    >
+                      <Icon name="close" size={11} />
+                    </button>
+                  </span>
+                {/if}
               </div>
             {/if}
           {/each}
@@ -456,12 +476,18 @@
   }
 
   .dd-grid-cell--empty {
+    position: relative;
     justify-content: center;
     color: var(--dd-muted);
     font-style: italic;
     font-size: 11px;
     border: 1.5px dashed var(--dd-border);
     background: var(--dd-panel-alt);
+  }
+
+  .dd-grid-cell--empty:hover .dd-stack-el-actions,
+  .dd-grid-cell--empty:focus-within .dd-stack-el-actions {
+    display: flex;
   }
 
   .dd-grid-cell--dragover {

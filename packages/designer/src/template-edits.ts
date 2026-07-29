@@ -145,7 +145,13 @@ export function createGridFieldElement(
 /** Appends a new static block element into a grid band's cell (row, col). */
 export function createGridBlockElement(kind: BlockKind, row: number, col: number): FreeElement {
   const base = { id: newId(), kind, x: 0, y: 0, w: 0, h: 0, row, col, colSpan: 1 } as const;
-  if (kind === 'text') return { ...base, text: '' };
+  // Non-empty starter text, matching createBlockElement/createStackBlockElement
+  // above — GridBand.svelte's isPlaceholder() treats any empty-text 'text'
+  // element as a ghost "Drop a field here" cell (that's how "Add row"'s own
+  // placeholder renders), so an actually-dropped Text block needs real
+  // content or it would be visually indistinguishable from an untouched
+  // placeholder and impossible to double-click into (memory.md D-043).
+  if (kind === 'text') return { ...base, text: 'Text' };
   if (kind === 'image') return { ...base, src: { kind: 'url', value: '' } };
   return base;
 }
