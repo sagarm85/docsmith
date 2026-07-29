@@ -256,6 +256,22 @@
     onUpdateElements([...band.elements, createGridPlaceholderElement(nextRowIndex(), 0)]);
   }
 
+  // Splits a wide (colSpan > 1) cell into two side by side (memory.md
+  // D-050) — a direct canvas alternative to typing a new "Width across
+  // columns" number in Properties. The existing content keeps roughly half
+  // its original span; the freed columns become a genuine new placeholder
+  // cell, not a phantom gap.
+  function handleSplitCell(rowIndex: number, group: FreeElement[], span: number, groupCol: number) {
+    if (span < 2) return;
+    const leftSpan = Math.floor(span / 2);
+    const rightSpan = span - leftSpan;
+    const rightCol = groupCol + leftSpan;
+    const groupIds = new Set(group.map((el) => el.id));
+    const shrunk = band.elements.map((el) => (groupIds.has(el.id) ? { ...el, colSpan: leftSpan } : el));
+    const placeholder = createGridPlaceholderElement(rowIndex, rightCol);
+    onUpdateElements([...shrunk, { ...placeholder, colSpan: rightSpan > 1 ? rightSpan : undefined }]);
+  }
+
   // ── Section hover toolbar (memory.md D-049) ─────────────────────────────
   let layoutPopoverRow = $state<number | null>(null);
 
@@ -619,6 +635,20 @@
                     </span>
                   </div>
                 {/each}
+                {#if cell.span > 1}
+                  <button
+                    type="button"
+                    class="dd-split-handle"
+                    aria-label={`Split section ${rowIndex + 1}'s wide cell into two`}
+                    title="Split into two columns"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleSplitCell(rowIndex, group, cell.span, groupCol);
+                    }}
+                  >
+                    <Icon name="grip" size={12} />
+                  </button>
+                {/if}
               </div>
             {:else}
               {@const emptyRow = cell.kind === 'empty' ? cell.row : rowIndex}
@@ -1002,6 +1032,33 @@
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
+  }
+
+  /* Split handle for a wide (colSpan > 1) cell (memory.md D-050) —
+     revealed on hover, positioned at the cell's own horizontal center
+     regardless of how many columns it spans. */
+  .dd-split-handle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid var(--dd-accent);
+    border-radius: 50%;
+    background: var(--dd-panel);
+    color: var(--dd-accent-strong);
+    box-shadow: var(--dd-shadow);
+    cursor: pointer;
+    z-index: 3;
+  }
+
+  .dd-grid-cell--filled:hover .dd-split-handle,
+  .dd-grid-cell--filled:focus-within .dd-split-handle {
+    display: flex;
   }
 
   .dd-grid-subitem {

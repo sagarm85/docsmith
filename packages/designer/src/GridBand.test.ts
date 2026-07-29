@@ -461,4 +461,30 @@ describe('GridBand', () => {
       expect(screen.queryByRole('button', { name: /Change layout|Duplicate section|Delete section/ })).toBeNull();
     });
   });
+
+  describe('split handle for wide cells (memory.md D-050)', () => {
+    it('splits a colSpan-2 cell into two: the original shrinks, a new placeholder fills the freed column', async () => {
+      const cb = callbacks();
+      // filledBand()'s row 0 ("Seller") spans both columns.
+      render(GridBand, { props: { band: filledBand(), ...cb } });
+
+      const handle = document.querySelector<HTMLButtonElement>("[aria-label=\"Split section 1's wide cell into two\"]");
+      expect(handle).toBeTruthy();
+      await fireEvent.click(handle!);
+
+      expect(cb.onUpdateElements).toHaveBeenCalledTimes(1);
+      const [elements] = cb.onUpdateElements.mock.calls[0] as [FreeElement[]];
+      const seller = elements.find((e) => e.id === 'a');
+      expect(seller).toMatchObject({ colSpan: 1 }); // 2 -> floor(2/2) = 1
+      const newPlaceholder = elements.find((e) => e.row === 0 && e.col === 1 && e.id !== 'a');
+      expect(newPlaceholder).toMatchObject({ kind: 'text', text: '', row: 0, col: 1 });
+    });
+
+    it('has no split handle on a single-column (colSpan 1) cell', () => {
+      render(GridBand, { props: { band: filledBand(), ...callbacks() } });
+      // filledBand()'s row 1 cells ("Invoice #", the col:1 placeholder) are
+      // both colSpan 1 — no split handle should exist for either.
+      expect(document.querySelectorAll('.dd-split-handle')).toHaveLength(1); // only "Seller"
+    });
+  });
 });
