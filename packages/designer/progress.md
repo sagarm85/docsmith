@@ -8,6 +8,16 @@
 
 ## Now / Next / Notes
 
+- **Current status (2026-07-29):** Phases 0–3 are done (see the historical
+  entries below), followed by two post-Phase-3 rounds not tracked in this
+  journal — see the dedicated "Post-Phase-3 (design-review-driven)" and
+  "v2 — usability redesign" sections further down for what's shipped since
+  (D-034 through D-051). Work is currently on the `v2` branch (off `main`
+  after D-046); `main` itself is fully caught up through D-046 and pushed.
+  Next: none queued — the approved v2 mockup's scope (Properties/Palette
+  simplification, click-to-add picker, per-section columns, section hover
+  toolbar, split handle) is fully implemented and green. The rest of this
+  section (below) is historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -716,6 +726,52 @@ already done. Tracked here with the same rigor as a phase checklist.
 
 ---
 
+## v2 — usability redesign (`v2` branch, off `main` after D-046)
+
+Prompted by direct feedback that the Properties panel/Palette were too
+technical/complicated for a non-technical end user, plus a proposal to
+consider React. Reaffirmed Svelte (memory.md D-051, D-007) — the actual
+problem is information architecture, not the framework. A mockup Artifact
+was approved before any code changed this time (learning from D-042's
+"mock vs actual" gap). Tracked here with the same rigor as any other phase.
+
+- [x] **Properties panel + Palette simplified for a non-technical
+      audience (D-051)** — icon align buttons, B/I toggle buttons, color
+      swatches + custom picker replace the old dropdown/checkboxes/raw
+      color input in `ElementProps.svelte`; "Column span" renamed "Width
+      across columns" and, with Layer order, moved into a collapsed
+      section. `SourceConfig.svelte`'s raw SQL dataset form moved behind
+      a new "Advanced" toggle, closed by default. No capability removed.
+- [x] **Click-to-add inline field/text picker for grid cells (D-047)** —
+      an empty cell is now clickable: a popover offers a search box over
+      header fields plus "Type your own text" (enters edit mode
+      immediately), reusing the same replace-vs-append placement logic
+      (D-045) drag-and-drop already used. Drag-and-drop is unchanged.
+- [x] **Per-section independent column layout (D-048)** — new
+      `FreeBand.sectionColumns` lets each grid-band row have its own
+      column widths instead of every row sharing one band-wide
+      `gridColumns`. `core.renderGridBand` renders each row as its own
+      `<table>`, merging consecutive same-layout rows back into one for
+      seamless `border-collapse`. Column-resize handles (D-044) are now
+      per-row. Fixed a related bug in `convertBandArrangement` (matched
+      rows by array position instead of their real `row` value).
+- [x] **Section hover toolbar: change layout / duplicate / delete
+      (D-049)** — hovering a section reveals a toolbar (same look as the
+      D-036 element toolbar). Change layout swaps just that section's
+      columns via a preset popover, clamping existing content into the
+      new count rather than losing it. Duplicate/delete act on the whole
+      row at once — previously only per-field delete existed.
+- [x] **Split handle for wide cells (D-050)** — a colSpan > 1 cell shows
+      a circular split handle on hover; clicking it halves the cell,
+      turning the freed columns into a real new placeholder cell. A
+      direct canvas alternative to the "Width across columns" stepper.
+
+61 core tests pass (was 60); 191 designer tests pass (was 184 before this
+whole pass). Every item verified in a real browser against the approved
+mockup, not just described.
+
+---
+
 ## Cross-cutting (must hold at every phase)
 
 - [ ] A11y: keyboard, focus rings, SR labels, contrast, reduced-motion
@@ -736,6 +792,44 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — v2 usability redesign: simplified Properties/Palette,
+  click-to-add picker, per-section columns, section hover toolbar, split
+  handle (D-047–D-051).** Direct feedback that the Properties panel was
+  "very complicated" for a non-technical end user, with a screenshot and
+  a proposal to consider migrating to React. Declined the React move
+  (reaffirms D-007 — the actual problem is information architecture, not
+  the framework, and switching would reintroduce the exact "second
+  runtime in a host page" risk D-007 was written to avoid). Built a
+  static, clearly-labeled Artifact mockup and got explicit approval
+  before touching any code — learning from D-042's earlier "mock vs
+  actual didn't match" complaint — then implemented on a new `v2` branch
+  (created off `main` right after pushing everything through D-046).
+  (D-051) `ElementProps.svelte`: icon align buttons, B/I toggle buttons,
+  theme-token color swatches + a custom picker, and a collapsed "Position
+  & layout"/"Layer order" section replace the old dropdown/checkboxes/
+  raw color input/always-visible Column-span field. `SourceConfig.svelte`:
+  the raw SQL dataset form moved behind a new "Advanced" toggle, closed
+  by default. (D-047) An empty grid cell is now clickable — a popover
+  offers a field search plus "Type your own text," reusing the same
+  replace-vs-append logic (D-045) drag-and-drop already used. (D-048) New
+  `FreeBand.sectionColumns` lets each grid-band row have its own column
+  layout instead of one band-wide `gridColumns` — `core.renderGridBand`
+  renders each row as its own `<table>` (merging consecutive same-layout
+  rows for seamless `border-collapse`), and column-resize (D-044) became
+  per-row; fixed a related `convertBandArrangement` bug (matched rows by
+  array position instead of their real `row` value). (D-049) Hovering a
+  section reveals a toolbar to change its layout (a preset popover,
+  clamping existing content into the new column count rather than losing
+  it), duplicate it, or delete the whole row at once. (D-050) A colSpan >
+  1 cell shows a split handle that halves it into two real cells. No
+  capability was removed anywhere — every change is re-labeling,
+  re-grouping, or a friendlier control for the same underlying data.
+  61 core tests pass (was 60); 191 designer tests pass (was 177 before
+  this whole pass). Every item verified in a real browser against the
+  approved mockup: icon controls and collapsed sections in Properties,
+  the click-to-add popover, two independent sections at different column
+  widths with independent resize, the layout-swap/duplicate/delete
+  toolbar, and the split handle producing two real cells.
 - **2026-07-29 — Five reference-document templates seeded as Saved
   Templates (D-046).** The user attached five real-world document
   screenshots (a bordered Sales Contract, a Shipping Instruction, two

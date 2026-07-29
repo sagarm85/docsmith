@@ -1439,6 +1439,203 @@ home for exactly this kind of scaffolding.
 
 ---
 
+## v2 — usability redesign (design-review-driven, second round)
+
+Prompted by a screenshot of the Properties panel ("Column span" under a
+"CELL" group, a raw SQL textarea sitting above the palette's actual
+fields) with direct feedback that it was "very complicated" for an
+end-user audience, plus a proposal to reconsider the whole stack. A
+mockup Artifact was built and approved before any code changed (learning
+from D-042's earlier "mock didn't match actual" complaint), and a `v2`
+branch was created off `main` for the work. Entries below are numbered in
+the order they were implemented; D-051 (the Properties/Palette
+simplification pass) happened first but is recorded last since its
+write-up was finished after D-047–D-050.
+
+### D-047 — Click-to-add inline field/text picker for grid cells, alongside drag-and-drop
+**Decision:** An empty grid cell is now clickable (when `GridBand.svelte`
+is given `adapter`/`entity` props, threaded from `Canvas.svelte`, same
+optional-capability pattern as everywhere else in this codebase): a small
+popover offers a search box over the entity's header fields plus a
+"Type your own text" option that immediately enters edit mode. Selecting
+a field or typing text reuses the exact same `placeElement()` replace-vs-
+append logic (memory.md D-045) the drag-and-drop path already used —
+dropping and clicking now converge on one code path. Drag-and-drop
+itself is completely unchanged; the picker is a second, easier way to
+reach the same result, not a replacement.
+**Why:** The v2 mockup showed this directly as an "easier in v2" scenario
+in response to "how are fields/text easily added" — dragging a chip
+across the screen is a real barrier for a user who isn't drag-comfortable
+or is on a trackpad; clicking and searching/typing is a much lower floor.
+**Verified:** `GridBand.test.ts` gained 6 tests (opens on click and loads
+fields, picking a field replaces the placeholder, "Type your own text"
+replaces it with an editable text element, search filters the list,
+outside-click closes it, and the old no-adapter behavior is unchanged).
+Verified visually in a real browser: clicking an empty section cell in
+the actual running app shows the same search-box + "Type your own text"
+popover the mockup depicted.
+**Rejected:** replacing drag-and-drop with the picker — both stay, since
+dragging is still the faster path once a user is comfortable with it.
+`[status: locked]`
+
+### D-048 — Per-section independent column layout
+**Decision:** `FreeBand` gains `sectionColumns?: Record<number, number[]>`
+— per-row column widths, keyed by row index. A row missing an entry
+falls back to the band's existing `gridColumns` (then a single 100%
+column), so every template saved before this existed keeps rendering
+identically. `core.renderGridBand` now renders each row as its own
+`<table>` (a native `<colgroup>` can't express two different column
+grids in one table) — consecutive rows that resolve to the *same*
+columns are merged back into one `<table>` so `border-collapse` stays
+seamless for the common case (a whole block of sections sharing one
+layout), and only a genuine layout change between adjacent sections
+starts a new `<table>`. `GridBand.svelte`'s column-resize handles
+(D-044) became per-row: each section gets its own divider overlay and
+resize state, and dragging one only ever touches that row's own
+`sectionColumns` entry. `addSectionToBand` (the "Sections" palette
+click-to-add path, D-037) now writes into `sectionColumns[newRow]`
+instead of overwriting the band-wide `gridColumns` for every row.
+**Why:** Flagged as an honest architecture note in the approved v2 mockup
+— today, all sections in a band shared one column setup, so dropping a
+new layout silently changed every existing row too, not just the one
+being added to. The mockup's own "add a section" storyboard showed a
+1-column and a 2-column section sitting side by side, which the old
+model structurally couldn't express.
+**Real bug found and fixed alongside this:** `convertBandArrangement`
+(schema.ts)'s `current === 'grid'` branch read the band-wide
+`gridColumns` for every row regardless of any per-row override, AND
+matched rows by their array position in `groupIntoRows`'s output rather
+than their actual `row` value (harmless before `sectionColumns` existed,
+since every row shared one column set either way — row numbers need not
+be contiguous or ordered per the type's own doc comment). Fixed to
+resolve each row's own columns by its real `row` value.
+**Verified:** core gained 4 tests (two sections with different column
+counts render as two separate `<table>`s with correct `<colgroup>`s;
+consecutive same-column rows merge into one `<table>`; a row missing from
+`sectionColumns` falls back to `gridColumns`; `convertBandArrangement`
+grid→free reads each row's own override, not just the band default) — 61
+core tests pass (was 60). `GridBand.test.ts`'s existing D-044 resize
+tests updated for the new per-row callback signature, plus one new test
+confirming two sections get independent resize handles. Verified
+end-to-end: a real column-resize drag on one section left a sibling
+section's columns untouched, and Preview mode's actual output showed two
+separate `<table>`s each with the right `<colgroup>`.
+**Rejected:** trying to express independent per-row columns within one
+shared `<table>`/`<colgroup>` via a common-denominator column count
+(e.g. a 6-column grid where 2-col uses colspan 3+3, 3-col uses colspan
+2+2+2) — technically possible but fragile and confusing to reason about
+compared to genuinely separate tables, which native `border-collapse`
+already handles correctly for the common same-layout case.
+`[status: locked]`
+
+### D-049 — Section hover toolbar: change layout, duplicate, delete
+**Decision:** Hovering a section (a grid-band row) reveals a small dark
+toolbar — same visual language as `FreeElement.svelte`'s existing D-036
+element toolbar. "Change layout" opens a popover of `SECTION_PRESETS` (1
+column / 2 columns / Large + small, the same list the palette's
+"Sections" group already uses) and swaps just that section's own
+`sectionColumns` entry (D-048); if the new column count is smaller,
+existing elements are clamped into the last valid column rather than
+disappearing (stacking there via D-045 if more than one lands in the
+same cell) — "existing fields keep their content and just reflow," as
+the mockup promised. "Duplicate section" copies every element in the row
+into a new row with the same column layout. "Delete section" removes the
+whole row (every element in it, plus its `sectionColumns` entry) in one
+action — previously only per-field delete existed. All three are one
+undo step each.
+**Why:** Directly requested in "how sections can be added/break/replace/
+deleted" — the mockup's storyboard showed all three as "new in v2"
+scenarios, contrasted with per-field delete (already real, D-043) and
+adding a section (already real, D-037).
+**Verified:** `GridBand.test.ts` gained 5 tests (layout popover opens and
+lists presets, picking one calls the callback with the right columns, the
+currently-matching preset is marked active, duplicate/delete call their
+callbacks with the right row index, and the toolbar is entirely absent
+when the callbacks aren't supplied). Verified end-to-end in a real
+browser: hovering a section reveals the toolbar, changing "2 columns" to
+"Large + small" correctly updates `sectionColumns` while keeping both
+fields' content, duplicate produces an identical second section, and
+delete removes it.
+**Rejected:** none — this closes out the add/replace/delete trio from the
+original question directly (split is D-050, its own decision).
+`[status: locked]`
+
+### D-050 — Split handle for wide (colSpan > 1) grid cells
+**Decision:** A cell spanning more than one column shows a small circular
+split handle at its horizontal center on hover. Clicking it halves the
+cell: the existing content's `colSpan` shrinks (rounded down), and the
+freed columns become a genuine new placeholder cell — not a phantom gap
+— ready to drop a field into or click-to-add (D-047). This is a second,
+more direct way to change a cell's span alongside the existing
+"Width across columns" stepper in Properties (memory.md D-047's
+ElementProps simplification) — both remain.
+**Why:** The mockup's "split a wide cell" storyboard showed this as a
+direct canvas alternative to typing a number, in response to wanting
+rich, visual ways to adjust layout without digging into a side panel.
+**Verified:** `GridBand.test.ts` gained 2 tests (splitting a colSpan-2
+cell produces the shrunk original plus a correctly-positioned new
+placeholder; a colSpan-1 cell shows no split handle). Verified
+end-to-end in a real browser: splitting a full-width "Seller" cell in a
+2-column section produced the original content on the left and an empty
+"Add a field" placeholder on the right.
+**Rejected:** a drag-based split (dragging the handle to choose an
+uneven split point, rather than a fixed halfway click) — offered no
+clear value over the simpler click-to-halve interaction for a v1, and
+the resulting uneven split can already be reached afterward via the
+"Width across columns" stepper on either half.
+`[status: locked]`
+
+### D-051 — v2 kickoff: reaffirmed Svelte over React; simplified Properties panel and Palette for a non-technical audience
+**Decision:** Asked directly whether to migrate the whole designer to
+React for simplicity. Declined, reaffirming D-007: the actual complaint
+(too many visible technical controls, developer-facing language) is an
+information-architecture problem, not a framework limitation — switching
+frameworks would reproduce the identical UX issues in different syntax
+while re-introducing the exact "second runtime shipped into a host page"
+risk D-007 rejected React for in the first place, since `<doc-designer>`
+embeds as one script tag into arbitrary ERP pages that may already run
+their own React. Proceeded instead with a UI-only redesign on a new `v2`
+branch (created off `main` after pushing everything through D-046):
+- `ElementProps.svelte`: the Align dropdown became three icon buttons
+  (left/center/right); Bold/Italic checkboxes became "B"/"I" toggle
+  buttons; the raw color `<input type=color>` became a row of
+  theme-token swatches (`var(--dd-text)`, `--dd-accent`, `--dd-ok`,
+  `--dd-danger`, `--dd-warn`) plus a "Custom" swatch that still opens the
+  native picker; "Column span" was renamed "Width across columns" and,
+  along with "Send backward"/"Bring forward", moved into a collapsed
+  "Position & layout"/"Layer order" section (closed by default, using
+  the existing `Collapsible` component) — rarely-needed controls tucked
+  away rather than always visible.
+- `SourceConfig.svelte`: the raw SQL dataset-id/label/query form (the
+  single most technical-looking thing in the whole palette) moved behind
+  a new "Advanced" `Collapsible`, closed by default. The Entity picker
+  and the related-dataset add/remove list stay visible by default (still
+  needed for ordinary template setup, not power-user-only).
+No capability was removed anywhere — every change is re-labeling,
+re-grouping, or a friendlier control for the exact same underlying
+`onChange`/style data shape.
+**Why:** Direct, specific feedback on a Properties-panel screenshot,
+plus an explicit ask to reconsider the framework. Also explicitly asked
+to see mock screens before any real code changed this time, given the
+earlier D-042 "mock vs actual didn't match" complaint — a static,
+clearly-labeled Artifact mockup was built and approved first.
+**Verified:** 184 designer tests passing at this point (was 177 before
+this pass — SourceConfig's SQL-form tests updated to open the Advanced
+toggle first; no ElementProps test file existed to update, since its
+controls were only ever exercised indirectly via DocDesigner.test.ts's
+`X position` field, unaffected since free-arrangement Position stayed
+visible). Verified visually in a real browser against the approved
+mockup: icon align buttons, B/I toggles, color swatches, and the
+collapsed Advanced/Position sections all render and behave as mocked.
+**Rejected:** migrating to React (see Decision above — reaffirms D-007,
+does not supersede it); hiding the Entity picker behind Advanced too —
+considered, but a brand-new template genuinely needs it to bootstrap
+Header Fields/Line-item datasets at all, unlike the SQL form which is
+purely additive/optional.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs
