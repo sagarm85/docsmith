@@ -11,8 +11,21 @@ import '../src/main.js';
 import type { DocDesignerConfig } from '../src/types.js';
 import { StaticAdapter } from '@docsmith/adapters';
 import { invoiceEntity, invoiceTemplate } from '../../../examples/invoice-demo/fixtures.mjs';
+import { allReferenceTemplates } from '../../../examples/reference-templates/fixtures.mjs';
 
-const adapter = new StaticAdapter({ entities: [invoiceEntity(60)] });
+const adapter = new StaticAdapter({
+  entities: [invoiceEntity(60), ...allReferenceTemplates().map((r) => r.entity)],
+});
+
+// Seed the five reference templates (memory.md D-046) into "Saved templates"
+// so they're pickable from the Toolbar without any extra setup — but only
+// once each: if the author already saved over one via the real Save button,
+// their edit wins on every later reload, never silently overwritten by the
+// fixture again.
+for (const { template } of allReferenceTemplates()) {
+  const key = `erpdoc.templates.${template.id}`;
+  if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(template));
+}
 
 const el = document.createElement('doc-designer') as HTMLElement & {
   config?: DocDesignerConfig;

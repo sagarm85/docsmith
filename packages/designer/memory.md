@@ -1379,6 +1379,64 @@ already-filled cell via a keyboard path with no visual target confirmation
 would be a surprising, hard-to-predict landing spot).
 `[status: locked]`
 
+### D-046 — Five reference-document templates seeded as Saved Templates in the dev harness, matching real-world screenshots the user shared
+**Decision:** New `examples/reference-templates/fixtures.mjs` (same
+"deterministic StaticAdapter fixture, not shipped truth" category as
+`examples/invoice-demo/fixtures.mjs`, D-015) — five real `Template` JSON
+objects recreating five reference document screenshots the user shared: a
+bordered Sales Contract, a Shipping Instruction (bordered grid + a colored
+"Export documents" divider row), two Purchase Order color themes sharing
+one builder function (blue, peach), and a two-tone orange/dark Invoice.
+Each is built entirely from existing DocSmith primitives — grid arrangement
+with `colSpan` (D-034), multi-element stacked cells for label/value and
+multi-line address blocks (D-045), `DetailBand` + aggregates for the
+line-item tables, `ElementStyle.bg`/`color`/`borderRadius` for the colored
+bars and total boxes — no new core/designer code, only fixture data.
+Logos are plain colored placeholder boxes, never a redrawn trademark.
+`packages/designer/dev/main.ts` (the harness `pnpm --filter @docsmith/designer
+dev` runs) registers all five entities into the same `StaticAdapter` the
+existing invoice demo already uses, and seeds each template into
+`localStorage['erpdoc.templates.<id>']` — but only if that key is empty, so
+a real edit+Save by the author is never silently overwritten by the fixture
+on a later reload. This makes all five appear in the Toolbar's "Saved
+templates" picker (already wired to read that exact localStorage key,
+`persistence.ts`) with zero new UI.
+**Why:** Asked directly — the user attached five reference images and
+wanted a way to "select any one and see how it is implemented." Since
+"Saved templates" already exists and is driven purely by localStorage
+(no schema change needed), seeding it in the dev harness's bootstrap script
+was the smallest change that makes all five selectable without any new UI
+surface, matching the existing `invoiceEntity()`/`invoiceTemplate()`
+precedent in `examples/invoice-demo` exactly.
+**Real bug found and fixed while verifying:** the Purchase Order builder's
+"Comments or Special Instructions" label element was given `h: 60` (a leftover
+copy-paste from a differently-sized element) instead of a short label
+height — since it also carried a solid background color, the oversized box
+visually overlapped the comment text positioned just below it, rendering
+dark text on the same dark background and making it unreadable. Caught via
+a real-browser Preview-mode screenshot (not code review) and fixed by
+shrinking the label to its actual content height.
+**Verified:** a standalone Node script called `core.renderToHtml` on all
+five fixtures directly, confirming each renders without throwing. Real-
+browser Puppeteer verification against **the actual `pnpm --filter
+@docsmith/designer dev` server** (not just the scratchpad harness) confirmed
+all five appear in "Saved templates" and load correctly; Design-view and
+Preview-mode screenshots of every template were visually compared against
+the original reference images.
+**Rejected:** pixel-perfect reproduction of every reference detail (e.g. a
+real logo mark, a nested sub-grid within a single grid cell, alternating
+table-row shading) — out of scope for what these are: structural
+demonstrations of DocSmith's own primitives (grid + colSpan + stacking +
+colors + detail-band aggregates), not a pixel-matching exercise against
+someone else's copyrighted template; shipping these as seeded fixtures
+inside the actual `@docsmith/designer` package's runtime (rather than only
+in the dev harness) — rejected, since D-008's zero-extra-runtime-deps
+posture and D-015's "StaticAdapter fixtures are demo scaffolding, never
+shipped truth" both argue against baking sample business documents into
+what ships to a real host ERP; the dev harness is the correct, existing
+home for exactly this kind of scaffolding.
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

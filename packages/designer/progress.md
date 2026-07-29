@@ -699,6 +699,20 @@ already done. Tracked here with the same rigor as a phase checklist.
       column previously rendered with NO gap `<td>` at all, silently
       misaligning any later real column in that row — now fixed for free by
       the same grouping rewrite.
+- [x] **Five reference-document templates seeded as Saved Templates (D-046)**
+      — new `examples/reference-templates/fixtures.mjs` recreates five
+      real-world document screenshots the user shared (Sales Contract,
+      Shipping Instruction, two Purchase Order color themes, a two-tone
+      Invoice) purely from existing DocSmith primitives (grid + colSpan,
+      D-045 stacked cells, DetailBand aggregates, ElementStyle colors) — no
+      new core/designer code. `dev/main.ts` registers all five entities and
+      seeds their templates into `localStorage`'s Saved Templates (only if
+      not already present, so an author's own edit is never overwritten),
+      so `pnpm --filter @docsmith/designer dev` shows all five in the
+      Toolbar dropdown with zero new UI. Found and fixed a real rendering
+      bug while verifying: the Purchase Order builder's "Comments" label
+      had a leftover oversized height, making its own colored background
+      overlap and obscure the comment text below it.
 
 ---
 
@@ -722,6 +736,31 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Five reference-document templates seeded as Saved
+  Templates (D-046).** The user attached five real-world document
+  screenshots (a bordered Sales Contract, a Shipping Instruction, two
+  Purchase Order color themes, a two-tone orange Invoice) and asked to
+  "select any one and see how it is implemented." New `examples/
+  reference-templates/fixtures.mjs` builds each one as a real `Template`
+  JSON using only existing primitives — grid arrangement + colSpan
+  (D-034), multi-element stacked cells for label/value pairs and address
+  blocks (D-045), DetailBand aggregates, ElementStyle colors — no new
+  core/designer code, matching the existing `examples/invoice-demo`
+  fixture pattern exactly (D-015: demo scaffolding, never shipped truth).
+  `dev/main.ts` registers all five entities into the same `StaticAdapter`
+  and seeds their templates into `localStorage`'s Saved Templates (only if
+  not already present, so a real edit+Save is never overwritten), so
+  `pnpm --filter @docsmith/designer dev` shows all five in the Toolbar
+  dropdown with zero new UI. A standalone script confirmed all five render
+  via `core.renderToHtml` without throwing; real-browser Puppeteer against
+  the actual dev server (not just the scratchpad harness) confirmed all
+  five load and select correctly; Design-view and Preview-mode screenshots
+  of each were visually compared against the original reference images.
+  Found and fixed a real bug while verifying: the Purchase Order builder's
+  "Comments or Special Instructions" label had a leftover oversized height
+  (60px instead of ~18px) — since it also carried a solid background
+  color, the oversized box visually overlapped and obscured the comment
+  text positioned just below it.
 - **2026-07-29 — Cursor-drag column resize (D-044); grid cells can hold
   multiple stacked elements (D-045).** Two follow-up requests right after
   D-043: "like Confluence doc, these sections should be adjustable from the
