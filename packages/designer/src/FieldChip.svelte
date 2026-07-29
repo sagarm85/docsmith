@@ -20,8 +20,6 @@
     onPickUp?: () => void;
   } = $props();
 
-  const format = $derived(defaultFormatForType(field.type));
-
   const addLabel = $derived(
     cls === 'header' ? `Add ${field.label} to report header` : `Add ${field.label} column`,
   );
@@ -36,7 +34,7 @@
       column: field.name,
       type: field.type,
       label: field.label,
-      format,
+      format: defaultFormatForType(field.type),
     };
     e.dataTransfer?.setData('application/x-doc-field', JSON.stringify(payload));
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
@@ -66,18 +64,8 @@
   ondragstart={handleDragStart}
   onkeydown={handleKeydown}
 >
-  <span class="dd-chip-glyph" aria-hidden="true">
-    {#if format === 'currency'}
-      $
-    {:else if format === 'date'}
-      <Icon name="calendar" size={11} />
-    {:else if format === 'number'}
-      <Icon name="hash" size={11} />
-    {:else}
-      T
-    {/if}
-  </span>
   <span class="dd-chip-label">{field.label}</span>
+  <span class="dd-chip-badge dd-chip-badge--{field.kind}">{field.kind}</span>
   <button
     type="button"
     class="dd-chip-add"
@@ -85,72 +73,78 @@
     disabled={!onAdd}
     onclick={onAdd}
   >
-    +
+    <Icon name="plus" size={12} />
   </button>
 </div>
 
 <style>
+  .dd-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--dd-radius-sm);
+    cursor: grab;
+  }
+
+  .dd-chip:hover {
+    background: var(--dd-panel-alt);
+  }
+
   .dd-chip:focus-visible {
     outline: 2px solid var(--dd-accent);
-    outline-offset: 1px;
+    outline-offset: -2px;
   }
 
   .dd-chip--picked {
     outline: 2px solid var(--dd-accent);
-    outline-offset: 1px;
+    outline-offset: -2px;
     background: var(--dd-accent-weak);
-  }
-
-  .dd-chip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 6px;
-    border: 1px solid var(--dd-border);
-    border-radius: var(--dd-radius);
-    background: var(--dd-panel);
-    cursor: grab;
   }
 
   .dd-chip:active {
     cursor: grabbing;
   }
 
-  .dd-chip-glyph {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--dd-accent);
-    background: var(--dd-accent-weak);
-    border-radius: 4px;
-  }
-
   .dd-chip-label {
     flex: 1;
     min-width: 0;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--dd-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .dd-chip-badge {
+    flex: none;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--dd-muted);
+    background: var(--dd-panel-alt);
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+
+  .dd-chip-badge--custom {
+    color: var(--dd-accent-strong);
+    background: var(--dd-accent-weak);
+  }
+
   .dd-chip-add {
     flex: none;
-    width: 18px;
-    height: 18px;
-    line-height: 1;
-    border: 1px solid var(--dd-border);
-    border-radius: 4px;
-    background: var(--dd-panel);
-    color: var(--dd-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dd-muted);
     cursor: pointer;
-    font-size: 12px;
   }
 
   .dd-chip-add:disabled {
@@ -159,11 +153,12 @@
   }
 
   .dd-chip-add:hover:not(:disabled) {
-    background: var(--dd-panel-alt);
+    background: var(--dd-panel);
+    color: var(--dd-accent-strong);
   }
 
   .dd-chip-add:focus-visible {
     outline: 2px solid var(--dd-accent);
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
 </style>

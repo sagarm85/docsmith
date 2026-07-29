@@ -1109,6 +1109,67 @@ silently reintroduce the exact same class of bug. Scoping the CSS property
 to only where it's semantically needed is the durable fix.
 `[status: locked]`
 
+### D-042 — Palette visual pass: per-item kind badge replaces System/Custom subheaders; icon-badge Collapsible headers; borderless chip rows; search icon
+**Decision:** Closing a visual gap the user flagged directly by comparing an
+"actual" screenshot of the live Palette against the earlier design-review
+Artifact mockup ("this is mock" / "I liked mocked one"). Four components
+restyled, no behavior change:
+- `Collapsible.svelte`: the leading icon becomes a filled 26×26 badge
+  (`background:var(--dd-accent-weak); border-radius:var(--dd-radius-sm)`,
+  matching the badge treatment D-034/D-036 already use elsewhere) instead of
+  a bare icon; the chevron moved to a real `Icon name="chevronDown"` (was a
+  literal `&#9656;` glyph) at the trigger's far right via
+  `margin-left:auto`, rotating open/closed instead of swapping glyphs;
+  dropped `text-transform:uppercase` on the title (sentence case, matching
+  the mock).
+- `FieldChip.svelte`: removed the per-type glyph (T/calendar/hash/$ icon)
+  entirely — `field.kind` ('system'|'custom', D-013) now renders as a small
+  pill badge (`.dd-chip-badge`) next to the label instead. The row itself
+  goes borderless (`background`/`border` removed, `:hover` reveals
+  `--dd-panel-alt`), matching the mock's flat-list look.
+- `FieldGroup.svelte`: the old System/Custom split (two `<h4>` subheaders,
+  one `<div>` per kind) collapses to one flat list, system fields first —
+  `ordered = [...system, ...custom]` — since the kind is now visible
+  per-chip via D-042's own badge, a separate subheader was redundant
+  chrome the mock didn't have.
+- `Palette.svelte`: added a search icon inside `.dd-search` (absolutely
+  positioned, `pointer-events:none`, input gets `padding-left:32px` to make
+  room); Blocks/Sections chips restyled to the same borderless-row +
+  icon-badge treatment as `FieldChip` for visual consistency across the
+  whole palette (all three chip types — field, block, section — now share
+  one look); literal `+` button text replaced with the existing `Icon
+  name="plus"` (was already used elsewhere, just not here).
+**Why:** Direct, repeated user feedback that the shipped UI "does not look
+slick and modern" and, on a side-by-side actual-vs-mock comparison, that
+the mock was preferred — specifically pointing at the Palette / Header
+Fields section. The System/Custom subheader split was the biggest concrete
+gap: the mock never had subheaders, just one list with each item's kind
+legible inline. All four changes are pure presentation — no new props, no
+new template fields, no adapter/render-service change — consistent with
+`claude.md` §0's "business logic lives in core" (nothing here is business
+logic) and `design.md` §11's existing token-driven color system (`--dd-*`
+throughout, no new hex).
+**Verified:** `FieldGroup.test.ts`'s two old header-text assertions
+(`getByText('System')`/`getByText('Custom')`) replaced with one test
+asserting `.dd-chip-badge` elements render `['system','custom']` in that
+order for a mixed-kind field set (the behavior actually changed — subheader
+text no longer exists — so the old assertions were correctly failing, not
+a case for a compat shim). Full designer suite green (170 tests, net −1
+from consolidating the two subheader tests into one badge test — no
+coverage lost, since the single new test still proves both the ordering
+and the per-item kind signal the old two tests checked separately). Real-
+browser Puppeteer screenshots of both the top of the Palette (Entity/
+dataset picker, Blocks, Sections, search bar) and, scrolled down, the
+Header Fields section with the new badge treatment — confirmed against the
+mock side by side.
+**Rejected:** keeping subheaders and only restyling their chrome (smaller
+diff, but leaves the actual structural gap — two grouped lists vs. one
+flat list — that the mock's layout depends on); a colored left-border
+accent per kind instead of a text badge (considered, but a text badge
+("system"/"custom") is unambiguous at a glance without requiring the
+reader to already know a color-coding convention, and matches the badge
+pattern already established for D-034 grid-band controls).
+`[status: locked]`
 
 ---
 

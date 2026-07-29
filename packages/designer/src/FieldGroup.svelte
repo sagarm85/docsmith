@@ -86,12 +86,13 @@
       : [],
   );
 
-  const system = $derived(filtered.filter((f) => f.kind === 'system'));
-  const custom = $derived(filtered.filter((f) => f.kind === 'custom'));
-  // D-013: system/custom is the adapter's truth. Only split into two sub-groups
-  // when both are actually present; otherwise a single flat list (never an empty
-  // "Custom" section just because the type allows it).
-  const splitByKind = $derived(system.length > 0 && custom.length > 0);
+  // D-013: system/custom is the adapter's truth, shown per-item via
+  // FieldChip's own kind badge rather than a separate subheader/subgroup —
+  // system fields listed first, then custom, one flat list either way.
+  const ordered = $derived([
+    ...filtered.filter((f) => f.kind === 'system'),
+    ...filtered.filter((f) => f.kind === 'custom'),
+  ]);
 </script>
 
 <div class="dd-field-group">
@@ -105,22 +106,9 @@
       <p class="dd-empty-hint">No fields available from the adapter.</p>
     {:else if filtered.length === 0}
       <p class="dd-empty-hint">No fields match “{filter}”.</p>
-    {:else if splitByKind}
-      <div class="dd-subgroup">
-        <h4 class="dd-subgroup-title">System</h4>
-        {#each system as field (field.name)}
-          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} picked={isPicked(field)} onPickUp={onPickUp && (() => onPickUp(field))} />
-        {/each}
-      </div>
-      <div class="dd-subgroup">
-        <h4 class="dd-subgroup-title">Custom</h4>
-        {#each custom as field (field.name)}
-          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} picked={isPicked(field)} onPickUp={onPickUp && (() => onPickUp(field))} />
-        {/each}
-      </div>
     {:else}
       <div class="dd-subgroup">
-        {#each filtered as field (field.name)}
+        {#each ordered as field (field.name)}
           <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} picked={isPicked(field)} onPickUp={onPickUp && (() => onPickUp(field))} />
         {/each}
       </div>
@@ -145,16 +133,7 @@
   .dd-subgroup {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-bottom: 8px;
-  }
-
-  .dd-subgroup-title {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--dd-muted);
-    margin: 0 0 2px;
+    gap: 2px;
+    margin-bottom: 4px;
   }
 </style>

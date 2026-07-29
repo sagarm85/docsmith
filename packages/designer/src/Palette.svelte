@@ -87,7 +87,7 @@
           ondragstart={(e) => handleBlockDragStart(e, block.kind)}
           onkeydown={(e) => handleBlockKeydown(e, block.kind)}
         >
-          <span class="dd-chip-glyph" aria-hidden="true"><Icon name={block.icon} size={12} /></span>
+          <span class="dd-chip-glyph" aria-hidden="true"><Icon name={block.icon} size={13} /></span>
           <span class="dd-chip-label">{block.label}</span>
           <button
             type="button"
@@ -96,7 +96,7 @@
             disabled={!onAddBlock}
             onclick={() => onAddBlock?.(block.kind)}
           >
-            +
+            <Icon name="plus" size={12} />
           </button>
         </div>
       {/each}
@@ -129,7 +129,7 @@
               aria-label={`Add ${preset.label} section to report header`}
               onclick={() => onAddSection?.(preset.columns)}
             >
-              +
+              <Icon name="plus" size={12} />
             </button>
           </div>
         {/each}
@@ -140,6 +140,7 @@
   {#if dataSource.entity}
     <div class="dd-search">
       <label class="dd-search-label" for="dd-palette-search">Filter fields</label>
+      <span class="dd-search-icon" aria-hidden="true"><Icon name="search" size={14} /></span>
       <input
         id="dd-palette-search"
         class="dd-search-input"
@@ -187,8 +188,8 @@
   }
 
   .dd-search {
-    padding: 8px 12px;
-    border-top: 1px solid var(--dd-border);
+    position: relative;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--dd-border);
   }
 
@@ -201,38 +202,50 @@
     white-space: nowrap;
   }
 
+  .dd-search-icon {
+    position: absolute;
+    left: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    color: var(--dd-muted);
+    pointer-events: none;
+  }
+
   .dd-search-input {
     width: 100%;
-    height: 28px;
-    padding: 0 8px;
+    height: 34px;
+    padding: 0 10px 0 32px;
     border: 1px solid var(--dd-border);
     border-radius: var(--dd-radius);
-    background: var(--dd-bg);
+    background: var(--dd-panel);
     color: var(--dd-text);
     font: inherit;
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .dd-search-input:focus-visible {
     outline: 2px solid var(--dd-accent);
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
 
   .dd-blocks {
-    padding: 0 8px;
+    padding: 0 4px;
     border-bottom: 1px solid var(--dd-border);
   }
 
   .dd-chip {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 6px;
-    margin-bottom: 4px;
-    border: 1px solid var(--dd-border);
-    border-radius: var(--dd-radius);
-    background: var(--dd-panel);
+    gap: 10px;
+    padding: 7px 8px;
+    margin-bottom: 1px;
+    border-radius: var(--dd-radius-sm);
     cursor: grab;
+  }
+
+  .dd-chip:hover {
+    background: var(--dd-panel-alt);
   }
 
   .dd-chip:active {
@@ -241,12 +254,12 @@
 
   .dd-chip:focus-visible {
     outline: 2px solid var(--dd-accent);
-    outline-offset: 1px;
+    outline-offset: -2px;
   }
 
   .dd-chip--picked {
     outline: 2px solid var(--dd-accent);
-    outline-offset: 1px;
+    outline-offset: -2px;
     background: var(--dd-accent-weak);
   }
 
@@ -255,33 +268,32 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
-    font-size: 10px;
-    font-weight: 700;
+    width: 26px;
+    height: 26px;
     color: var(--dd-accent);
     background: var(--dd-accent-weak);
-    border-radius: 4px;
+    border-radius: var(--dd-radius-sm);
   }
 
   .dd-chip-label {
     flex: 1;
     min-width: 0;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--dd-text);
   }
 
   .dd-chip-add {
     flex: none;
-    width: 18px;
-    height: 18px;
-    line-height: 1;
-    border: 1px solid var(--dd-border);
-    border-radius: 4px;
-    background: var(--dd-panel);
-    color: var(--dd-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dd-muted);
     cursor: pointer;
-    font-size: 12px;
   }
 
   .dd-chip-add:disabled {
@@ -290,24 +302,27 @@
   }
 
   .dd-chip-add:hover:not(:disabled) {
-    background: var(--dd-panel-alt);
+    background: var(--dd-panel);
+    color: var(--dd-accent-strong);
   }
 
   .dd-chip-add:focus-visible {
     outline: 2px solid var(--dd-accent);
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
 
   .dd-section-chip {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px;
-    margin-bottom: 4px;
-    border: 1px solid var(--dd-border);
-    border-radius: var(--dd-radius);
-    background: var(--dd-panel);
+    gap: 10px;
+    padding: 7px 8px;
+    margin-bottom: 1px;
+    border-radius: var(--dd-radius-sm);
     cursor: grab;
+  }
+
+  .dd-section-chip:hover {
+    background: var(--dd-panel-alt);
   }
 
   .dd-section-chip:active {

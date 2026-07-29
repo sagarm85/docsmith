@@ -18,23 +18,9 @@ function makeAdapter(headerFields: FieldMeta[]) {
 }
 
 describe('FieldGroup', () => {
-  it('splits into System/Custom only when both kinds are present', async () => {
+  it('renders a flat list with each field showing its own system/custom badge, system fields first', async () => {
     const adapter = makeAdapter([
-      { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
       { name: 'po_reference', label: 'PO Reference', type: 'text', kind: 'custom' },
-    ]);
-    render(FieldGroup, {
-      props: { title: 'Header fields', cls: 'header', adapter, entity: 'invoice' },
-    });
-
-    await waitFor(() => expect(screen.getByText('System')).toBeTruthy());
-    expect(screen.getByText('Custom')).toBeTruthy();
-    expect(screen.getByText('Invoice #')).toBeTruthy();
-    expect(screen.getByText('PO Reference')).toBeTruthy();
-  });
-
-  it('renders a flat list (no System/Custom headers) when only one kind is present', async () => {
-    const adapter = makeAdapter([
       { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
     ]);
     render(FieldGroup, {
@@ -42,8 +28,10 @@ describe('FieldGroup', () => {
     });
 
     await waitFor(() => expect(screen.getByText('Invoice #')).toBeTruthy());
-    expect(screen.queryByText('System')).toBeNull();
-    expect(screen.queryByText('Custom')).toBeNull();
+    expect(screen.getByText('PO Reference')).toBeTruthy();
+    // Per-item badges (memory.md D-042), not a separate subheader/subgroup.
+    const badges = document.querySelectorAll('.dd-chip-badge');
+    expect(Array.from(badges).map((b) => b.textContent)).toStrictEqual(['system', 'custom']);
   });
 
   it('shows an honest empty hint when the adapter has no fields', async () => {

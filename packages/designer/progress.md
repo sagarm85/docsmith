@@ -652,6 +652,21 @@ already done. Tracked here with the same rigor as a phase checklist.
       markup/CSS (jsdom-based tests can't see this class of bug at all —
       no real box-model layout). Fixed by moving `white-space:pre-wrap` to
       `.dd-el-body`, where it's semantically correct anyway.
+- [x] **Palette visual pass (D-042)**, a follow-up discovered *after* the six
+      items above were called complete: the user compared an actual-app
+      screenshot against the earlier design-review mockup and flagged the
+      Palette specifically as not matching — the System/Custom subheader
+      split was the biggest structural gap. `Collapsible.svelte`'s icon
+      becomes a filled badge with a real rotating chevron icon (was a
+      literal glyph) and sentence-case title; `FieldChip.svelte` drops its
+      per-type glyph in favor of a `field.kind` pill badge and goes
+      borderless; `FieldGroup.svelte` collapses the System/Custom subheader
+      split into one flat list (system fields first) since the kind is now
+      legible per-chip; `Palette.svelte` gets a search icon in the filter
+      input and restyles Blocks/Sections chips to match. Pure presentation —
+      no template/core changes. Verified with real-browser screenshots of
+      the top of the Palette and, scrolled down, the Header Fields section,
+      both matching the mock.
 
 ---
 
@@ -675,6 +690,33 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Palette visual pass (D-042).** The user compared a real
+  screenshot of the Palette against the earlier design-review mockup
+  ("this is mock" / "I liked mocked one") and flagged the gap directly —
+  raised right after the post-Phase-3 list below was called complete, so
+  tracked as its own follow-up rather than folded into that claim.
+  `Collapsible.svelte`'s leading icon becomes a filled accent badge with a
+  real rotating `Icon name="chevronDown"` (was a literal `&#9656;` glyph
+  swap) at the trigger's far right, and the title drops its uppercase
+  transform (sentence case, matching the mock). `FieldChip.svelte` removes
+  the per-type glyph (T/calendar/hash/$) in favor of a small `field.kind`
+  ('system'/'custom') pill badge next to the label, and goes borderless
+  (hover-reveal background instead of a bordered card). `FieldGroup.svelte`
+  collapses the old System/Custom subheader split (two `<h4>`s, two lists)
+  into one flat list, system fields first — the kind is now legible
+  per-chip via the new badge, making the subheader redundant chrome the
+  mock never had. `Palette.svelte` gains a search icon inside the filter
+  input and restyles the Blocks/Sections chips to the same borderless +
+  icon-badge look, so all three chip types (field/block/section) read as
+  one consistent system. Pure presentation — no `core`/template changes.
+  `FieldGroup.test.ts`'s two header-text assertions were replaced with one
+  test asserting the per-item `.dd-chip-badge` order (`['system','custom']`)
+  — a real behavior change (subheader text no longer exists), not a
+  compat shim. 170 designer tests pass (net −1 from consolidating two
+  subheader tests into one badge test; no coverage lost); lint/typecheck/
+  build all green. Verified with real-browser screenshots of the top of the
+  Palette and, scrolled down, the Header Fields section — both matching
+  the mock's flat-list, badge-forward look.
 - **2026-07-29 — Full-height table + page-pinned summary (D-040); real
   selection/content-desync bug found and fixed (D-041); post-Phase-3
   design-review list complete.** New `printSetup.fillPage` — `.doc-flow`

@@ -25,7 +25,8 @@ export type IconName =
   | 'database'
   | 'palette'
   | 'plus'
-  | 'close';
+  | 'close'
+  | 'search';
 
 export const ICONS: Record<IconName, string[]> = {
   doc: ['M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M14 3v6h6'],
@@ -51,4 +52,5 @@ export const ICONS: Record<IconName, string[]> = {
   palette: ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M3 14h7v7H3z', 'M14 14h7v7h-7z'],
   plus: ['M12 5v14', 'M5 12h14'],
   close: ['M6 6l12 12', 'M18 6L6 18'],
+  search: ['M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z', 'M21 21l-4.3-4.3'],
 };
