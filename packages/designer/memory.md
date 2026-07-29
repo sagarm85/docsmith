@@ -903,6 +903,37 @@ whole element is already draggable via pointerdown, unlike
 row itself would conflict with selecting individual cells inside it).
 `[status: locked]`
 
+### D-037 — "Sections" palette group: ready-made column layouts that create/extend a grid band; click-to-add only in v1
+**Decision:** A new "Sections" `Collapsible` group in `Palette.svelte`
+(hidden entirely — not just disabled — when no `onAddSection` handler is
+supplied, matching the honest-capability precedent elsewhere), offering
+three presets (`SECTION_PRESETS` in `template-edits.ts`: 1 column, 2
+columns, Large + small). Clicking a preset's "+" always targets
+`reportHeader` (same D-018 default-target rule as header fields/Blocks):
+if the band isn't already `'grid'`-arranged, it's converted first (existing
+elements migrated via the already-generalized `convertBandArrangement`);
+either way, `gridColumns` is set/replaced to the chosen preset and one new
+row of empty placeholder cells (`createSectionRow`, reusing the existing
+`createGridPlaceholderElement`) is appended. No drag-and-drop onto other
+bands in v1 — `Band.svelte`/`GridBand.svelte` don't yet handle the
+`application/x-doc-section` payload the chip sets on `dragstart`; an
+unrecognized payload is a silent no-op drop, not an error, so this is a
+safe, honest scope cut rather than a broken half-feature.
+**Why:** This is the concrete deliverable for "categorized/icon-forward
+palette" from the design-review thread — on closer inspection, the palette
+already had collapsible icon-labeled groups (`Collapsible.svelte`) and
+per-type field glyphs (`FieldChip.svelte`) before this session touched it;
+the actual, real gap was the MailerLite-style "drag in a layout skeleton"
+interaction, which needed the Grid arrangement (D-034) as its foundation.
+**Rejected:** auto-detecting/preserving a band's existing column widths
+when a second Section is dropped on an already-grid band (replaces
+`gridColumns` outright instead) — same "not lossless, best-effort default"
+framing as every other arrangement conversion in this project; wiring full
+drag-to-any-band support in v1 (real scope for a convenience that
+click-to-add-then-manually-move already covers, and none of the reference
+templates in the original conversation needed it on a non-default band).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

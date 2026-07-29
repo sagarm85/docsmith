@@ -46,6 +46,7 @@
     createGridFieldElement,
     createGridBlockElement,
     nextGridCell,
+    createSectionRow,
     type BlockKind,
   } from './template-edits.js';
   import { pageDimensionsPx } from './geometry.js';
@@ -333,6 +334,37 @@
       'reportHeader',
       createBlockElement(kind, reportHeader?.elements ?? [], contentWidthPx, template.layoutUnit ?? 'px'),
     );
+  }
+
+  // "Sections" (memory.md D-034/D-037): sets/replaces a band's gridColumns
+  // and appends one new row of empty placeholder cells. Converts the band to
+  // 'grid' arrangement first (migrating any existing elements) if it isn't
+  // already — a real, visible model change, so this always goes through
+  // commitTemplate as one undo step, same as onArrangementChange.
+  function addSectionToBand(bandId: string, columns: number[]) {
+    const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+    if (!band) return;
+    const contentWidthPx = pageDimensionsPx(template.printSetup).width;
+    const layoutUnit = template.layoutUnit ?? 'px';
+    const migrated =
+      band.arrangement === 'grid' ? band : convertBandArrangement(band, 'grid', contentWidthPx, layoutUnit);
+    const nextRow = migrated.elements.reduce((max, e) => Math.max(max, (e.row ?? 0) + 1), 0);
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) =>
+        b.id === bandId
+          ? { ...migrated, gridColumns: columns, elements: [...migrated.elements, ...createSectionRow(columns, nextRow)] }
+          : b,
+      ),
+    });
+  }
+
+  // Same D-018 default-target rule as header fields/Blocks — click-to-add
+  // always targets reportHeader; dragging a Sections chip directly onto
+  // another band (Band.svelte/GridBand.svelte accept
+  // application/x-doc-section) is the way to place it elsewhere.
+  function handlePaletteAddSection(columns: number[]) {
+    addSectionToBand('reportHeader', columns);
   }
 
   // ── Keyboard drag-alternative (design.md §12) ───────────────────────────────
@@ -734,6 +766,7 @@
             onDataSourceChange={handleDataSourceChange}
             onAddField={handlePaletteAddField}
             onAddBlock={handlePaletteAddBlock}
+            onAddSection={handlePaletteAddSection}
             {pickedUp}
             onPickUpField={handlePickUpField}
             onPickUpBlock={handlePickUpBlock}

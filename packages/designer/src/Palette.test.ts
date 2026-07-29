@@ -79,3 +79,38 @@ describe('Palette — Blocks group', () => {
     expect(screen.getByRole('group', { name: 'Box block (picked up)' })).toBeTruthy();
   });
 });
+
+describe('Palette — Sections group (memory.md D-034/D-037)', () => {
+  it('is hidden entirely when no onAddSection is supplied (not just disabled)', () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    render(Palette, {
+      props: { adapter, dataSource: emptyDataSource(), onDataSourceChange: vi.fn() },
+    });
+    expect(screen.queryByText('Sections')).toBeNull();
+  });
+
+  it('shows all three presets and calls onAddSection with the right columns on "+"', async () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    const onAddSection = vi.fn();
+    render(Palette, {
+      props: { adapter, dataSource: emptyDataSource(), onDataSourceChange: vi.fn(), onAddSection },
+    });
+    expect(screen.getByText('1 column')).toBeTruthy();
+    expect(screen.getByText('2 columns')).toBeTruthy();
+    expect(screen.getByText('Large + small')).toBeTruthy();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Add 2 columns section to report header' }));
+    expect(onAddSection).toHaveBeenCalledWith([50, 50]);
+  });
+
+  it('sets the application/x-doc-section payload on dragstart', () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    render(Palette, {
+      props: { adapter, dataSource: emptyDataSource(), onDataSourceChange: vi.fn(), onAddSection: vi.fn() },
+    });
+    const chip = screen.getByRole('group', { name: 'Large + small section' });
+    const setData = vi.fn();
+    fireEvent.dragStart(chip, { dataTransfer: { setData, effectAllowed: '' } as unknown as DataTransfer });
+    expect(setData).toHaveBeenCalledWith('application/x-doc-section', JSON.stringify({ columns: [65, 35] }));
+  });
+});

@@ -881,6 +881,39 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('adding a "2 columns" Section (memory.md D-037) converts reportHeader to grid and adds a row of 2 empty cells', async () => {
+    const el = await mountWithEntitySelected();
+
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add 2 columns section to report header"]')!
+      .click();
+    await nextTick();
+
+    const reportHeader = () =>
+      el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+        arrangement?: string;
+        gridColumns?: number[];
+        elements: Array<{ row?: number; col?: number }>;
+      };
+    expect(reportHeader().arrangement).toBe('grid');
+    expect(reportHeader().gridColumns).toStrictEqual([50, 50]);
+    expect(reportHeader().elements).toHaveLength(2);
+    expect(reportHeader().elements[0]).toMatchObject({ row: 0, col: 0 });
+    expect(reportHeader().elements[1]).toMatchObject({ row: 0, col: 1 });
+
+    // Adding a second section appends another row rather than replacing —
+    // reportHeader is already 'grid', so it's a straight row append.
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add 1 column section to report header"]')!
+      .click();
+    await nextTick();
+    expect(reportHeader().gridColumns).toStrictEqual([100]);
+    expect(reportHeader().elements).toHaveLength(3);
+    expect(reportHeader().elements[2]).toMatchObject({ row: 1, col: 0 });
+
+    el.remove();
+  });
+
   it('theme editor: editing a brand color applies it live, and saving/re-applying round-trips it (memory.md D-032)', async () => {
     const el = mountWithAdapter();
     await nextTick();

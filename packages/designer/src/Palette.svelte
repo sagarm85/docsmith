@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DataSource, DataSourceAdapter, FieldMeta } from '@docsmith/core';
-  import type { BlockKind } from './template-edits.js';
+  import { SECTION_PRESETS, type BlockKind } from './template-edits.js';
   import type { PickedUp } from './types.js';
   import SourceConfig from './SourceConfig.svelte';
   import FieldGroup from './FieldGroup.svelte';
@@ -14,6 +14,7 @@
     onDataSourceChange,
     onAddField,
     onAddBlock,
+    onAddSection,
     pickedUp = null,
     onPickUpField,
     onPickUpBlock,
@@ -28,6 +29,11 @@
      */
     onAddField?: (field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) => void;
     onAddBlock?: (kind: BlockKind) => void;
+    /** "Sections" — draggable column-layout skeletons (memory.md D-034/
+     * D-037). Same D-018 click-to-add default target as Blocks
+     * (reportHeader) — no keyboard drag-alternative for sections in v1,
+     * matching the scope note on `createSectionRow`. */
+    onAddSection?: (columns: number[]) => void;
     /** Keyboard drag-alternative (design.md §12), lifted to DocDesigner. */
     pickedUp?: PickedUp;
     onPickUpField?: (field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) => void;
@@ -96,6 +102,40 @@
       {/each}
     </Collapsible>
   </div>
+
+  {#if onAddSection}
+    <div class="dd-blocks">
+      <Collapsible title="Sections" icon="table">
+        {#each SECTION_PRESETS as preset (preset.label)}
+          <div
+            class="dd-section-chip"
+            role="group"
+            aria-label={`${preset.label} section`}
+            draggable="true"
+            ondragstart={(e) => {
+              e.dataTransfer?.setData('application/x-doc-section', JSON.stringify({ columns: preset.columns }));
+              if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+            }}
+          >
+            <span class="dd-section-thumb" aria-hidden="true">
+              {#each preset.columns as w, i (i)}
+                <span class="dd-section-thumb-col" style="flex:{w}"></span>
+              {/each}
+            </span>
+            <span class="dd-chip-label">{preset.label}</span>
+            <button
+              type="button"
+              class="dd-chip-add"
+              aria-label={`Add ${preset.label} section to report header`}
+              onclick={() => onAddSection?.(preset.columns)}
+            >
+              +
+            </button>
+          </div>
+        {/each}
+      </Collapsible>
+    </div>
+  {/if}
 
   {#if dataSource.entity}
     <div class="dd-search">
@@ -256,5 +296,35 @@
   .dd-chip-add:focus-visible {
     outline: 2px solid var(--dd-accent);
     outline-offset: 2px;
+  }
+
+  .dd-section-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    margin-bottom: 4px;
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    background: var(--dd-panel);
+    cursor: grab;
+  }
+
+  .dd-section-chip:active {
+    cursor: grabbing;
+  }
+
+  .dd-section-thumb {
+    flex: none;
+    display: flex;
+    gap: 3px;
+    width: 34px;
+    height: 20px;
+  }
+
+  .dd-section-thumb-col {
+    background: var(--dd-accent-weak);
+    border: 1px solid var(--dd-accent);
+    border-radius: 2px;
   }
 </style>

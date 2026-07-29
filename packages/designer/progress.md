@@ -596,7 +596,21 @@ already done. Tracked here with the same rigor as a phase checklist.
       stays fixed regardless), a "Row borders" toggle in `BandProps.svelte`
       when the detail band is selected. Distinct from grid-band borders,
       which only apply to free-form bands, not the line-items table.
-- [ ] Categorized/icon-forward palette groups — mocked, not yet built.
+- [x] Categorized/icon-forward palette groups — turned out to already be
+      substantially built (`Collapsible.svelte`'s chevron+icon+title groups
+      already covered Blocks/Header Fields/each dataset, with per-type field
+      glyphs in `FieldChip.svelte`) — corrected the earlier "not built"
+      claim rather than silently re-doing existing work. The genuine gap was
+      the "Sections" group (D-034/D-037): three column-layout presets (1
+      column, 2 columns, Large + small) with diagram thumbnails; clicking
+      "+" converts `reportHeader` to grid arrangement (migrating existing
+      content) and appends a row of empty placeholder cells sized to the
+      chosen columns. Click-to-add only in v1 (drag onto other bands
+      documented as a follow-up, not required — same D-018 precedent as
+      Blocks). Found and fixed a real Svelte crash while building it: keying
+      a column thumbnail's `{#each}` by its own width value threw
+      `each_key_duplicate` for the `[50, 50]` preset — fixed by keying on
+      index instead.
 - [ ] Product image per line item (`DetailColumn.format:'image'` or similar)
       — explicitly flagged as NOT achievable with today's column model when
       asked; a real, scoped `core` change, not yet designed as a D-entry.
@@ -629,6 +643,21 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — "Sections" palette group (D-037), post-Phase-3.** On
+  closer inspection the palette already had collapsible icon-labeled groups
+  and per-type field glyphs before this session — corrected the earlier
+  "categorized palette not built" claim. The real, new deliverable: a
+  "Sections" group with 3 column-layout presets (1 column / 2 columns /
+  Large + small), diagram thumbnails matching the mockup. Clicking "+"
+  converts `reportHeader` to grid arrangement (migrating existing content)
+  and appends a row of empty placeholder cells sized to the chosen columns.
+  Click-to-add only in v1; drag onto other bands is a documented follow-up.
+  Found and fixed a real crash while building it: keying a thumbnail's
+  `{#each}` by column width threw `each_key_duplicate` for the `[50, 50]`
+  preset (both columns share a width) — fixed by keying on index. 166
+  designer tests pass (was 162, including new `Palette.test.ts` and
+  `DocDesigner.test.ts` coverage); lint/typecheck/build all green; verified
+  with a real-browser screenshot.
 - **2026-07-29 — Borderless detail table (D-035) + element hover toolbar
   (D-036), post-Phase-3.** Two more items from the design-review thread.
   `DetailBand.cellBorder` (a CSS `border-bottom` override via a

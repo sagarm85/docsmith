@@ -181,6 +181,22 @@ export function nextGridCell(elements: readonly FreeElement[], numCols: number):
   return { row: maxRow + 1, col: 0 };
 }
 
+/** Ready-made column layouts for the palette's "Sections" group (memory.md
+ * D-034/D-037) — MailerLite-style draggable layout skeletons. Dropping one
+ * onto a band sets its `gridColumns` to `columns` and adds one new row of
+ * empty placeholder cells, one per column. */
+export type SectionPreset = { label: string; columns: number[] };
+export const SECTION_PRESETS: SectionPreset[] = [
+  { label: '1 column', columns: [100] },
+  { label: '2 columns', columns: [50, 50] },
+  { label: 'Large + small', columns: [65, 35] },
+];
+
+/** One empty placeholder cell per column, for a new "Sections" row. */
+export function createSectionRow(columns: number[], row: number): FreeElement[] {
+  return columns.map((_, col) => createGridPlaceholderElement(row, col));
+}
+
 /** Builds a DetailColumn from a dataset field; align defaults sensibly by format. */
 export function createDetailColumn(field: Pick<FieldMeta, 'name' | 'label' | 'type'>): DetailColumn {
   const format = defaultFormatForType(field.type);
