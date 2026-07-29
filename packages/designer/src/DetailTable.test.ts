@@ -311,4 +311,53 @@ describe('DetailTable', () => {
       expect(screen.getByText(/doesn't support sample rows/)).toBeTruthy(),
     );
   });
+
+  it('image-format column (memory.md D-039): renders a real <img> for a row with a value, and a placeholder for an empty one', async () => {
+    const adapter = new StaticAdapter({
+      entities: [
+        {
+          meta: { name: 'invoice', label: 'Invoice' },
+          headerFields: [],
+          datasets: [{ meta: { id: 'invoice_items', label: 'Line items' }, fields: [] }],
+          documents: {
+            '1001': {
+              header: {},
+              datasets: {
+                invoice_items: [
+                  { description: 'Widget', qty: 3, photo_url: 'https://example.com/widget.png' },
+                  { description: 'Gadget', qty: 1, photo_url: '' },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    });
+    const band: DetailBand = {
+      ...filledDetailBand(),
+      columns: [
+        ...filledDetailBand().columns,
+        { column: 'photo_url', header: 'Photo', width: 60, format: 'image' },
+      ],
+    };
+    render(DetailTable, {
+      props: {
+        band,
+        adapter,
+        entity: 'invoice',
+        onAddColumn: vi.fn(),
+        onUpdateColumns: vi.fn(),
+        onInvalidDrop: vi.fn(),
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
+      },
+    });
+
+    await waitFor(() => expect(screen.getByText('Widget')).toBeTruthy());
+    const img = document.querySelector('.dd-sample-image') as HTMLImageElement | null;
+    expect(img?.src).toBe('https://example.com/widget.png');
+    // Exactly one <img> — the empty-value row shows the placeholder icon, not a broken image.
+    expect(document.querySelectorAll('.dd-sample-image').length).toBe(1);
+    expect(document.querySelector('.dd-sample-image-empty')).toBeTruthy();
+  });
 });

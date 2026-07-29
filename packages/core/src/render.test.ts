@@ -421,6 +421,53 @@ describe('renderToHtml — DetailBand.cellBorder', () => {
   });
 });
 
+describe('renderToHtml — DetailColumn.format:"image" (memory.md D-039)', () => {
+  function imageTemplate(): Template {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.type === 'detail'
+        ? {
+            ...(b as DetailBand),
+            columns: [
+              ...(b as DetailBand).columns,
+              { column: 'photo_url', header: 'Photo', width: 60, format: 'image' as const },
+            ],
+          }
+        : b,
+    );
+    return t;
+  }
+
+  function docWithImages(): DocumentData {
+    return {
+      header: { invoice_number: 'INV-1001', total_amount: 1 },
+      datasets: {
+        d1: [
+          { description: 'A', qty: 1, unit_price: 1, line_total: 1, photo_url: 'https://example.com/a.png' },
+          { description: 'B', qty: 1, unit_price: 1, line_total: 1, photo_url: '' },
+        ],
+      },
+    };
+  }
+
+  it('renders an <img> for a row with a value, never text-escapes the URL', () => {
+    const out = renderToHtml(imageTemplate(), docWithImages());
+    expect(out.html).toContain('<img src="https://example.com/a.png"');
+    expect(out.html).not.toContain('&lt;img'); // sanity: not double-escaped/dropped
+  });
+
+  it('renders an empty cell (no broken-image icon) when the value is missing/empty', () => {
+    const out = renderToHtml(imageTemplate(), docWithImages());
+    // Row A has a photo_url, row B's is '' — exactly one <img> total.
+    expect((out.html.match(/<img /g) ?? []).length).toBe(1);
+  });
+
+  it('never calls formatValue/escapes the raw URL as text for an image column', () => {
+    const out = renderToHtml(imageTemplate(), docWithImages());
+    expect(out.html).not.toContain('>https://example.com/a.png<');
+  });
+});
+
 describe('matchesConditionalRule / resolveConditionalStyle (memory.md D-031)', () => {
   it('evaluates every operator', () => {
     expect(matchesConditionalRule({ operator: 'eq', value: 'x', style: {} }, 'x')).toBe(true);

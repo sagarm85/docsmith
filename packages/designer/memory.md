@@ -983,6 +983,55 @@ functional value beyond the line itself, not required for the feature to
 work, can be added later without changing the underlying snap logic.
 `[status: locked]`
 
+### D-039 — Product images per line item: `ValueFormat:'image'`, a real per-row bound value, special-cased in `renderDetailBand` before `formatValue`
+**Decision:** `core.ValueFormat` gains `'image'` as a sixth value. Unlike
+`FreeElement`'s image kind (`src: { kind: 'url'|'assetId', value }`, needed
+because a free-form image isn't bound to a per-row dataset value), a
+`DetailColumn` with `format: 'image'` reads its bound value exactly like
+any other column — a plain string per row (a URL), same shape the adapter
+already returns for text/currency/date columns — so no new binding shape
+was needed. `renderDetailBand`'s cell loop checks `c.format === 'image'`
+*before* calling `formatValue` (which stays untouched — it's never invoked
+for an image cell in the real render path) and emits
+`<img src="{value}" style="max-width:100%;max-height:60px;object-fit:
+contain">` instead of escaped text; a missing/empty value renders a
+genuinely empty `<td>`, never a broken-image icon (no fabricated
+placeholder in the actual printed/PDF output — that's a canvas-only
+authoring aid, see below). Designer: `ColumnProps.svelte`/
+`DetailTable.svelte`'s format `<Select>`s gained "Image" (not
+`ElementProps.svelte` — a header/totals-band field element has no
+per-row concept, so 'image' is meaningless there; the shared `ValueFormat`
+union carries the option regardless, filtered per-surface the same way
+`'words'` already is). `DetailTable.svelte`'s real-sample-row preview
+renders an actual `<img>` thumbnail for a row with a value, or a dashed
+placeholder icon (honestly labeled as empty, not a fabricated image) for
+one without — matching the "no fabricated data" prime directive for the
+one case where an empty cell needs *some* visual affordance to still read
+as "this is an image column" while designing.
+**Why:** Asked directly ("Is it possible to generate an invoice with
+product image as well?") — answered honestly as a real, un-shipped
+`core` gap at the time (no image format existed on `DetailColumn`), then
+built once the user confirmed they wanted the whole pending list done.
+**Verified:** three core tests (`<img>` renders for a real value, never
+double-escapes/drops the URL, exactly the right count of `<img>` tags
+when one row's value is empty); a `DetailTable.test.ts` test (real
+thumbnail for a row with a value, placeholder icon for the empty one);
+and a real-browser screenshot of both the canvas preview and the actual
+Preview-mode output (`core.renderToHtml`, via data-URI test images so the
+screenshot doesn't depend on external network access) — confirming the
+feature works through the real render pipeline, not just the designer's
+own approximation of it.
+**Rejected:** a `{kind,value}` wrapper matching `FreeElement.src` (adds a
+migration/authoring-shape mismatch for zero benefit — a detail column's
+value is always adapter-bound, so it's always "the raw value," never a
+choice between a URL and an uploaded asset the way a static free-form
+image element is); inferring `format:'image'` automatically from an
+adapter field's type string (no reliable signal — `FieldMeta.type` is a
+DB-ish type like `text`/`varchar`, not a semantic hint, and guessing from
+a name pattern like "url"/"photo" risks false positives on an ordinary
+text column that happens to be named that).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

@@ -261,6 +261,8 @@ function renderFreeBand(
 }
 
 // ── detail band (the flowing, paginating line-item table) ───────────────────────
+const IMAGE_CELL_MAX_HEIGHT = 60; // px — keeps a product-image column from blowing out row height
+
 function renderDetailBand(
   band: DetailBand,
   data: DocumentData,
@@ -299,6 +301,18 @@ function renderDetailBand(
                 c.conditionalFormat,
                 raw,
               );
+              // memory.md D-039: an 'image' column is a real per-row bound
+              // image (the adapter returns a URL string per row, same shape
+              // as any other field) — never text-escaped/formatValue'd, an
+              // <img> instead. Empty/missing value is an honest empty cell,
+              // not a broken image icon.
+              if (c.format === 'image') {
+                const src = raw == null || raw === '' ? '' : String(raw);
+                const img = src
+                  ? `<img src="${esc(src)}" alt="" style="max-width:100%;max-height:${IMAGE_CELL_MAX_HEIGHT}px;object-fit:contain;display:block"/>`
+                  : '';
+                return `<td style="${styleToCss(cellStyle)}">${img}</td>`;
+              }
               return `<td style="${styleToCss(cellStyle)}">${esc(formatValue(raw, c.format, fmtOpts))}</td>`;
             })
             .join('') +

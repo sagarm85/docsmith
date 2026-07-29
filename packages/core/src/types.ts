@@ -46,7 +46,13 @@ export type Orientation = 'portrait' | 'landscape';
  * design: a real multi-locale number-to-words system is a large, genuinely
  * different feature (grammar rules vary far more than Intl's locale-aware
  * number/date formatting does) — see format.ts's `numberToWords` doc comment. */
-export type ValueFormat = 'text' | 'number' | 'currency' | 'date' | 'words';
+/** 'image' is a real per-row bound image, not a text format in
+ * `formatValue`'s usual sense — the column's bound value is a URL string
+ * per row (same shape an adapter already returns for any other field), and
+ * `renderDetailBand` special-cases `format === 'image'` to emit an
+ * `<img src="{value}">` instead of calling `formatValue`/escaping it as
+ * text (memory.md D-039). Only meaningful on a `DetailColumn`. */
+export type ValueFormat = 'text' | 'number' | 'currency' | 'date' | 'words' | 'image';
 export type Align = 'left' | 'center' | 'right';
 
 export type PrintSetup = {

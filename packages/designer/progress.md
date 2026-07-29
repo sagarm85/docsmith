@@ -620,9 +620,19 @@ already done. Tracked here with the same rigor as a phase checklist.
       a column thumbnail's `{#each}` by its own width value threw
       `each_key_duplicate` for the `[50, 50]` preset — fixed by keying on
       index instead.
-- [ ] Product image per line item (`DetailColumn.format:'image'` or similar)
-      — explicitly flagged as NOT achievable with today's column model when
-      asked; a real, scoped `core` change, not yet designed as a D-entry.
+- [x] Product image per line item (D-039) — `ValueFormat` gained `'image'`;
+      `renderDetailBand` special-cases it (before calling `formatValue`) to
+      emit a real `<img src="{value}">` per row instead of escaped text —
+      the bound value is just a URL string per row, same shape the adapter
+      already returns for any other field, no new `{kind,value}` wrapper
+      needed (unlike `FreeElement.src`, which needs one since it's not
+      adapter-bound). Empty/missing values render an honest empty cell, not
+      a broken-image icon. `ColumnProps.svelte`/`DetailTable.svelte`'s
+      format selects gained "Image"; the canvas sample-row preview shows a
+      real thumbnail or a placeholder icon for an empty value — never
+      fabricated. Verified end-to-end with a real-browser screenshot of
+      both the canvas and the actual Preview-mode output (via
+      `core.renderToHtml`, not just the designer's own approximation).
 - [ ] Full-height table + page-pinned summary (table area fills to the
       bottom of the page, summary/totals block pinned there even with one
       row) — feasible today for a single/last page via a CSS flex-fill
@@ -652,6 +662,22 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Product image per line item (D-039), post-Phase-3.**
+  `ValueFormat` gains `'image'` — a real per-row bound value (a plain URL
+  string, same shape the adapter returns for any other column), not a new
+  `{kind,value}` wrapper like `FreeElement.src` needs. `renderDetailBand`
+  special-cases it before calling `formatValue`, emitting a real `<img>`
+  per row (or an honest empty cell for a missing value — never a broken-
+  image icon in the actual output). `ColumnProps.svelte`/`DetailTable.svelte`
+  gained "Image" in their format selects; the canvas sample-row preview
+  shows a real thumbnail or an honestly-empty placeholder icon. This item
+  had been explicitly flagged as NOT achievable with the pre-existing
+  column model when first asked — now a real, scoped `core` change. 52
+  core tests pass (was 49); 170 designer tests pass (was 169, including a
+  new `DetailTable.test.ts` image-column test); lint/typecheck/build all
+  green. Verified end-to-end with a real-browser screenshot of both the
+  canvas and the actual `core.renderToHtml` Preview output (data-URI test
+  images, so verification doesn't depend on external network access).
 - **2026-07-29 — Alignment guides while dragging (D-038), post-Phase-3.**
   `FreeElement.svelte` compares the dragged element's left/center/right and
   top/center/bottom edges against every sibling in the band on each

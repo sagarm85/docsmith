@@ -115,6 +115,7 @@
     { value: 'currency', label: 'Currency' },
     { value: 'date', label: 'Date' },
     { value: 'words', label: 'Words' },
+    { value: 'image', label: 'Image' },
   ];
   const ALIGN_OPTIONS = [
     { value: 'left', label: 'Left' },
@@ -296,7 +297,18 @@
             {#each sampleState.rows as row, i (i)}
               <tr>
                 {#each band.columns as col (col.column)}
-                  <td style="text-align:{col.align ?? 'left'}">{String(row[col.column] ?? '')}</td>
+                  {@const value = row[col.column]}
+                  <td style="text-align:{col.align ?? 'left'}">
+                    {#if col.format === 'image'}
+                      {#if value}
+                        <img class="dd-sample-image" src={String(value)} alt="" />
+                      {:else}
+                        <span class="dd-sample-image-empty" aria-hidden="true"><Icon name="image" size={14} /></span>
+                      {/if}
+                    {:else}
+                      {String(value ?? '')}
+                    {/if}
+                  </td>
                 {/each}
               </tr>
             {/each}
@@ -449,5 +461,24 @@
     color: var(--dd-muted);
     font-style: italic;
     text-align: left;
+  }
+
+  .dd-sample-image {
+    display: block;
+    max-width: 100%;
+    max-height: 32px;
+    object-fit: contain;
+  }
+
+  .dd-sample-image-empty {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--dd-muted);
+    background: var(--dd-panel-alt);
+    border: 1px dashed var(--dd-border);
+    border-radius: var(--dd-radius-sm);
   }
 </style>

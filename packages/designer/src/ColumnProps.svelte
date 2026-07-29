@@ -37,6 +37,7 @@
     { value: 'currency', label: 'Currency' },
     { value: 'date', label: 'Date' },
     { value: 'words', label: 'Words' },
+    { value: 'image', label: 'Image' },
   ];
   const ALIGN_OPTIONS = [
     { value: 'left', label: 'Left' },
