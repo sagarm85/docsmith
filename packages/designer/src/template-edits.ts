@@ -118,6 +118,69 @@ export function createStackBlockElement(
   return base;
 }
 
+/** Appends a new bound field element into a grid band's cell (row, col),
+ * memory.md D-034. Width/height are governed by `FreeBand.gridColumns` and
+ * the row's content, not stored per-element (unlike free/stack). */
+export function createGridFieldElement(
+  source: 'header' | string,
+  field: Pick<FieldMeta, 'name' | 'label' | 'type'>,
+  row: number,
+  col: number,
+): FreeElement {
+  return {
+    id: newId(),
+    kind: 'field',
+    x: 0,
+    y: 0,
+    w: 0,
+    h: 0,
+    row,
+    col,
+    colSpan: 1,
+    label: field.label,
+    binding: { source, column: field.name, format: defaultFormatForType(field.type) },
+  };
+}
+
+/** Appends a new static block element into a grid band's cell (row, col). */
+export function createGridBlockElement(kind: BlockKind, row: number, col: number): FreeElement {
+  const base = { id: newId(), kind, x: 0, y: 0, w: 0, h: 0, row, col, colSpan: 1 } as const;
+  if (kind === 'text') return { ...base, text: '' };
+  if (kind === 'image') return { ...base, src: { kind: 'url', value: '' } };
+  return base;
+}
+
+/** An empty placeholder cell for "+ Add row" (memory.md D-034) — a real,
+ * empty text element (`text: ''`), not a phantom UI-only row. Renders as a
+ * "Drop a field here" ghost cell (GridBand.svelte) but is genuine template
+ * data an author can select/delete like any other element, and dropping a
+ * real field/block onto it replaces it in place (same row/col). */
+export function createGridPlaceholderElement(row: number, col: number): FreeElement {
+  return { id: newId(), kind: 'text', x: 0, y: 0, w: 0, h: 0, row, col, colSpan: 1, text: '' };
+}
+
+/** Next empty cell in a grid band, scanning existing rows top-to-bottom then
+ * left-to-right, falling back to a new row when every existing row is full —
+ * the keyboard drag-alternative's landing spot (design.md §12), since there's
+ * no per-cell keyboard targeting yet (v1: always lands in the first gap). */
+export function nextGridCell(elements: readonly FreeElement[], numCols: number): { row: number; col: number } {
+  const occupied = new Set<string>();
+  let maxRow = -1;
+  for (const el of elements) {
+    const r = el.row ?? 0;
+    const c = el.col ?? 0;
+    const span = Math.max(1, el.colSpan ?? 1);
+    for (let i = 0; i < span; i++) occupied.add(`${r}:${c + i}`);
+    maxRow = Math.max(maxRow, r);
+  }
+  for (let r = 0; r <= maxRow; r++) {
+    for (let c = 0; c < numCols; c++) {
+      if (!occupied.has(`${r}:${c}`)) return { row: r, col: c };
+    }
+  }
+  return { row: maxRow + 1, col: 0 };
+}
+
 /** Builds a DetailColumn from a dataset field; align defaults sensibly by format. */
 export function createDetailColumn(field: Pick<FieldMeta, 'name' | 'label' | 'type'>): DetailColumn {
   const format = defaultFormatForType(field.type);

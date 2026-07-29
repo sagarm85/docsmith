@@ -6,6 +6,7 @@ import type {
   DatasetMeta,
   DetailBand,
   FreeBand,
+  FreeElement,
   PrintSetup,
   Template,
   TemplateDataset,
@@ -168,61 +169,119 @@ export function convertLayoutUnit(
   };
 }
 
-const STACK_ROW_GAP = 8; // px, between stacked rows once converted back to 'free'
+const STACK_ROW_GAP = 8; // px, between rows once converted back to 'free'
 const STACK_FALLBACK_ROW_HEIGHT = 20; // px, when an element's own h isn't a useful row-height hint
 
+type Arrangement = 'free' | 'stack' | 'grid';
+
+function gridColumnOffsets(cols: number[]): number[] {
+  const offsets: number[] = [];
+  let acc = 0;
+  for (const w of cols) {
+    offsets.push(acc);
+    acc += w;
+  }
+  return offsets;
+}
+
 /**
- * Convert one band between 'free' (absolute x/y/w/h) and 'stack' (auto-flow
- * rows, memory.md D-029). Best-effort, not lossless in either direction —
- * matches `convertLayoutUnit`'s spirit: a reasonable default the user can
- * then adjust, not a promise of pixel-perfect round-tripping.
+ * Convert one band between 'free' (absolute x/y/w/h), 'stack' (auto-flow
+ * rows, memory.md D-029), and 'grid' (explicit row/column table, memory.md
+ * D-034). Best-effort, not lossless for any pair — matches
+ * `convertLayoutUnit`'s spirit: a reasonable default the user can then
+ * adjust, not a promise of pixel-perfect round-tripping.
  *
- * 'free' -> 'stack': elements are sorted top-to-bottom by their current y
- * and each becomes its own single-element row (never guesses which elements
- * were "meant" to share a row — that's a manual merge afterward, dragging
- * one element onto another's row). Widths convert to a plain percentage
- * (of `contentWidthPx`, using `currentLayoutUnit` to know what the stored
- * w already means).
+ * Implemented as normalize-then-materialize through one shared intermediate
+ * shape (rows of `{ el, xPercent, wPercent }`, percentages of the band's
+ * content width) rather than a bespoke function per pair — the same idea as
+ * `convertLayoutUnit`'s px<->% conversion, generalized to three arrangements
+ * instead of two units.
  *
- * 'stack' -> 'free': rows (grouped the same way the renderer groups them)
- * are laid out top-to-bottom with a fixed gap; each row's elements are
- * placed left-to-right, x offsets computed by accumulating the row's own
- * width percentages. Width converts back to px or % per `currentLayoutUnit`.
+ * 'free' input: elements sorted top-to-bottom by y, each its own single-
+ * element row (never guesses which elements were "meant" to share a row).
+ * 'stack' input: existing rows (grouped the same way the renderer groups
+ * them), x offsets accumulated from each row's own width percentages.
+ * 'grid' input: existing rows, x/width read from `gridColumns` + each
+ * element's `col`/`colSpan`.
+ *
+ * 'free' output: rows laid out top-to-bottom with a fixed gap, left-to-right
+ * within a row. 'stack' output: row index + width percentage, `col`/
+ * `colSpan` dropped. 'grid' output: a single full-width column
+ * (`gridColumns: [100]`), each row's element(s) placed at `col: 0` — this
+ * does NOT attempt to auto-detect a sensible multi-column split from
+ * existing free/stack content (rows can have arbitrarily different widths;
+ * a grid needs one column set shared by the whole band), so converting INTO
+ * grid always starts single-column and the author adds columns/colSpan
+ * afterward.
  */
 export function convertBandArrangement(
   band: FreeBand,
-  target: 'free' | 'stack',
+  target: Arrangement,
   contentWidthPx: number,
   currentLayoutUnit: 'px' | '%',
 ): FreeBand {
   const current = band.arrangement ?? 'free';
   if (current === target) return band;
 
-  if (target === 'stack') {
-    const ordered = [...band.elements].sort((a, b) => a.y - b.y);
-    return {
-      ...band,
-      arrangement: 'stack',
-      elements: ordered.map((el, i) => ({
-        ...el,
-        row: i,
-        w: currentLayoutUnit === '%' ? el.w : (contentWidthPx > 0 ? (el.w / contentWidthPx) * 100 : 0),
-      })),
-    };
+  type Cell = { el: FreeElement; xPercent: number; wPercent: number };
+
+  let rows: Cell[][];
+  if (current === 'grid') {
+    const cols = band.gridColumns?.length ? band.gridColumns : [100];
+    const offsets = gridColumnOffsets(cols);
+    rows = groupIntoRows(band.elements).map((row) =>
+      row.map((el) => {
+        const col = el.col ?? 0;
+        const span = Math.max(1, el.colSpan ?? 1);
+        const wPercent = cols.slice(col, col + span).reduce((s, w) => s + w, 0);
+        return { el, xPercent: offsets[col] ?? 0, wPercent };
+      }),
+    );
+  } else if (current === 'stack') {
+    rows = groupIntoRows(band.elements).map((row) => {
+      let x = 0;
+      return row.map((el) => {
+        const cell: Cell = { el, xPercent: x, wPercent: el.w };
+        x += el.w;
+        return cell;
+      });
+    });
+  } else {
+    const toPercent = (v: number, basis: number) =>
+      currentLayoutUnit === '%' ? v : basis > 0 ? (v / basis) * 100 : 0;
+    rows = [...band.elements]
+      .sort((a, b) => a.y - b.y)
+      .map((el) => [{ el, xPercent: toPercent(el.x, contentWidthPx), wPercent: toPercent(el.w, contentWidthPx) }]);
   }
 
-  // 'stack' -> 'free'
-  const rows = groupIntoRows(band.elements);
+  if (target === 'stack') {
+    const elements = rows.flatMap((row, i) =>
+      row.map(({ el, wPercent }) => {
+        const { col: _col, colSpan: _colSpan, ...rest } = el;
+        void _col;
+        void _colSpan;
+        return { ...rest, row: i, w: Math.round(wPercent * 100) / 100 };
+      }),
+    );
+    return { ...band, arrangement: 'stack', elements };
+  }
+
+  if (target === 'grid') {
+    const elements = rows.flatMap((row, i) => row.map(({ el }) => ({ ...el, row: i, col: 0, colSpan: 1 })));
+    return { ...band, arrangement: 'grid', gridColumns: [100], elements };
+  }
+
+  // target === 'free'
   let y = 0;
   const elements = rows.flatMap((row) => {
-    const rowHeightPx = Math.max(STACK_FALLBACK_ROW_HEIGHT, ...row.map((el) => el.h || 0));
-    let xPercent = 0;
-    const placed = row.map((el) => {
+    const rowHeightPx = Math.max(STACK_FALLBACK_ROW_HEIGHT, ...row.map(({ el }) => el.h || 0));
+    const placed = row.map(({ el, xPercent, wPercent }) => {
       const x = currentLayoutUnit === '%' ? xPercent : (xPercent / 100) * contentWidthPx;
-      const w = currentLayoutUnit === '%' ? el.w : (el.w / 100) * contentWidthPx;
-      xPercent += el.w;
-      const { row: _row, ...rest } = el;
+      const w = currentLayoutUnit === '%' ? wPercent : (wPercent / 100) * contentWidthPx;
+      const { row: _row, col: _col, colSpan: _colSpan, ...rest } = el;
       void _row;
+      void _col;
+      void _colSpan;
       return { ...rest, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, w: Math.round(w * 100) / 100 };
     });
     y += rowHeightPx + STACK_ROW_GAP;

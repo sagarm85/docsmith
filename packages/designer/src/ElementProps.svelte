@@ -32,13 +32,14 @@
      * already in this unit (DocDesigner converts the whole template up front
      * when the unit toggles, so this component never converts anything). */
     unit?: 'px' | '%';
-    /** The containing band's arrangement (memory.md D-029). 'stack' hides
-     * X/Y (position is row order, not coordinates) and z-order (reordering
-     * is the drag-handle in StackBand.svelte, not bring-forward/send-back —
-     * "forward/back" doesn't have a stack-mode meaning since there's no
-     * overlap to resolve). Width is always a row percentage in 'stack',
-     * regardless of `unit`. */
-    arrangement?: 'free' | 'stack';
+    /** The containing band's arrangement (memory.md D-029, D-034). 'stack'
+     * and 'grid' both hide X/Y (position is row/cell, not coordinates) and
+     * z-order (reordering is the drag-handle in StackBand.svelte / cell
+     * position in GridBand.svelte, not bring-forward/send-back — "forward/
+     * back" doesn't have a meaning without overlap to resolve). Width is
+     * always a row percentage in 'stack'; in 'grid', width comes from the
+     * band's `gridColumns` + this element's `colSpan`, never set directly. */
+    arrangement?: 'free' | 'stack' | 'grid';
     onChange: (patch: Partial<FreeElement>) => void;
     onDelete: () => void;
     onDuplicate: () => void;
@@ -81,6 +82,20 @@
           <NumberInput id="dd-el-h" ariaLabel="Height" min={1} value={element.h} onchange={(v) => onChange({ h: v })} />
         </Field>
       {/if}
+    </fieldset>
+  {:else if arrangement === 'grid'}
+    <fieldset class="dd-props-grid">
+      <legend>Cell</legend>
+      <Field label="Column span" fieldId="dd-el-colspan">
+        <NumberInput
+          id="dd-el-colspan"
+          ariaLabel="Column span"
+          min={1}
+          max={12}
+          value={element.colSpan ?? 1}
+          onchange={(v) => onChange({ colSpan: v })}
+        />
+      </Field>
     </fieldset>
   {:else}
     <fieldset class="dd-props-grid">
@@ -203,6 +218,16 @@
         type="color"
         value={element.style?.bg ?? '#ffffff'}
         oninput={(e) => patchStyle({ bg: (e.currentTarget as HTMLInputElement).value })}
+      />
+    </Field>
+    <Field label="Corner radius (px)" fieldId="dd-el-radius">
+      <NumberInput
+        id="dd-el-radius"
+        ariaLabel="Corner radius"
+        min={0}
+        max={999}
+        value={typeof element.style?.borderRadius === 'number' ? element.style.borderRadius : 0}
+        onchange={(v) => patchStyle({ borderRadius: v })}
       />
     </Field>
   {/if}

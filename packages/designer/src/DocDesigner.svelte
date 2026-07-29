@@ -43,6 +43,9 @@
     createStackFieldElement,
     createStackBlockElement,
     nextStackRow,
+    createGridFieldElement,
+    createGridBlockElement,
+    nextGridCell,
     type BlockKind,
   } from './template-edits.js';
   import { pageDimensionsPx } from './geometry.js';
@@ -213,11 +216,11 @@
     commitTemplate(convertLayoutUnit(template, nextUnit, contentWidthPx));
   }
 
-  // Band arrangement (memory.md D-029): toggling free<->stack migrates that
-  // one band's elements via core.convertBandArrangement in the same commit.
-  // Only ever called for reportHeader/totals (Properties.svelte only wires
-  // onArrangementChange for those two types).
-  function handleBandArrangementChange(bandId: string, arrangement: 'free' | 'stack') {
+  // Band arrangement (memory.md D-029, D-034): toggling free/stack/grid
+  // migrates that one band's elements via core.convertBandArrangement in the
+  // same commit. Only ever called for reportHeader/totals (Properties.svelte
+  // only wires onArrangementChange for those two types).
+  function handleBandArrangementChange(bandId: string, arrangement: 'free' | 'stack' | 'grid') {
     const contentWidthPx = pageDimensionsPx(template.printSetup).width;
     const layoutUnit = template.layoutUnit ?? 'px';
     commitTemplate({
@@ -290,6 +293,12 @@
       void datasetId;
       return;
     }
+    if (reportHeader?.arrangement === 'grid') {
+      const { row, col } = nextGridCell(reportHeader.elements, reportHeader.gridColumns?.length || 1);
+      handleAddElement('reportHeader', createGridFieldElement('header', field, row, col));
+      void datasetId;
+      return;
+    }
     handleAddElement('reportHeader', createFieldElement('header', field, reportHeader?.elements ?? []));
     void datasetId;
   }
@@ -303,6 +312,11 @@
     const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
     if (reportHeader?.arrangement === 'stack') {
       handleAddElement('reportHeader', createStackBlockElement(kind, nextStackRow(reportHeader.elements)));
+      return;
+    }
+    if (reportHeader?.arrangement === 'grid') {
+      const { row, col } = nextGridCell(reportHeader.elements, reportHeader.gridColumns?.length || 1);
+      handleAddElement('reportHeader', createGridBlockElement(kind, row, col));
       return;
     }
     const contentWidthPx = pageDimensionsPx(template.printSetup).width;
@@ -347,6 +361,11 @@
       case 'header': {
         const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
         const fieldMeta = { name: picked.column, label: picked.label, type: picked.type };
+        if (band?.arrangement === 'grid') {
+          const { row, col } = nextGridCell(band.elements, band.gridColumns?.length || 1);
+          handleAddElement(bandId, createGridFieldElement('header', fieldMeta, row, col));
+          break;
+        }
         handleAddElement(
           bandId,
           band?.arrangement === 'stack'
@@ -357,6 +376,11 @@
       }
       case 'block': {
         const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+        if (band?.arrangement === 'grid') {
+          const { row, col } = nextGridCell(band.elements, band.gridColumns?.length || 1);
+          handleAddElement(bandId, createGridBlockElement(picked.kind, row, col));
+          break;
+        }
         const contentWidthPx = pageDimensionsPx(template.printSetup).width;
         handleAddElement(
           bandId,

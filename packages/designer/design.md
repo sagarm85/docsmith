@@ -366,6 +366,30 @@ and gives each element its own row; stack→free lays rows out top-to-bottom
 with a fixed gap) — same spirit as the `layoutUnit` migration: a reasonable
 default, not a promise of pixel-perfect round-tripping.
 
+**Arrangement — grid (memory.md D-034).** A third `FreeBand.arrangement`
+value, offered alongside free/stacked in the same Properties → Selection →
+Band picker (same `reportHeader`/`totals`-only restriction, same "needs a
+known height" reasoning). `'grid'` is an explicit row/column table:
+`FreeBand.gridColumns` (percentage widths, editable in Properties) defines
+the columns, and each element's `row`/`col`/`colSpan` places it into one
+cell — `colSpan` lets one row hold a full-width cell (e.g. "Seller") while
+the next row splits into narrower ones (e.g. "Invoice #" / "Date"), the
+bordered-form-header layout common in commercial invoice/contract templates.
+`FreeBand.gridBorder` (a CSS `border` shorthand, empty by default) draws a
+line around every cell when set — `core.renderGridBand` renders a real
+`<table>` (not CSS Grid) specifically so `border-collapse` gives perfectly
+shared single-pixel borders and native `colspan` handles spanning, both for
+free, without an author hand-matching border/position per element (the
+whole point of this arrangement vs. approximating the same look with
+individually-bordered free-form boxes). Canvas editing is
+`GridBand.svelte` (parallel to `StackBand.svelte`): click a cell to select,
+drag a field/block onto an empty cell to fill it or onto a filled cell to
+replace it in place, "Add row" appends one row (a real, empty `text`
+element in its first cell — genuine template data an author can select/
+delete, not a phantom UI-only row); a truly-empty cell elsewhere in that row
+renders the same dashed "Drop a field here" placeholder. No cell-level drag
+reordering in v1 — a documented simplification, not silently missing.
+
 ### 8.4 Drop handling
 - Palette chip dragover a **valid** band → band highlights, insertion ghost shown.
 - Drop on valid target → create element (header field) or append column (dataset field)
@@ -448,19 +472,23 @@ Context-sensitive. Tabs: **Selection** and **Page**.
 
 **Selection tab** — depends on what's selected:
 - **Free-form element:** position (x/y/w/h), font (size, weight, style, color,
-  align, line-height), background/border (for box), the **binding** (source +
-  column dropdown sourced from the palette fields + format), z-order, lock. A
-  bound `field` element additionally gets **conditional formatting** (Phase 3,
-  memory.md D-031): a repeatable list of declarative rules (operator + value +
-  a style to apply on match — text color, background, bold), never a
-  scripting/expression language, per claude.md's prime directives.
+  align, line-height), background/border/corner-radius (for box, memory.md
+  D-034), the **binding** (source + column dropdown sourced from the palette
+  fields + format), z-order, lock. A bound `field` element additionally gets
+  **conditional formatting** (Phase 3, memory.md D-031): a repeatable list of
+  declarative rules (operator + value + a style to apply on match — text
+  color, background, bold), never a scripting/expression language, per
+  claude.md's prime directives. An element in a **grid** band (D-034) shows
+  **column span** instead of x/y/z-order (position is the cell, not
+  coordinates).
 - **Text element:** the static text + typography (no binding).
 - **Image element:** source (URL now; upload in Phase 2), fit (contain/cover), alt.
 - **Detail column:** header text, width, align, format, aggregate, and the same
   conditional-formatting rule list (tests that column's own value per row).
 - **Band:** height (except detail), visibility (optional bands), background,
-  and (`reportHeader`/`totals` only) the free-form/stacked **arrangement**
-  toggle — §8.3.
+  and (`reportHeader`/`totals` only) the free-form/stacked/**grid**
+  **arrangement** toggle — §8.3. Grid arrangement additionally shows a
+  column-width editor and a cell-borders toggle.
 
 **Page tab (Print Setup):** page size, orientation, margins (mm, four inputs +
 presets), the element position/size unit (px/%, §8.3, D-028 — grouped here

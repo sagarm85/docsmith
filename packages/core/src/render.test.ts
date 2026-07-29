@@ -192,6 +192,68 @@ describe('renderToHtml — "stack" arrangement (memory.md D-029)', () => {
   });
 });
 
+describe('renderToHtml — "grid" arrangement (memory.md D-034)', () => {
+  function gridTemplate(gridBorder?: string): Template {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            arrangement: 'grid' as const,
+            gridColumns: [60, 40],
+            gridBorder,
+            elements: [
+              { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Seller', row: 0, col: 0, colSpan: 2 },
+              { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Invoice #', row: 1, col: 0 },
+              { id: 'c', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Date', row: 1, col: 1 },
+            ] as FreeElement[],
+          }
+        : b,
+    );
+    return t;
+  }
+
+  it('renders as a real <table> with colgroup widths and a colspan for a spanning cell', () => {
+    const out = renderToHtml(gridTemplate(), fatDocument(1));
+    expect(out.html).toContain('class="band band-reportHeader band-grid');
+    expect(out.html).toContain('<table class="grid-table">');
+    expect(out.html).toContain('<col style="width:60%"/>');
+    expect(out.html).toContain('<col style="width:40%"/>');
+    expect(out.html).toContain('colspan="2"');
+    // 2 rows in the grid table itself (not the detail table's own <tr>s):
+    // the spanning "Seller" row, then "Invoice #"/"Date" side by side.
+    const gridTableHtml = out.html.slice(out.html.indexOf('<table class="grid-table">'), out.html.indexOf('</table>'));
+    expect((gridTableHtml.match(/<tr>/g) ?? []).length).toBe(2);
+  });
+
+  it('applies gridBorder to every cell, and omits it when unset', () => {
+    const bordered = renderToHtml(gridTemplate('1px solid #1a1c22'), fatDocument(1));
+    expect(bordered.html).toContain('border:1px solid #1a1c22');
+
+    const borderless = renderToHtml(gridTemplate(undefined), fatDocument(1));
+    expect(borderless.html).toContain('border:none');
+    expect(borderless.html).not.toContain('border:1px solid');
+  });
+
+  it('never grids pageHeader/pageFooter even if arrangement is set (same reasoning as stack — no known height)', () => {
+    const t = invoiceTemplate();
+    t.bands = [
+      ...t.bands,
+      {
+        id: 'pageHeader',
+        type: 'pageHeader',
+        height: 40,
+        enabled: true,
+        arrangement: 'grid',
+        gridColumns: [100],
+        elements: [{ id: 'ph1', kind: 'text', x: 0, y: 0, w: 100, h: 18, text: 'Running', row: 0, col: 0 }],
+      },
+    ];
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).not.toContain('band-pageHeader band-grid');
+  });
+});
+
 describe('convertBandArrangement', () => {
   function band(): FreeBand {
     return {
@@ -240,6 +302,99 @@ describe('convertBandArrangement', () => {
     expect(left?.y).toBe(right?.y); // same row -> same y
     expect(below?.y).toBeGreaterThan(left!.y); // next row is lower
     expect(next.elements.every((e) => e.row === undefined)).toBe(true);
+  });
+
+  it('free -> grid gives each element its own row/col:0 in a single full-width column', () => {
+    const next = convertBandArrangement(band(), 'grid', 800, 'px');
+    expect(next.arrangement).toBe('grid');
+    expect(next.gridColumns).toStrictEqual([100]);
+    expect(next.elements.map((e) => e.text)).toStrictEqual(['First', 'Second']); // sorted by y
+    expect(next.elements[0]).toMatchObject({ row: 0, col: 0, colSpan: 1 });
+    expect(next.elements[1]).toMatchObject({ row: 1, col: 0, colSpan: 1 });
+  });
+
+  it('grid -> free reads x/w from gridColumns + col/colSpan, including a spanning cell', () => {
+    const grid: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 120,
+      arrangement: 'grid',
+      gridColumns: [60, 40],
+      elements: [
+        { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Seller', row: 0, col: 0, colSpan: 2 },
+        { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Invoice #', row: 1, col: 0 },
+        { id: 'c', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Date', row: 1, col: 1 },
+      ],
+    };
+    const next = convertBandArrangement(grid, 'free', 1000, 'px');
+    expect(next.arrangement).toBe('free');
+    const [seller, invNum, date] = next.elements;
+    expect(seller?.w).toBe(1000); // 60+40% spanning both columns
+    expect(invNum?.x).toBe(0);
+    expect(invNum?.w).toBe(600); // 60% of 1000
+    expect(date?.x).toBe(600); // starts right after the first column
+    expect(date?.w).toBe(400); // 40% of 1000
+    expect(invNum?.y).toBe(date?.y);
+    expect(date?.y).toBeGreaterThan(seller!.y);
+    expect(next.elements.every((e) => e.col === undefined && e.colSpan === undefined)).toBe(true);
+  });
+
+  it('grid -> stack drops col/colSpan and keeps row-derived width as a plain percentage', () => {
+    const grid: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 120,
+      arrangement: 'grid',
+      gridColumns: [60, 40],
+      elements: [
+        { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Invoice #', row: 0, col: 0 },
+        { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Date', row: 0, col: 1 },
+      ],
+    };
+    const next = convertBandArrangement(grid, 'stack', 1000, 'px');
+    expect(next.arrangement).toBe('stack');
+    expect(next.elements[0]).toMatchObject({ row: 0, w: 60 });
+    expect(next.elements[1]).toMatchObject({ row: 0, w: 40 });
+    expect(next.elements.every((e) => e.col === undefined && e.colSpan === undefined)).toBe(true);
+  });
+
+  it('stack -> grid gives each row its own grid row in a single full-width column', () => {
+    const stacked: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 120,
+      arrangement: 'stack',
+      elements: [
+        { id: 'a', kind: 'text', x: 0, y: 0, w: 50, h: 20, text: 'Left', row: 0 },
+        { id: 'b', kind: 'text', x: 0, y: 0, w: 50, h: 20, text: 'Right', row: 0 },
+      ],
+    };
+    const next = convertBandArrangement(stacked, 'grid', 800, 'px');
+    expect(next.arrangement).toBe('grid');
+    expect(next.gridColumns).toStrictEqual([100]);
+    // Both elements shared stack row 0 -> both land in grid row 0, col 0 (best-effort, not lossless).
+    expect(next.elements[0]).toMatchObject({ row: 0, col: 0 });
+    expect(next.elements[1]).toMatchObject({ row: 0, col: 0 });
+  });
+});
+
+describe('styleToCss — borderRadius', () => {
+  it('emits px for a number and passes a string through as-is', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            elements: [
+              { id: 'a', kind: 'text', x: 0, y: 0, w: 40, h: 20, text: 'Pill', style: { borderRadius: 999 } },
+              { id: 'b', kind: 'text', x: 0, y: 30, w: 40, h: 20, text: 'Rounded', style: { borderRadius: '4px 4px 0 0' } },
+            ] as FreeElement[],
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('border-radius:999px');
+    expect(out.html).toContain('border-radius:4px 4px 0 0');
   });
 });
 

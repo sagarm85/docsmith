@@ -748,6 +748,102 @@ lives on `DetailBand.aggregates`, never denormalized onto `DetailColumn`").
 
 ---
 
+## Post-Phase-3 (design-review-driven)
+
+Phase 3 (`progress.md`) was already DONE when this work started. The following
+decisions came out of an open-ended design-review conversation (the user
+sharing reference invoice/document templates — MailerLite's editor, several
+commercial invoice templates — and asking "is this possible?") rather than
+`design.md`'s phase checklist. Recorded with the same rigor as any other
+decision; `design.md`/`progress.md` updated in the same change.
+
+### D-034 — A third band arrangement, `'grid'`: explicit row/column table via `row`/`col`/`colSpan`, rendered as a real `<table>`; plus `ElementStyle.borderRadius`
+**Decision:** `FreeBand.arrangement` widens to `'free' | 'stack' | 'grid'`
+(memory.md D-029 already established free/stack). `'grid'` bands get two new
+optional fields: `gridColumns?: number[]` (column widths as percentages,
+default a single 100% column) and `gridBorder?: string` (a CSS `border`
+shorthand applied to every cell; absent/empty means no visible cell borders
+— the "Sections"/column-layout look). `FreeElement` gets `col?: number` and
+`colSpan?: number` (alongside the existing `row`, shared with stack), placing
+an element into one grid cell, optionally spanning multiple columns (so one
+row can hold a full-width cell like "Seller" while the next splits into
+narrower ones like "Invoice #"/"Date" — the bordered-form-header pattern
+common in commercial invoice/shipping-document templates). `core`'s new
+`renderGridBand` renders a real HTML `<table>` — deliberately NOT CSS Grid —
+so native `border-collapse` gives perfectly shared single-pixel cell borders
+and native `colspan` handles spanning, both for free, without the author
+hand-matching border thickness/position per element the way approximating
+the same look with individually-bordered free-form boxes would require.
+Separately, `ElementStyle` gains `borderRadius?: number | string` (px for a
+number, or any CSS `<length>` string, e.g. `"999px"` for a full pill) —
+small and independent of the grid work, but enables the rounded/pill visual
+style (rounded table headers, pill-shaped total badges) requested in the
+same conversation; only wired into the designer for `kind:'box'` elements in
+v1 (Corner radius field next to Background).
+**Designer:** `GridBand.svelte` (parallel to `StackBand.svelte`, swapped in
+by `Canvas.svelte`): click a cell to select; dragging a field/block chip
+onto an empty cell creates an element there, onto a filled cell replaces it
+in place (same `row`/`col`/`colSpan`); "Add row" appends one row via a real,
+empty `text` element (`text: ''`) at `col: 0` — genuine template data an
+author can select/delete, not a phantom UI-only row — with the rest of that
+row's columns rendering as the same dashed "Drop a field here" ghost cell
+used for any truly-absent cell. `BandProps.svelte` gained the third
+arrangement option plus (grid only) a column-width editor (add/remove/
+resize columns, each a `NumberInput`) and a "Cell borders" checkbox.
+`ElementProps.svelte` shows "Column span" instead of x/y/z-order for a
+selected grid-band element (same reasoning as stack: position is the cell,
+not coordinates; z-order has no meaning without overlap to resolve).
+`core.convertBandArrangement` (already generalized for D-029) extended to a
+3-way normalize-through-one-shared-intermediate-representation conversion
+(rows of `{ el, xPercent, wPercent }`) rather than a bespoke function per
+pair — converting INTO grid always starts single-column (`gridColumns:
+[100]`), one element per row; auto-detecting a sensible multi-column split
+from existing free/stack content is NOT attempted (rows can have arbitrarily
+different widths; a grid needs one column set shared by the whole band), so
+the author adds columns/colSpan afterward — same "best-effort, not lossless"
+framing as every other arrangement conversion.
+**Why:** The user shared several real invoice/shipping-document/contract
+template screenshots (a sales contract with a fully bordered metadata grid —
+"Seller"/"Buyer"/"Invoice Number"/"Date" etc. as literal attached table
+cells; a rounded-pill-styled invoice) and asked whether DocSmith could
+produce the same. Two answers were possible: approximate it by hand-matching
+free-form element borders/positions (works today, fragile — exactly the
+"align marker" gap the user separately flagged), or add a real primitive.
+Offered as a genuine architecture decision (a new template-model concept,
+not a style tweak) via `AskUserQuestion`; the user chose the unified
+primitive, explicitly connecting it to the earlier "Sections" (MailerLite
+2-column/3-column layout) request as the same underlying need with borders
+toggled off — one primitive instead of two features.
+**Verified:** core unit tests (real `<table>`/`colgroup`/`colspan` output,
+`gridBorder` on/off, pageHeader/pageFooter never grid for the same "no known
+height" reason stack excludes them, all 4 arrangement-conversion pairs
+touching grid, `borderRadius` CSS output for both a number and a string); a
+dedicated `GridBand.test.ts` (9 tests: empty state, spanning cell + gap
+placeholder, select, duplicate/delete, text-edit, fill-empty-cell,
+replace-filled-cell, dataset-field rejection, add-row); a `DocDesigner.test.ts`
+integration test (toggle to grid, palette "+" routes through `nextGridCell`,
+toggle back to free migrates coordinates); and real-browser screenshots of
+both the design canvas (grid band with a spanning cell + empty placeholder)
+and the actual Preview output (confirming `core.renderToHtml`'s real
+`<table>` renders correctly, not just the designer's approximation of it).
+**Rejected:** CSS Grid instead of a real `<table>` for `renderGridBand`
+(would need hand-rolled border-doubling avoidance and a `colSpan`-to-
+`grid-column` translation the browser already does for free with `<table>`
++ `colspan`); auto-detecting multi-column splits when converting free/stack
+content into grid (genuinely ambiguous — rows can have different widths;
+punted to manual authoring, consistent with every other arrangement
+conversion's "best-effort" framing); per-cell drag reordering in v1 (real
+scope for marginal value over the existing "replace in place" + manual
+row-order-via-array-position — noted as a possible follow-up, not silently
+dropped); a nested/recursive "grid block containing child elements" element
+kind instead of extending `FreeBand`/`FreeElement` (more powerful — a grid
+anywhere, even floating inside a free band — but a materially bigger
+structural change for a need `FreeBand.arrangement` already covers, same
+reasoning D-029 used against a parallel `rows: FreeElement[][]` field).
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

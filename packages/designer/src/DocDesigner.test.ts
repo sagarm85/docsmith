@@ -796,6 +796,62 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('switching reportHeader to "grid" arrangement (memory.md D-034) migrates elements and routes new "+" adds into a cell', async () => {
+    const el = await mountWithEntitySelected();
+
+    const reportHeaderTab = Array.from(el.shadowRoot!.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Report Header',
+    );
+    reportHeaderTab?.click();
+    await nextTick();
+
+    const arrangementSelect = el.shadowRoot!.querySelector<HTMLSelectElement>(
+      '[aria-label="Band arrangement"]',
+    );
+    expect(arrangementSelect?.value).toBe('free');
+    arrangementSelect!.value = 'grid';
+    arrangementSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+
+    const reportHeader = () =>
+      el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+        arrangement?: string;
+        gridColumns?: number[];
+        elements: Array<{ row?: number; col?: number; colSpan?: number }>;
+      };
+    expect(reportHeader().arrangement).toBe('grid');
+    expect(reportHeader().gridColumns).toStrictEqual([100]);
+    expect(el.shadowRoot?.textContent).toContain('Grid');
+
+    // The palette "+" now routes through nextGridCell: lands at row 0, col 0
+    // of the single default column.
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Invoice # to report header"]')!
+      .click();
+    await nextTick();
+    expect(reportHeader().elements).toHaveLength(1);
+    expect(reportHeader().elements[0]).toMatchObject({ row: 0, col: 0, colSpan: 1 });
+
+    // A second "+" add (same field, fixture only has one) lands in the next
+    // row — col 0 of row 0 is now occupied.
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Invoice # to report header"]')!
+      .click();
+    await nextTick();
+    expect(reportHeader().elements).toHaveLength(2);
+    expect(reportHeader().elements[1]).toMatchObject({ row: 1, col: 0 });
+
+    // Switching back to 'free' migrates it back to real x/y (col/row cleared).
+    arrangementSelect!.value = 'free';
+    arrangementSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+    await nextTick();
+    expect(reportHeader().arrangement).toBe('free');
+    expect(reportHeader().elements[0]?.row).toBeUndefined();
+    expect(reportHeader().elements[0]?.col).toBeUndefined();
+
+    el.remove();
+  });
+
   it('theme editor: editing a brand color applies it live, and saving/re-applying round-trips it (memory.md D-032)', async () => {
     const el = mountWithAdapter();
     await nextTick();

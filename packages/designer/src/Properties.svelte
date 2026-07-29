@@ -53,7 +53,7 @@
     onBandChange: (bandId: string, patch: Partial<FreeBand>) => void;
     /** Free<->stack migration (memory.md D-029), offered only for
      * reportHeader/totals — see BandProps.svelte's onArrangementChange doc. */
-    onBandArrangementChange: (bandId: string, arrangement: 'free' | 'stack') => void;
+    onBandArrangementChange: (bandId: string, arrangement: 'free' | 'stack' | 'grid') => void;
     printSetup: PrintSetupType;
     onPrintSetupChange: (next: PrintSetupType) => void;
     keepRowTogether: boolean;

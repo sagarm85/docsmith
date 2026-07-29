@@ -3,6 +3,7 @@
   import type { PickedUp, Selection } from './types.js';
   import Band from './Band.svelte';
   import StackBand from './StackBand.svelte';
+  import GridBand from './GridBand.svelte';
   import DetailTable from './DetailTable.svelte';
   import Toast from './ui/Toast.svelte';
   import { pageDimensionsPx, marginsPx } from './geometry.js';
@@ -212,6 +213,20 @@
             onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
             onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
           />
+        {:else if reportHeader.arrangement === 'grid'}
+          <GridBand
+            band={reportHeader}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'reportHeader' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'reportHeader'}
+            onUpdateElements={(els) => onUpdateElements('reportHeader', els)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('reportHeader', id)}
+            onSelectBand={() => onSelectBand('reportHeader')}
+            {onDeselect}
+            onElementDelete={(id) => onElementDelete('reportHeader', id)}
+            onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
+            onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
+          />
         {:else}
           <Band
             band={reportHeader}
@@ -252,6 +267,20 @@
       {#if totals}
         {#if totals.arrangement === 'stack'}
           <StackBand
+            band={totals}
+            selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
+            bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}
+            onUpdateElements={(els) => onUpdateElements('totals', els)}
+            onInvalidDrop={handleInvalidDrop}
+            onSelectElement={(id) => onSelectElement('totals', id)}
+            onSelectBand={() => onSelectBand('totals')}
+            {onDeselect}
+            onElementDelete={(id) => onElementDelete('totals', id)}
+            onElementDuplicate={(id) => onElementDuplicate('totals', id)}
+            onElementEditText={(id, text) => onElementEditText('totals', id, text)}
+          />
+        {:else if totals.arrangement === 'grid'}
+          <GridBand
             band={totals}
             selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
             bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}

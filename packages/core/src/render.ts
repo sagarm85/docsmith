@@ -58,6 +58,7 @@ function styleToCss(s: ElementStyle | undefined): string {
   if (s.color) out.push(`color:${s.color}`);
   if (s.bg) out.push(`background:${s.bg}`);
   if (s.border) out.push(`border:${s.border}`);
+  if (s.borderRadius != null) out.push(`border-radius:${typeof s.borderRadius === 'number' ? `${s.borderRadius}px` : s.borderRadius}`);
   if (s.lineHeight) out.push(`line-height:${s.lineHeight}`);
   if (s.padding != null) out.push(`padding:${s.padding}px`);
   return out.join(';');
@@ -188,6 +189,55 @@ function renderStackBand(
   return `<div class="band band-${band.type} band-stack ${extraClass}" data-band="${band.type}" style="${st}">${rowsHtml}</div>`;
 }
 
+// ── grid elements/bands (memory.md D-034) ────────────────────────────────────
+// A "grid" band renders as a real HTML <table> — not CSS grid — so
+// `border-collapse` gives perfectly shared single-pixel cell borders and
+// native `colspan` handles a cell spanning multiple columns, both for free,
+// without hand-matching border/position per element (the point of this
+// arrangement: bordered form layouts like "Seller" spanning a full row while
+// "Invoice #"/"Date" split the next row into two narrower cells).
+function renderGridCellContent(el: FreeElement, data: DocumentData, fmtOpts: FormatOptions): string {
+  switch (el.kind) {
+    case 'text':
+      return esc(el.text ?? '');
+    case 'field':
+      return esc(resolveElementValue(el, data, fmtOpts));
+    case 'image': {
+      const src = el.src?.value ?? '';
+      if (!src) return '';
+      return `<img src="${esc(src)}" alt="" style="max-width:100%;display:block"/>`;
+    }
+    case 'line':
+      return `<div style="border-top:${el.style?.border ?? '1px solid #333'}"></div>`;
+    case 'box':
+      return '';
+    default:
+      return '';
+  }
+}
+
+function renderGridBand(band: FreeBand, data: DocumentData, fmtOpts: FormatOptions, extraClass = ''): string {
+  if (band.enabled === false) return '';
+  const cols = band.gridColumns?.length ? band.gridColumns : [100];
+  const cellBorder = band.gridBorder ? `border:${band.gridBorder}` : 'border:none';
+  const colgroup = cols.map((w) => `<col style="width:${w}%"/>`).join('');
+  const rowsHtml = groupIntoRows(band.elements)
+    .map((row) => {
+      const cellsHtml = row
+        .map((el) => {
+          const raw = el.kind === 'field' && el.binding ? resolveBindingRaw(el.binding, data) : undefined;
+          const cellStyle = styleToCss(resolveConditionalStyle(el.style, el.conditionalFormat, raw));
+          const span = el.colSpan && el.colSpan > 1 ? ` colspan="${el.colSpan}"` : '';
+          return `<td${span} style="${cellBorder};${cellStyle}">${renderGridCellContent(el, data, fmtOpts)}</td>`;
+        })
+        .join('');
+      return `<tr>${cellsHtml}</tr>`;
+    })
+    .join('');
+  const st = styleToCss(band.style);
+  return `<div class="band band-${band.type} band-grid ${extraClass}" data-band="${band.type}" style="${st}"><table class="grid-table"><colgroup>${colgroup}</colgroup><tbody>${rowsHtml}</tbody></table></div>`;
+}
+
 function renderFreeBand(
   band: FreeBand,
   data: DocumentData,
@@ -198,6 +248,9 @@ function renderFreeBand(
   if (band.enabled === false) return '';
   if (band.arrangement === 'stack' && band.type !== 'pageHeader' && band.type !== 'pageFooter') {
     return renderStackBand(band, data, fmtOpts, extraClass);
+  }
+  if (band.arrangement === 'grid' && band.type !== 'pageHeader' && band.type !== 'pageFooter') {
+    return renderGridBand(band, data, fmtOpts, extraClass);
   }
   const els = band.elements.map((e) => renderFreeElement(e, data, fmtOpts, layoutUnit)).join('');
   const st = styleToCss(band.style);
@@ -300,6 +353,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helve
 .band-stack { display: flex; flex-direction: column; gap: 4px; }
 .stack-row { display: flex; gap: 8px; align-items: flex-start; }
 .el-stack { position: static; white-space: pre-wrap; }
+.band-grid { position: static; }
+table.grid-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.grid-table td { padding: 8px 10px; vertical-align: top; word-wrap: break-word; }
 table.detail { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.detail th, table.detail td { padding: 6px 8px; border-bottom: 1px solid #e2e5e9; vertical-align: top; word-wrap: break-word; }
 table.detail thead th { border-bottom: 1.5px solid #333; font-weight: 700; background: #f6f7f9; }

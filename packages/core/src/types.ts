@@ -90,6 +90,8 @@ export type ElementStyle = {
   color?: string;
   bg?: string;
   border?: string; // css shorthand, e.g. "1px solid #ccc"
+  /** px, or any valid CSS <length> string (e.g. "999px" for a full pill). */
+  borderRadius?: number | string;
   lineHeight?: number;
   padding?: number;
 };
@@ -151,6 +153,17 @@ export type FreeElement = {
    * unique row (a single-column line), so authoring never *requires*
    * setting it. */
   row?: number;
+  /** Column index into the containing band's `gridColumns` (memory.md
+   * D-034). Only read when the band's `arrangement === 'grid'`; ignored
+   * otherwise. Combined with `row`, places this element into one grid cell.
+   * Absent behaves as column 0. */
+  col?: number;
+  /** How many grid columns this element's cell spans, starting at `col`.
+   * Only read when `arrangement === 'grid'`. Absent/1 means no span — this
+   * is what lets one row mix a wide cell (e.g. "Seller", spanning the whole
+   * row) with narrower cells in the next row (e.g. "Invoice #" / "Date"
+   * side by side), matching a real bordered form layout. */
+  colSpan?: number;
   style?: ElementStyle;
   text?: string; // kind:'text'
   label?: string; // kind:'field' — shown as {label} token in the designer
@@ -203,15 +216,28 @@ export type FreeBand = {
   elements: FreeElement[];
   style?: ElementStyle;
   enabled?: boolean; // optional bands (pageHeader/pageFooter) can be off
-  /** Per-band arrangement (memory.md D-029): 'free' (default, absent means
-   * 'free' — fully backward-compatible) is today's absolute x/y positioning.
-   * 'stack' auto-flows `elements` top-to-bottom in array order (grouped into
-   * rows via each element's `row`), MailerLite-editor style — no x/y, width
-   * is always a percentage of the row (regardless of the template's
-   * `layoutUnit`, since a fixed px width in a stack could overflow a
-   * narrower page — the entire point of stacking is to never need that
-   * unit choice for this band). */
-  arrangement?: 'free' | 'stack';
+  /** Per-band arrangement (memory.md D-029, D-034): 'free' (default, absent
+   * means 'free' — fully backward-compatible) is today's absolute x/y
+   * positioning. 'stack' auto-flows `elements` top-to-bottom in array order
+   * (grouped into rows via each element's `row`), MailerLite-editor style —
+   * no x/y, width is always a percentage of the row. 'grid' is an explicit
+   * row/column table: elements are placed via `row`/`col`/`colSpan` into
+   * `gridColumns`-defined columns, optionally bordered via `gridBorder` —
+   * for bordered form layouts (a "Seller" cell next to an "Invoice #" cell)
+   * that would otherwise need pixel-perfect manual border-matching in
+   * 'free'. */
+  arrangement?: 'free' | 'stack' | 'grid';
+  /** Only read when `arrangement === 'grid'`: column widths as percentages
+   * of the band's content width (e.g. `[60, 20, 20]`, summing to ~100).
+   * Absent defaults to a single 100%-wide column. */
+  gridColumns?: number[];
+  /** Only read when `arrangement === 'grid'`: a CSS `border` shorthand
+   * (e.g. `"1px solid #1a1c22"`) applied to every cell via the grid's
+   * underlying `<table>` + `border-collapse` — one band-level setting
+   * instead of matching border style/position by hand per element (the
+   * point of the grid arrangement). Absent/empty means no cell borders
+   * (the "Sections" / column-layout look, memory.md D-034). */
+  gridBorder?: string;
 };
 
 export type DetailBand = {

@@ -562,6 +562,42 @@ explicitly, honestly documented as a known, deliberate gap (barcode/QR).
 
 ---
 
+## Post-Phase-3 — design-review-driven work
+
+Not on `design.md`'s original phase map — these came out of an open-ended
+design-review conversation (reference invoice/document templates shared by
+the user, asked against DocSmith's actual capabilities) after Phase 3 was
+already done. Tracked here with the same rigor as a phase checklist.
+
+- [x] `ElementStyle.borderRadius` (core) — rounded/pill styling, wired into
+      the designer for `kind:'box'` elements (Corner radius field).
+- [x] Grid arrangement (`FreeBand.arrangement: 'grid'`, `gridColumns`,
+      `gridBorder`, `FreeElement.col`/`colSpan`) — a third arrangement
+      alongside free/stacked; an explicit bordered or borderless row/column
+      table, rendered as a real `<table>` (D-034). New `GridBand.svelte`
+      designer component; `BandProps.svelte` column-width editor + cell-
+      borders toggle; `ElementProps.svelte` column-span field.
+- [ ] Element-level hover toolbar (duplicate/delete/bring-forward/send-back
+      at the cursor, not only the right-rail Properties panel) — mocked,
+      not yet built.
+- [ ] Alignment guides while dragging (snap lines + gap distance against
+      sibling elements) — mocked, not yet built.
+- [ ] Borderless/styled detail table option (`DetailBand` border-style
+      toggle) — mocked, not yet built; distinct from grid-band borders,
+      which only apply to free-form bands, not the line-items table.
+- [ ] Categorized/icon-forward palette groups — mocked, not yet built.
+- [ ] Product image per line item (`DetailColumn.format:'image'` or similar)
+      — explicitly flagged as NOT achievable with today's column model when
+      asked; a real, scoped `core` change, not yet designed as a D-entry.
+- [ ] Full-height table + page-pinned summary (table area fills to the
+      bottom of the page, summary/totals block pinned there even with one
+      row) — feasible today for a single/last page via a CSS flex-fill
+      technique; guaranteeing it on every page of a multi-page document
+      needs render-service-side page-break awareness, the same class of
+      problem as carried-forward subtotals (D-033). Not yet built either way.
+
+---
+
 ## Cross-cutting (must hold at every phase)
 
 - [ ] A11y: keyboard, focus rings, SR labels, contrast, reduced-motion
@@ -582,6 +618,45 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Grid arrangement + borderRadius (D-034, post-Phase-3).** A
+  design-review conversation (reference invoice/shipping-document templates
+  shared by the user — a bordered sales-contract metadata grid, a rounded-
+  pill invoice) surfaced a real gap: DocSmith could approximate a bordered
+  form-grid layout only by hand-matching free-form element borders/positions.
+  New third `FreeBand.arrangement: 'grid'` (alongside D-029's free/stacked):
+  `gridColumns` (percentage column widths) + `gridBorder` (a CSS border
+  shorthand, applied to every cell) at the band level; `FreeElement.col`/
+  `colSpan` place an element into one cell, optionally spanning columns (so
+  "Seller" can span a full row while "Invoice #"/"Date" split the next one).
+  `core.renderGridBand` renders a real HTML `<table>` — not CSS Grid — so
+  native `border-collapse`/`colspan` handle shared borders and spanning for
+  free. New `GridBand.svelte` (parallel to `StackBand.svelte`): click to
+  select, drag a field onto an empty cell to fill it or a filled cell to
+  replace it in place, "Add row" appends a real empty-text placeholder cell
+  (not a phantom UI row). `BandProps.svelte` gained the arrangement option
+  plus a column-width editor and cell-borders toggle; `ElementProps.svelte`
+  shows column span instead of x/y/z-order for grid elements.
+  `core.convertBandArrangement` generalized from a free↔stack-only function
+  into a 3-way conversion through one shared intermediate representation.
+  Separately, new `ElementStyle.borderRadius` (px or any CSS length string)
+  for the rounded/pill visual style, wired into the designer for `kind:'box'`
+  elements. This was offered to the user as a genuine architecture decision
+  (a new template-model concept) via `AskUserQuestion` — chosen explicitly
+  as a *unified* primitive covering both the bordered-form-grid need and the
+  earlier "Sections" (MailerLite 2-col/3-col layout) idea from the same
+  conversation, rather than two separate features. 46 core tests pass (was
+  38); 160 designer tests pass (was 150, including a new `GridBand.test.ts`
+  with 9 tests and a `DocDesigner.test.ts` arrangement-toggle integration
+  test); lint/typecheck/build all green. Verified with real-browser
+  screenshots of both the design canvas (a grid band with a spanning cell
+  and an empty placeholder) and the actual Preview output, confirming
+  `core.renderToHtml`'s real `<table>` renders correctly end to end, not
+  just the designer's approximation of it. Several other ideas from the
+  same design-review thread (element hover toolbar, alignment guides,
+  borderless detail table, categorized palette, product-image column,
+  full-height/page-pinned summary) were mocked but are explicitly NOT yet
+  built — tracked in the new "Post-Phase-3" checklist above, not silently
+  dropped.
 - **2026-07-29 — Carried-forward subtotals (D-033); Phase 3 done.** New
   `Aggregate.into: 'tfoot' | 'carryForward'` (core) — a second, independent
   aggregate entry per column, surfaced in `ColumnProps.svelte` as "Carry
