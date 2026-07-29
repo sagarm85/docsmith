@@ -673,6 +673,79 @@ field and renderer change, which the "saved themes" ask didn't call for and
 authoring for the actual document).
 `[status: locked]`
 
+### D-033 — Carried-forward subtotals computed and injected by `@docsmith/render-service`, not `core`; a single-pass best-effort approximation
+**Decision:** `core.Aggregate.into` widens from the literal `'tfoot'` to
+`'tfoot' | 'carryForward'`. A `'carryForward'` entry is a SECOND, independent
+`Aggregate` for the same column (a column can have both a grand total and a
+running per-page subtotal at once) — never a replacement for the existing
+`'tfoot'` entry. `core.renderToHtml` never renders carry-forward rows: it has
+no concept of page breaks (they don't exist until a browser/print engine
+actually lays the page out), so this stays a render-service-only, PDF-only
+post-layout pass — a post-processing mutation of the SAME DOM `core` already
+produced (analogous to Puppeteer's own header/footer templates already being
+a post-processing layer), not a second renderer, preserving D-009.
+`packages/render-service/src/pagination.ts`'s `applyCarryForward(page,
+template, data)` runs right after `page.setContent()` and before `page.pdf()`
+in `pdf.ts`: it resizes the Puppeteer page to the real print content width
+(page width minus `printSetup.margins`, converted via a small duplicated
+`MM_TO_PX` constant — see `packages/designer/src/geometry.ts`'s own copy and
+comment for why this is duplicated rather than shared), measures the actual
+rendered heights of `reportHeader`, `<thead>`, `<tfoot>`, and every detail
+row, then greedily simulates page breaks against the printable height
+budget, and finally injects "Carried forward"/"Brought forward" `<tr>` rows
+into the live DOM. Cumulative values are computed via `core.aggregate()`
+against the real `DocumentData` rows sliced at each break point — never by
+scraping rendered text. The pair is forced onto different pages via CSS
+`break-after:page` on the "Carried forward" row.
+**Why:** The user was asked (`AskUserQuestion`, since this genuinely trips
+claude.md §9's "requires a forbidden dependency or a second renderer, stop
+and flag it" rule) and chose "Implement via render-service (Puppeteer)" —
+explicitly scoped as real backend work, a post-layout measurement pass that
+queries rendered row positions and injects running-total rows. Two real bugs
+were caught only by rendering an actual multi-page PDF and inspecting it
+(not by code review or unit tests):
+1. Relying on natural CSS reflow to land the page break exactly between the
+   injected "Carried forward" and "Brought forward" rows doesn't work — both
+   rows can land on the same page if there happens to be room, since nothing
+   about their DOM adjacency forces a split. Fixed by forcing the break via
+   `break-after:page` on the first row.
+2. `<tfoot>` is `display:table-footer-group`, which — like `<thead>` — 
+   repeats on **every** printed page once a `'tfoot'` aggregate exists, not
+   just the last page. The initial page-budget math only reserved space for
+   `reportHeader`/`<thead>`, silently eating the safety margin meant to hold
+   the injected carry-forward row and causing it to spill onto its own
+   near-empty page. Fixed by reserving `<tfoot>` height on every page too.
+Because the measurement pass is an ordinary (non-print) Puppeteer layout —
+not `page.pdf()`'s own internal print pipeline — resized to what should be
+the matching content width, it can still drift from Chromium's true print
+layout by a small amount (observed, not fully root-caused to the pixel). A
+1.5× row-height safety margin around the injected rows' reserved space
+absorbs that drift in practice (verified against the 60-row invoice
+fixture). This is accepted as a genuine, documented approximation — single
+measurement pass, not iterative refinement — the same practical tradeoff
+real-world reporting tools make, per the user's explicit framing when
+choosing this approach.
+**Verified:** the real 60-row `StaticAdapter` invoice fixture, rendered
+through the actual `renderPdf()` Puppeteer pipeline with a `carryForward`
+aggregate added, parsed with `pdfjs-dist` (installed ad hoc in the
+scratchpad only, same throwaway pattern as the original Phase 1
+pagination-gate verification — never added to any `package.json`): 3 pages
+(same page count as the identical fixture without carry-forward — the
+feature doesn't inflate page count when the budget is right), correct
+"Carried forward"/"Brought forward" values at both page breaks, and the
+running values independently cross-checked against the fixture's own row
+data (sum of the last 6 rows = grand total − last carried-forward value).
+**Rejected:** computing carry-forward client-side/in `core` (structurally
+impossible — page breaks don't exist before a print engine lays the page
+out, per D-012's "carried-forward subtotals are server/P3" which already
+anticipated this); an iterative refinement loop that re-measures after each
+injection to converge on pixel-perfect breaks (real complexity for a feature
+already explicitly scoped as "best-effort" by the user's own framing of the
+chosen option); denormalizing the carry-forward flag onto `DetailColumn`
+instead of a second `Aggregate` entry (would fight D-024's "aggregate config
+lives on `DetailBand.aggregates`, never denormalized onto `DetailColumn`").
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)
@@ -685,3 +758,15 @@ authoring for the actual document).
   Lean: adapter pre-joins (keeps the client dumb). Confirm at P3.
 - **O-3 — Theming API surface:** exact shape of the `theme` token-override object
   passed to `mount`. Lean: a flat `{ '--dd-accent': '#…' }` map. Confirm at P2.
+- **O-4 — Barcode/QR element (P3, skipped):** design.md §2/§14 lists a barcode/QR
+  element among Phase 3's ERP-grade features, but no correct Code128/QR
+  encoder can be hand-rolled without a new dependency — trips claude.md §9's
+  "requires a forbidden dependency, stop and flag it" rule. Flagged to the
+  user via `AskUserQuestion`; chosen answer was "Skip for now — leave it
+  undone in progress.md as a known gap, revisit later" (not "never" — just
+  not decided yet). Revisit if/when a barcode/QR dependency is proposed and
+  approved through the doc-update ritual (claude.md §0.4): would need a
+  license-compatible, tree-shakeable encoder (e.g. a minimal Code128/QR-only
+  library, not a general imaging toolkit) added to the approved dependency
+  list in `claude.md` §3, plus a new `ElementKind` (or a `kind:'image'`
+  variant whose `src` is generated rather than a URL/asset) in `core`.

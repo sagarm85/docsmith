@@ -26,6 +26,7 @@
     onElementSendBack,
     onColumnChange,
     onColumnAggregateChange,
+    onColumnCarryForwardChange,
     onBandChange,
     onBandArrangementChange,
     printSetup,
@@ -47,6 +48,8 @@
     onElementSendBack: (bandId: string, elementId: string) => void;
     onColumnChange: (columnIndex: number, patch: Partial<DetailColumn>) => void;
     onColumnAggregateChange: (columnIndex: number, fn: Aggregate['fn'] | null) => void;
+    /** memory.md D-033 — independent from the tfoot aggregate above. */
+    onColumnCarryForwardChange: (columnIndex: number, fn: Aggregate['fn'] | null) => void;
     onBandChange: (bandId: string, patch: Partial<FreeBand>) => void;
     /** Free<->stack migration (memory.md D-029), offered only for
      * reportHeader/totals — see BandProps.svelte's onArrangementChange doc. */
@@ -98,7 +101,15 @@
     const detail = template.bands.find((b) => isDetailBand(b)) as DetailBand | undefined;
     const col = detail?.columns[selection.columnIndex];
     if (!col) return null;
-    return detail?.aggregates?.find((a) => a.column === col.column)?.fn ?? null;
+    return detail?.aggregates?.find((a) => a.column === col.column && a.into === 'tfoot')?.fn ?? null;
+  });
+
+  const selectedColumnCarryForward = $derived.by(() => {
+    if (selection?.kind !== 'column') return null;
+    const detail = template.bands.find((b) => isDetailBand(b)) as DetailBand | undefined;
+    const col = detail?.columns[selection.columnIndex];
+    if (!col) return null;
+    return detail?.aggregates?.find((a) => a.column === col.column && a.into === 'carryForward')?.fn ?? null;
   });
 
   const selectedBand = $derived.by(() => {
@@ -155,6 +166,8 @@
           onChange={(patch) => onColumnChange(columnIndex, patch)}
           aggregate={selectedColumnAggregate}
           onAggregateChange={(fn) => onColumnAggregateChange(columnIndex, fn)}
+          carryForward={selectedColumnCarryForward}
+          onCarryForwardChange={(fn) => onColumnCarryForwardChange(columnIndex, fn)}
         />
       {:else if selection?.kind === 'band' && selectedBand}
         {@const bandId = selection.bandId}

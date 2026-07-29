@@ -11,6 +11,8 @@
     onChange,
     aggregate = null,
     onAggregateChange,
+    carryForward = null,
+    onCarryForwardChange,
   }: {
     column: DetailColumn;
     onChange: (patch: Partial<DetailColumn>) => void;
@@ -20,6 +22,13 @@
      * see memory.md D-024. */
     aggregate?: 'sum' | 'count' | 'avg' | null;
     onAggregateChange?: (fn: 'sum' | 'count' | 'avg' | null) => void;
+    /** This column's running per-page-break subtotal function, or null
+     * (memory.md D-033) — a SEPARATE `Aggregate` entry (`into:'carryForward'`)
+     * from the tfoot one above; a column can have both at once. Computed and
+     * injected by `@docsmith/render-service` at PDF time only — the preview
+     * never shows carry-forward rows (core has no concept of page breaks). */
+    carryForward?: 'sum' | 'count' | 'avg' | null;
+    onCarryForwardChange?: (fn: 'sum' | 'count' | 'avg' | null) => void;
   } = $props();
 
   const FORMAT_OPTIONS = [
@@ -98,6 +107,22 @@
     />
   </Field>
 
+  <Field label="Carry forward (page breaks)" fieldId="dd-col-carry-forward">
+    <Select
+      id="dd-col-carry-forward"
+      ariaLabel="Column carry-forward across page breaks"
+      value={carryForward ?? 'none'}
+      options={AGGREGATE_OPTIONS}
+      onchange={(v) =>
+        onCarryForwardChange?.(v === 'none' ? null : (v as 'sum' | 'count' | 'avg'))
+      }
+    />
+    <p class="dd-col-hint">
+      Adds "Carried forward" / "Brought forward" rows at each page break in the exported PDF
+      (not shown in preview).
+    </p>
+  </Field>
+
   <ConditionalRulesEditor
     rules={column.conditionalFormat ?? []}
     onChange={(rules) => onChange({ conditionalFormat: rules })}
@@ -121,6 +146,13 @@
     font-weight: 600;
     color: var(--dd-text);
     word-break: break-all;
+  }
+
+  .dd-col-hint {
+    margin: 4px 0 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--dd-muted);
   }
 
   .dd-col-text-input {

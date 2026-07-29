@@ -5,6 +5,7 @@
 
 import puppeteer, { type Browser, type PaperFormat } from 'puppeteer';
 import { renderToHtml, type DocumentData, type Template } from '@docsmith/core';
+import { applyCarryForward } from './pagination.js';
 
 // Reuse one browser across requests; launch lazily.
 let browserPromise: Promise<Browser> | null = null;
@@ -57,6 +58,10 @@ export async function renderPdf({ template, data }: RenderPdfOptions): Promise<U
   const page = await browser.newPage();
   try {
     await page.setContent(document, { waitUntil: 'networkidle0' });
+    // memory.md D-033: inject carried-forward/brought-forward rows (if the
+    // template has any) BEFORE printing — page.pdf() below prints whatever
+    // DOM state exists at call time.
+    await applyCarryForward(page, template, data);
 
     const ps = template.printSetup;
     const showNums = ps.showPageNumbers !== false;

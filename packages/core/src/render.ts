@@ -255,10 +255,15 @@ function renderDetailBand(
     `</tbody>`;
 
   let tfoot = '';
-  if (band.aggregates?.length) {
+  // Only 'tfoot' aggregates render here — 'carryForward' ones (memory.md
+  // D-033) have no meaning without page-break positions, which don't exist
+  // until Puppeteer lays the page out; @docsmith/render-service injects
+  // those as a post-layout pass, never core.
+  const tfootAggregates = band.aggregates?.filter((a) => a.into === 'tfoot');
+  if (tfootAggregates?.length) {
     // Map each aggregate onto its column position; blank the rest.
     const cells = cols.map((c) => {
-      const agg = band.aggregates!.find((a) => a.column === c.column);
+      const agg = tfootAggregates.find((a) => a.column === c.column);
       if (!agg) return `<td></td>`;
       const val = aggregate(rows, agg.column, agg.fn);
       return `<td style="text-align:${alignVal(c.align)};font-weight:700">${esc(formatValue(val, c.format ?? 'number', fmtOpts))}</td>`;

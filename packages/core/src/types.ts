@@ -174,7 +174,18 @@ export type DetailColumn = {
 export type Aggregate = {
   column: string;
   fn: 'sum' | 'count' | 'avg';
-  into: 'tfoot';
+  /** 'tfoot' (existing): one grand total after the last row, rendered by
+   * `core.renderToHtml` itself. 'carryForward' (memory.md D-033): a running
+   * per-page subtotal ("Carried forward" / "Brought forward" rows at each
+   * page break) — NOT computed by `core.renderToHtml`, which has no concept
+   * of page breaks (they don't exist until the browser/Puppeteer actually
+   * lays the page out). `@docsmith/render-service` reads `into:
+   * 'carryForward'` entries and injects those rows as a post-layout pass
+   * during PDF generation only; the on-screen preview and a raw
+   * `renderToHtml()` call render the table with no carry-forward rows at
+   * all (an honest, documented gap — see design.md §9's "client-side
+   * honest limitations"), not a silent no-op. */
+  into: 'tfoot' | 'carryForward';
   label?: string;
 };
 

@@ -284,6 +284,63 @@
   round-trip, plus the host-supplied-theme disabled case), and a
   real-browser screenshot. 150 designer tests pass (was 134);
   lint/typecheck/build all green (`dist/doc-designer.js` ~340KB / ~80KB gzip).
+- **Now — Barcode/QR skipped; Carried-forward subtotals shipped (D-033) —
+  Phase 3 done (2026-07-29).** Both of Phase 3's remaining items required a
+  genuine stop-and-ask per `claude.md` §9 (barcode/QR needs a new dependency
+  no template-driven output can hand-roll correctly; carried-forward needs a
+  page-break-aware computation `core.renderToHtml` structurally cannot do).
+  Flagged both via `AskUserQuestion`. **Barcode/QR:** user chose "Skip for
+  now" — left unchecked above with the reasoning recorded, and
+  memory.md O-4 tracks it as a revisit-later open item, not silently dropped.
+  **Carried-forward:** user chose "Implement via render-service (Puppeteer)."
+  `core.Aggregate.into` widened from the literal `'tfoot'` to
+  `'tfoot' | 'carryForward'` — a SECOND, independent aggregate entry per
+  column (a column can have both a grand total and a running subtotal).
+  `ColumnProps.svelte` gained a "Carry forward (page breaks)" select
+  alongside the existing footer-aggregate one; `DocDesigner.svelte`'s new
+  `handleColumnCarryForwardChange` writes/removes only the `into:
+  'carryForward'` entry, never touching the `into: 'tfoot'` one.
+  `core.renderToHtml`'s `<tfoot>` render path was tightened to only ever
+  render `into: 'tfoot'` aggregates (previously `.find()` could have matched
+  either kind for the same column). New
+  `packages/render-service/src/pagination.ts`
+  (`applyCarryForward(page, template, data)`, called from `pdf.ts` right
+  after `page.setContent()` and before `page.pdf()`): resizes the Puppeteer
+  page to the real print content width, measures the actual rendered
+  `reportHeader`/`thead`/`tfoot`/row heights (both `thead` *and* `tfoot` are
+  `display:table-*-group` and repeat on **every** printed page — missing the
+  `tfoot` reservation was a real bug caught during verification, see below),
+  greedily simulates where pages will break against the printable height
+  budget (with a 1.5× row-height safety margin absorbing measured
+  drift between this non-print measurement pass and Chromium's real print
+  layout — empirically tuned, not derived exactly), then injects "Carried
+  forward"/"Brought forward" `<tr>` rows into the live DOM. The pair is
+  **forced** onto different pages via CSS `break-after:page` on the
+  "Carried forward" row — an earlier version relied on natural reflow
+  landing the break between them, which a real PDF render showed doesn't
+  reliably happen (both rows landed on the same page instead). Cumulative
+  values are computed via `core.aggregate()` against the real
+  `DocumentData` rows sliced at each break point — never by scraping
+  rendered text. Explicitly a best-effort, single-pass approximation (not
+  a guarantee of pixel-perfect alignment with Chromium's internal
+  fragmentation) — accepted per the user's chosen approach. `tsconfig.json`
+  for `@docsmith/render-service` added `"DOM"` to `lib` (typecheck-only, for
+  the `page.evaluate()` callback bodies that run in the browser, not Node —
+  no runtime DOM globals added to the actual Node process).
+  **Verified** against the real 60-row `StaticAdapter` invoice fixture
+  through the actual `renderPdf()` Puppeteer pipeline (added a
+  `carryForward` aggregate to a copy of the demo template), parsed with
+  `pdfjs-dist` (installed ad hoc in the scratchpad only, same throwaway
+  pattern as the original Phase 1 pagination-gate verification): 3 pages
+  (matching the same fixture's page count *without* carry-forward — the
+  feature doesn't change page count when the reserved slack is right),
+  "Carried forward: $1,266.25" ending page 1 / "Brought forward: $1,266.25"
+  starting page 2, "Carried forward: $2,663.75" ending page 2 / "Brought
+  forward: $2,663.75" starting page 3, and the running values independently
+  cross-checked against the fixture's own row data (sum of rows 54–59 =
+  $308.75 = grand total $2,972.50 − $2,663.75). 38 core tests still pass;
+  `@docsmith/render-service` typecheck/build green (no lint/test scripts
+  for that package — confirmed, matches its existing `package.json`).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -465,18 +522,43 @@
       `ConditionalRulesEditor.svelte` (operator + value + text
       color/background/bold), never a scripting/expression language — tests
       only that element/column's own value, per claude.md's prime directives.
-- [ ] Barcode / QR element
+- [ ] Barcode / QR element — **skipped for now, known gap** (see memory.md
+      O-4). No correct barcode/QR symbology can be hand-rolled without a new
+      dependency (Code128/QR encoding is a real algorithm, not something to
+      approximate), which trips claude.md §9's "stop and flag" rule. Flagged
+      to the user via `AskUserQuestion`; explicit choice was "Skip for now —
+      leave it undone in progress.md as a known gap, revisit later." Not
+      silently dropped — revisit if/when a barcode/QR dependency is approved
+      through the doc-update ritual (claude.md §0.4).
 - [x] i18n + locale currency; amount-in-words — `PrintSetup.svelte` gained
       Locale/Currency selects (Page tab; `core.formatValue` already did the
       real `Intl` work, only the UI was missing); new `core.numberToWords()`
       + `'words'` `ValueFormat` for the classic "amount in words" totals-band
       line (English-only by design — see progress.md's "Now" note/memory.md
       for the reasoning).
-- [ ] Carried-forward subtotals (server-assisted)
+- [x] Carried-forward subtotals (server-assisted, D-033) — a NEW second
+      `Aggregate` entry (`into: 'carryForward'`, independent of the existing
+      `into: 'tfoot'` grand total) surfaced in `ColumnProps.svelte` as a
+      "Carry forward (page breaks)" select. `core.renderToHtml` never renders
+      carry-forward rows (it has no concept of page breaks); a new
+      `packages/render-service/src/pagination.ts` module measures the real
+      rendered row/thead/tfoot/reportHeader heights at the actual print
+      content width, simulates where Chromium's print pagination will break
+      pages against the page's printable height budget, and injects
+      "Carried forward"/"Brought forward" `<tr>` rows into the live DOM
+      (forcing the page break between the pair via CSS `break-after:page` —
+      relying on natural reflow to land the break exactly between them
+      proved unreliable) before `page.pdf()` runs. Explicit best-effort,
+      single-pass approximation, not pixel-perfect fragmentation matching —
+      accepted tradeoff per the user's chosen `AskUserQuestion` option
+      ("Implement via render-service (Puppeteer)").
 - [x] Saved themes / brand presets — reuses the existing `config.theme`
       token-override mechanism (design.md §13); new `ThemeList.svelte`
       (Toolbar) lets the author edit/save/apply/delete named sets of 4
       brand-relevant tokens, `localStorage`-persisted like templates (D-032).
+
+**Phase 3 is DONE (2026-07-29)** — all checklist items are either shipped or
+explicitly, honestly documented as a known, deliberate gap (barcode/QR).
 
 ---
 
@@ -500,6 +582,31 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Carried-forward subtotals (D-033); Phase 3 done.** New
+  `Aggregate.into: 'tfoot' | 'carryForward'` (core) — a second, independent
+  aggregate entry per column, surfaced in `ColumnProps.svelte` as "Carry
+  forward (page breaks)". `core.renderToHtml`'s `<tfoot>` now only renders
+  `into:'tfoot'` entries (a real bug fix — it could previously match either
+  kind). New `packages/render-service/src/pagination.ts`: measures real
+  rendered row/thead/tfoot/reportHeader heights at the print content width,
+  simulates page breaks against the printable height budget, and injects
+  "Carried forward"/"Brought forward" `<tr>` rows before `page.pdf()` —
+  forcing the pair onto different pages via CSS `break-after:page` (natural
+  reflow alone proved unreliable). A real bug caught during verification:
+  `<tfoot>` also repeats on every printed page (`display:table-footer-group`,
+  same as `<thead>`) and had been left out of the page-budget reservation,
+  causing spurious near-empty pages. Best-effort, single-pass approximation
+  per the user's chosen approach (not a guarantee of pixel-perfect
+  Chromium-fragmentation matching). Verified against the real 60-row invoice
+  fixture through the actual Puppeteer `renderPdf()` pipeline, parsed with
+  `pdfjs-dist` (scratchpad-only): 3 pages (unchanged from the no-carry-
+  forward baseline), correct carried/brought values at both page breaks,
+  cross-checked against the fixture's real row data. Barcode/QR stays
+  explicitly skipped (memory.md O-4) — both of Phase 3's remaining items hit
+  claude.md §9's stop-and-ask; user chose "skip" for barcode/QR and
+  "implement via render-service" for carried-forward. **Phase 3 is DONE.**
+  38 core tests pass; render-service typecheck/build green (no lint/test
+  scripts for that package).
 - **2026-07-29 — Saved themes / brand presets (D-032).** Reuses design.md
   §13's existing `config.theme` token-override mechanism rather than a new
   template-model concept. New Toolbar **Theme** control (`ThemeList.svelte`,

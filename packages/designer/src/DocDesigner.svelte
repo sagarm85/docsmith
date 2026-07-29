@@ -479,8 +479,31 @@
         if (!isDetailBand(b)) return b;
         const col = b.columns[columnIndex];
         if (!col) return b;
-        const rest = (b.aggregates ?? []).filter((a) => a.column !== col.column);
-        return { ...b, aggregates: fn ? [...rest, { column: col.column, fn, into: 'tfoot' }] : rest };
+        const rest = (b.aggregates ?? []).filter((a) => a.column !== col.column || a.into !== 'tfoot');
+        return {
+          ...b,
+          aggregates: fn ? [...rest, { column: col.column, fn, into: 'tfoot' }] : rest,
+        };
+      }),
+    });
+  }
+
+  // memory.md D-033: carry-forward is a SECOND, independent Aggregate entry
+  // (into:'carryForward') for the same column — a column can have both a
+  // grand-total (tfoot) and a running per-page subtotal at once, so this
+  // never touches the tfoot entry written by handleColumnAggregateChange.
+  function handleColumnCarryForwardChange(columnIndex: number, fn: Aggregate['fn'] | null) {
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) => {
+        if (!isDetailBand(b)) return b;
+        const col = b.columns[columnIndex];
+        if (!col) return b;
+        const rest = (b.aggregates ?? []).filter((a) => a.column !== col.column || a.into !== 'carryForward');
+        return {
+          ...b,
+          aggregates: fn ? [...rest, { column: col.column, fn, into: 'carryForward' }] : rest,
+        };
       }),
     });
   }
@@ -712,6 +735,7 @@
               onElementSendBack={handleElementSendBack}
               onColumnChange={handleColumnChange}
               onColumnAggregateChange={handleColumnAggregateChange}
+              onColumnCarryForwardChange={handleColumnCarryForwardChange}
               onBandChange={handleBandChange}
               onBandArrangementChange={handleBandArrangementChange}
               printSetup={template.printSetup}

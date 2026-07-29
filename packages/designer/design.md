@@ -426,7 +426,13 @@ setup"** summary and **Export PDF** / **Print** buttons sit in the toolbar.
   supplies real "Page X of Y"** via Puppeteer header/footer templates (§: that's the
   backend's job; the designer just exposes the toggle and lets the service fill it).
 - **Carried-forward subtotals** ("brought forward" per page) need break positions the
-  browser won't reveal — server-only, Phase 3.
+  browser won't reveal — server-only (implemented Phase 3, memory.md D-033): a
+  `DetailColumn`'s aggregate can carry an `into: 'carryForward'` entry (independent
+  of the usual `into: 'tfoot'` grand total); `core.renderToHtml`/the on-screen
+  preview never render these rows (no concept of page breaks exists client-side) —
+  only `@docsmith/render-service`'s `pagination.ts` measures real rendered heights,
+  simulates page breaks, and injects "Carried forward"/"Brought forward" rows before
+  producing the PDF. A documented best-effort approximation, not pixel-perfect.
 - Exact WYSIWYG↔PDF fidelity varies with the user's OS print dialog. Steer users to
   **Export PDF** (server) for anything official; **Print** (browser) for quick copies.
 
