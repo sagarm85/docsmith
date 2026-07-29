@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
+  import type { DataSourceAdapter, FieldMeta, FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
   import {
     createGridBlockElement,
     createGridFieldElement,
@@ -35,6 +35,8 @@
     onGridColumnsChange,
     onColumnResizeStart,
     onColumnResizeEnd,
+    adapter,
+    entity,
   }: {
     band: FreeBand;
     selectedElementId?: string;
@@ -65,6 +67,14 @@
      * changed, only when the gesture starts/ends. */
     onColumnResizeStart?: () => void;
     onColumnResizeEnd?: () => void;
+    /** Powers the click-to-add inline field/text picker (memory.md D-047) —
+     * undefined disables the picker entirely (an empty cell falls back to
+     * drag-and-drop only), matching every other "honestly disabled until
+     * the capability exists" affordance in this codebase. Only header
+     * fields are offered (same D-018 rule as the palette's own header vs.
+     * dataset split — a grid band is never the detail table). */
+    adapter?: DataSourceAdapter;
+    entity?: string;
   } = $props();
 
   const bandLabel: Record<FreeBand['type'], string> = {
@@ -193,7 +203,17 @@
   // (from "Add row"/a Section) replaces it in place — that's the whole point
   // of a placeholder. Dropping onto a cell with REAL content instead appends
   // (stacks) the new element alongside it (memory.md D-045) — the mechanism
-  // behind "add multiple fields to one section column".
+  // behind "add multiple fields to one section column". Shared by both the
+  // drag-and-drop path and the click-to-add picker (memory.md D-047).
+  function placeElement(group: FreeElement[] | null, el: FreeElement) {
+    const solePlaceholder = group?.length === 1 && isPlaceholder(group[0]!) ? group[0]! : null;
+    if (solePlaceholder) {
+      onUpdateElements(band.elements.map((existing) => (existing.id === solePlaceholder.id ? el : existing)));
+    } else {
+      onUpdateElements([...band.elements, el]);
+    }
+  }
+
   function handleCellDrop(e: DragEvent, row: number, col: number, group: FreeElement[] | null) {
     e.preventDefault();
     e.stopPropagation();
@@ -204,16 +224,92 @@
       return;
     }
     if (!el) return;
-    const solePlaceholder = group?.length === 1 && isPlaceholder(group[0]!) ? group[0]! : null;
-    if (solePlaceholder) {
-      onUpdateElements(band.elements.map((existing) => (existing.id === solePlaceholder.id ? el : existing)));
-    } else {
-      onUpdateElements([...band.elements, el]);
-    }
+    placeElement(group, el);
   }
 
   function handleAddRow() {
     onUpdateElements([...band.elements, createGridPlaceholderElement(nextRowIndex(), 0)]);
+  }
+
+  // ── Click-to-add inline picker (memory.md D-047) ────────────────────────
+  // An easier alternative to drag-and-drop: click any empty cell to search
+  // header fields or add plain text, without needing to drag anything.
+  type PickerState = { row: number; col: number; group: FreeElement[] | null };
+  let picker = $state<PickerState | null>(null);
+  let pickerSearch = $state('');
+
+  type FieldsState =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'error'; message: string }
+    | { status: 'ready'; data: FieldMeta[] };
+  let fieldsState = $state<FieldsState>({ status: 'idle' });
+  let fieldsGen = 0;
+
+  async function ensureFieldsLoaded() {
+    if (!adapter || !entity) return;
+    if (fieldsState.status === 'ready' || fieldsState.status === 'loading') return;
+    const gen = ++fieldsGen;
+    fieldsState = { status: 'loading' };
+    try {
+      const data = await adapter.getFields(entity);
+      if (gen !== fieldsGen) return;
+      fieldsState = { status: 'ready', data };
+    } catch (err) {
+      if (gen !== fieldsGen) return;
+      fieldsState = { status: 'error', message: err instanceof Error ? err.message : 'Failed to load fields.' };
+    }
+  }
+
+  const filteredPickerFields = $derived.by(() => {
+    if (fieldsState.status !== 'ready') return [];
+    const q = pickerSearch.trim().toLowerCase();
+    if (!q) return fieldsState.data;
+    return fieldsState.data.filter((f) => f.label.toLowerCase().includes(q) || f.name.toLowerCase().includes(q));
+  });
+
+  function openPicker(row: number, col: number, group: FreeElement[] | null) {
+    picker = { row, col, group };
+    pickerSearch = '';
+    void ensureFieldsLoaded();
+  }
+
+  function closePicker() {
+    picker = null;
+    pickerSearch = '';
+  }
+
+  function pickField(field: FieldMeta) {
+    if (!picker) return;
+    const el = createGridFieldElement('header', { name: field.name, label: field.label, type: field.type }, picker.row, picker.col);
+    placeElement(picker.group, el);
+    closePicker();
+  }
+
+  function pickTypeText() {
+    if (!picker) return;
+    const el = createGridBlockElement('text', picker.row, picker.col);
+    placeElement(picker.group, el);
+    editingId = el.id;
+    closePicker();
+  }
+
+  function handlePickerKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closePicker();
+    }
+  }
+
+  // Close on any outside click — composedPath() (not e.target) since this
+  // runs inside a shadow root (memory.md D-022). Clicking any empty cell
+  // (including the one that's opening/reopening the picker) is exempted so
+  // the same click that opens a picker can't also immediately close it.
+  function handleWindowClick(e: MouseEvent) {
+    if (!picker) return;
+    const path = e.composedPath();
+    const clickedEmptyCell = path.some((n) => n instanceof Element && n.classList.contains('dd-grid-cell--empty'));
+    if (!clickedEmptyCell) closePicker();
   }
 
   function handleBodyClick(e: MouseEvent) {
@@ -292,6 +388,8 @@
     return `${el.kind} element ${el.id}, ${bandLabel[band.type]}`;
   }
 </script>
+
+<svelte:window onclick={handleWindowClick} />
 
 <div class="dd-band dd-band--{bandVariant[band.type]}">
   <button type="button" class="dd-band-tab" class:dd-band-tab--selected={bandSelected} data-band-id={band.id} onclick={onSelectBand}>
@@ -416,18 +514,36 @@
                    row"/a Sections drop) is deletable like any other element —
                    a genuinely-absent gap cell (no backing element, from a
                    neighboring colSpan not reaching this column) has nothing
-                   to delete (memory.md D-043). -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
+                   to delete (memory.md D-043). role/tabindex are genuinely
+                   conditional on adapter+entity being available (the
+                   click-to-add picker, memory.md D-047) — the linter can't
+                   see that they're always set together. -->
+              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
               <div
                 class="dd-grid-cell dd-grid-cell--empty"
                 class:dd-grid-cell--bordered={bordered}
                 class:dd-grid-cell--dragover={dragOverKey === `${emptyRow}:${emptyCol}`}
-                aria-label={`Empty cell, ${bandLabel[band.type]}, drop a field here`}
+                role={adapter && entity ? 'button' : undefined}
+                tabindex={adapter && entity ? 0 : undefined}
+                aria-label={adapter && entity ? `Add a field or text, ${bandLabel[band.type]}` : `Empty cell, ${bandLabel[band.type]}, drop a field here`}
                 ondragover={(e) => handleCellDragOver(e, emptyRow, emptyCol)}
                 ondragleave={handleCellDragLeave}
                 ondrop={(e) => handleCellDrop(e, emptyRow, emptyCol, placeholderGroup)}
+                onclick={() => {
+                  if (adapter && entity) openPicker(emptyRow, emptyCol, placeholderGroup);
+                }}
+                onkeydown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && adapter && entity) {
+                    e.preventDefault();
+                    openPicker(emptyRow, emptyCol, placeholderGroup);
+                  }
+                }}
               >
-                Drop a field here
+                {#if adapter && entity}
+                  <span class="dd-grid-add-ghost"><Icon name="plus" size={11} /> Add a field</span>
+                {:else}
+                  Drop a field here
+                {/if}
                 {#if placeholderId}
                   <span class="dd-stack-el-actions">
                     <button
@@ -442,6 +558,42 @@
                       <Icon name="close" size={11} />
                     </button>
                   </span>
+                {/if}
+
+                {#if picker && picker.row === emptyRow && picker.col === emptyCol}
+                  <div
+                    class="dd-cell-picker"
+                    role="group"
+                    aria-label="Add a field or text"
+                    onclick={(e) => e.stopPropagation()}
+                    onkeydown={handlePickerKeydown}
+                  >
+                    <button type="button" class="dd-cell-picker-text" onclick={pickTypeText}>
+                      <Icon name="text" size={12} /> Type your own text
+                    </button>
+                    <input
+                      class="dd-cell-picker-search"
+                      type="search"
+                      placeholder="Search fields…"
+                      aria-label="Search fields"
+                      bind:value={pickerSearch}
+                    />
+                    <div class="dd-cell-picker-list">
+                      {#if fieldsState.status === 'loading'}
+                        <p class="dd-cell-picker-hint">Loading fields…</p>
+                      {:else if fieldsState.status === 'error'}
+                        <p class="dd-cell-picker-hint">{fieldsState.message}</p>
+                      {:else if filteredPickerFields.length === 0}
+                        <p class="dd-cell-picker-hint">No fields match.</p>
+                      {:else}
+                        {#each filteredPickerFields as field (field.name)}
+                          <button type="button" class="dd-cell-picker-option" onclick={() => pickField(field)}>
+                            {field.label}
+                          </button>
+                        {/each}
+                      {/if}
+                    </div>
+                  </div>
                 {/if}
               </div>
             {/if}
@@ -677,11 +829,120 @@
     font-size: 11px;
     border: 1.5px dashed var(--dd-border);
     background: var(--dd-panel-alt);
+    cursor: default;
+  }
+
+  .dd-grid-cell--empty[role='button'] {
+    cursor: pointer;
+  }
+
+  .dd-grid-cell--empty[role='button']:hover {
+    border-color: var(--dd-accent);
+    background: var(--dd-accent-weak);
+  }
+
+  .dd-grid-cell--empty[role='button']:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
   }
 
   .dd-grid-cell--empty:hover .dd-stack-el-actions,
   .dd-grid-cell--empty:focus-within .dd-stack-el-actions {
     display: flex;
+  }
+
+  .dd-grid-add-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-style: normal;
+  }
+
+  .dd-cell-picker {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 5;
+    width: 220px;
+    background: var(--dd-panel);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    box-shadow: var(--dd-shadow);
+    padding: 8px;
+    text-align: left;
+    font-style: normal;
+    cursor: default;
+  }
+
+  .dd-cell-picker-text {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 7px 8px;
+    margin-bottom: 6px;
+    border: none;
+    border-radius: var(--dd-radius-sm);
+    background: var(--dd-accent-weak);
+    color: var(--dd-accent-strong);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .dd-cell-picker-text:hover {
+    filter: brightness(0.97);
+  }
+
+  .dd-cell-picker-search {
+    width: 100%;
+    height: 30px;
+    padding: 0 8px;
+    margin-bottom: 6px;
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius-sm);
+    background: var(--dd-panel);
+    color: var(--dd-text);
+    font: inherit;
+    font-size: 12px;
+  }
+
+  .dd-cell-picker-search:focus-visible {
+    outline: 2px solid var(--dd-accent);
+    outline-offset: 1px;
+  }
+
+  .dd-cell-picker-list {
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .dd-cell-picker-option {
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: none;
+    border-radius: var(--dd-radius-sm);
+    background: transparent;
+    color: var(--dd-text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .dd-cell-picker-option:hover {
+    background: var(--dd-panel-alt);
+  }
+
+  .dd-cell-picker-hint {
+    margin: 4px 0;
+    font-size: 11.5px;
+    color: var(--dd-muted);
+    font-style: normal;
   }
 
   .dd-grid-cell--dragover {

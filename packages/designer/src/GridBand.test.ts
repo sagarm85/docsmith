@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import type { FreeBand, FreeElement } from '@docsmith/core';
 import GridBand from './GridBand.svelte';
 
@@ -39,6 +39,18 @@ function callbacks() {
     onElementDelete: vi.fn(),
     onElementDuplicate: vi.fn(),
     onElementEditText: vi.fn(),
+  };
+}
+
+// Minimal fake adapter (just the one method the click-to-add picker reads,
+// memory.md D-047) — a full StaticAdapter isn't needed for these tests.
+function fakeAdapter(fields: Array<{ name: string; label: string; type: string; kind: 'system' | 'custom' }>) {
+  return {
+    listEntities: vi.fn(),
+    getFields: vi.fn().mockResolvedValue(fields),
+    getRelatedDatasets: vi.fn(),
+    getDatasetFields: vi.fn(),
+    fetchDocument: vi.fn(),
   };
 }
 
@@ -274,5 +286,101 @@ describe('GridBand', () => {
     // clamped so the pair (60 + 40 = 100) still sums to 100.
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 100 + 4000 }));
     expect(onGridColumnsChange).toHaveBeenLastCalledWith([92, 8]);
+  });
+
+  describe('click-to-add inline picker (memory.md D-047)', () => {
+    function invoiceFields() {
+      return [
+        { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' as const },
+        { name: 'customer_name', label: 'Customer name', type: 'text', kind: 'system' as const },
+      ];
+    }
+
+    // A single-row, single-column band with one real placeholder cell (the
+    // same shape "Add row" produces) — an actually-empty CELL to click, not
+    // the zero-rows "Add a row…" empty state.
+    function bandWithOneEmptyRow(): FreeBand {
+      return {
+        id: 'reportHeader',
+        type: 'reportHeader',
+        height: 140,
+        arrangement: 'grid',
+        gridColumns: [100],
+        elements: [{ id: 'ph', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: '', row: 0, col: 0 }],
+      };
+    }
+
+    it('without adapter/entity, an empty cell has no button role and just says "Drop a field here"', () => {
+      render(GridBand, { props: { band: bandWithOneEmptyRow(), ...callbacks() } });
+      const cell = screen.getByText(/Drop a field here/);
+      expect(cell.closest('[role="button"]')).toBeNull();
+    });
+
+    it('clicking an empty cell (with adapter/entity) opens a picker listing header fields', async () => {
+      const adapter = fakeAdapter(invoiceFields());
+      render(GridBand, { props: { band: bandWithOneEmptyRow(), ...callbacks(), adapter, entity: 'invoice' } });
+
+      await fireEvent.click(screen.getByRole('button', { name: /Add a field or text/ }));
+      expect(adapter.getFields).toHaveBeenCalledWith('invoice');
+      await waitFor(() => expect(screen.getByText('Invoice #')).toBeTruthy());
+      expect(screen.getByText('Customer name')).toBeTruthy();
+    });
+
+    it('picking a field replaces the placeholder at that cell', async () => {
+      const adapter = fakeAdapter(invoiceFields());
+      const cb = callbacks();
+      render(GridBand, { props: { band: bandWithOneEmptyRow(), ...cb, adapter, entity: 'invoice' } });
+
+      await fireEvent.click(screen.getByRole('button', { name: /Add a field or text/ }));
+      await waitFor(() => expect(screen.getByText('Invoice #')).toBeTruthy());
+      await fireEvent.click(screen.getByText('Invoice #'));
+
+      expect(cb.onUpdateElements).toHaveBeenCalledTimes(1);
+      const [elements] = cb.onUpdateElements.mock.calls[0] as [FreeElement[]];
+      expect(elements).toHaveLength(1); // replaced the placeholder, not appended
+      expect(elements[0]).toMatchObject({
+        kind: 'field',
+        row: 0,
+        col: 0,
+        binding: { source: 'header', column: 'invoice_number' },
+      });
+    });
+
+    it('"Type your own text" replaces the placeholder with a text element and enters edit mode immediately', async () => {
+      const adapter = fakeAdapter(invoiceFields());
+      const cb = callbacks();
+      render(GridBand, { props: { band: bandWithOneEmptyRow(), ...cb, adapter, entity: 'invoice' } });
+
+      await fireEvent.click(screen.getByRole('button', { name: /Add a field or text/ }));
+      await fireEvent.click(screen.getByRole('button', { name: 'Type your own text' }));
+
+      expect(cb.onUpdateElements).toHaveBeenCalledTimes(1);
+      const [elements] = cb.onUpdateElements.mock.calls[0] as [FreeElement[]];
+      expect(elements).toHaveLength(1);
+      expect(elements[0]).toMatchObject({ kind: 'text', text: 'Text', row: 0, col: 0 });
+    });
+
+    it('searching filters the field list', async () => {
+      const adapter = fakeAdapter(invoiceFields());
+      render(GridBand, { props: { band: bandWithOneEmptyRow(), ...callbacks(), adapter, entity: 'invoice' } });
+
+      await fireEvent.click(screen.getByRole('button', { name: /Add a field or text/ }));
+      await waitFor(() => expect(screen.getByText('Invoice #')).toBeTruthy());
+
+      await fireEvent.input(screen.getByPlaceholderText('Search fields…'), { target: { value: 'customer' } });
+      expect(screen.queryByText('Invoice #')).toBeNull();
+      expect(screen.getByText('Customer name')).toBeTruthy();
+    });
+
+    it('clicking outside the picker closes it', async () => {
+      const adapter = fakeAdapter(invoiceFields());
+      render(GridBand, { props: { band: bandWithOneEmptyRow(), ...callbacks(), adapter, entity: 'invoice' } });
+
+      await fireEvent.click(screen.getByRole('button', { name: /Add a field or text/ }));
+      await waitFor(() => expect(screen.getByText('Invoice #')).toBeTruthy());
+
+      await fireEvent.click(document.body);
+      expect(screen.queryByText('Invoice #')).toBeNull();
+    });
   });
 });

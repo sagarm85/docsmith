@@ -230,6 +230,8 @@
         {:else if reportHeader.arrangement === 'grid'}
           <GridBand
             band={reportHeader}
+            {adapter}
+            entity={template.dataSource.entity}
             selectedElementId={selection?.kind === 'element' && selection.bandId === 'reportHeader' ? selection.elementId : undefined}
             bandSelected={selection?.kind === 'band' && selection.bandId === 'reportHeader'}
             onUpdateElements={(els) => onUpdateElements('reportHeader', els)}
@@ -300,6 +302,8 @@
         {:else if totals.arrangement === 'grid'}
           <GridBand
             band={totals}
+            {adapter}
+            entity={template.dataSource.entity}
             selectedElementId={selection?.kind === 'element' && selection.bandId === 'totals' ? selection.elementId : undefined}
             bandSelected={selection?.kind === 'band' && selection.bandId === 'totals'}
             onUpdateElements={(els) => onUpdateElements('totals', els)}
