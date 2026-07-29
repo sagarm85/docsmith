@@ -247,7 +247,7 @@ describe('GridBand', () => {
     expect(cb.onElementDelete).toHaveBeenCalledWith('c');
   });
 
-  it('dragging a column divider live-reports the two adjacent widths and batches the gesture (memory.md D-044)', () => {
+  it('dragging a column divider live-reports the row index + two adjacent widths and batches the gesture (memory.md D-044/D-048)', () => {
     const onGridColumnsChange = vi.fn();
     const onColumnResizeStart = vi.fn();
     const onColumnResizeEnd = vi.fn();
@@ -255,16 +255,19 @@ describe('GridBand', () => {
       props: { band: filledBand(), ...callbacks(), onGridColumnsChange, onColumnResizeStart, onColumnResizeEnd },
     });
 
-    const wrap = document.querySelector('.dd-grid-rows-wrap') as HTMLElement;
+    // filledBand()'s row 1 ("Invoice #" | "Date") uses the band's own
+    // gridColumns [60, 40] (no sectionColumns override) — resize its own
+    // section-scoped wrap, not the whole band.
+    const handle = screen.getByRole('button', { name: 'Resize column 1 in section 2' });
+    const wrap = handle.closest('.dd-grid-row-wrap') as HTMLElement;
     vi.spyOn(wrap, 'getBoundingClientRect').mockReturnValue({ width: 400 } as DOMRect);
 
-    const handle = screen.getByRole('button', { name: 'Resize column 1' });
     handle.dispatchEvent(new MouseEvent('pointerdown', { clientX: 100, bubbles: true }));
     expect(onColumnResizeStart).toHaveBeenCalledTimes(1);
 
     // gridColumns [60, 40]; +40px of a 400px-wide wrap is +10% → [70, 30].
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 140 }));
-    expect(onGridColumnsChange).toHaveBeenLastCalledWith([70, 30]);
+    expect(onGridColumnsChange).toHaveBeenLastCalledWith(1, [70, 30]);
     expect(onColumnResizeEnd).not.toHaveBeenCalled();
 
     window.dispatchEvent(new MouseEvent('pointerup'));
@@ -277,15 +280,38 @@ describe('GridBand', () => {
       props: { band: filledBand(), ...callbacks(), onGridColumnsChange },
     });
 
-    const wrap = document.querySelector('.dd-grid-rows-wrap') as HTMLElement;
+    const handle = screen.getByRole('button', { name: 'Resize column 1 in section 2' });
+    const wrap = handle.closest('.dd-grid-row-wrap') as HTMLElement;
     vi.spyOn(wrap, 'getBoundingClientRect').mockReturnValue({ width: 400 } as DOMRect);
 
-    const handle = screen.getByRole('button', { name: 'Resize column 1' });
     handle.dispatchEvent(new MouseEvent('pointerdown', { clientX: 100, bubbles: true }));
     // A huge rightward drag would push the right column below the 8% floor —
     // clamped so the pair (60 + 40 = 100) still sums to 100.
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 100 + 4000 }));
-    expect(onGridColumnsChange).toHaveBeenLastCalledWith([92, 8]);
+    expect(onGridColumnsChange).toHaveBeenLastCalledWith(1, [92, 8]);
+  });
+
+  it('two sections with different column layouts each get their own independent resize handles (memory.md D-048)', () => {
+    const band: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 140,
+      arrangement: 'grid',
+      gridColumns: [100],
+      sectionColumns: { 0: [50, 50] },
+      elements: [
+        { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Left', row: 0, col: 0 },
+        { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Right', row: 0, col: 1 },
+        { id: 'c', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Full width', row: 1, col: 0 },
+      ],
+    };
+    const onGridColumnsChange = vi.fn();
+    render(GridBand, { props: { band, ...callbacks(), onGridColumnsChange } });
+
+    // Section 0 has 2 columns (1 boundary); section 1 (falling back to the
+    // band's single-column gridColumns) has 0 boundaries — no handle at all.
+    expect(screen.getByRole('button', { name: 'Resize column 1 in section 1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /in section 2/ })).toBeNull();
   });
 
   describe('click-to-add inline picker (memory.md D-047)', () => {

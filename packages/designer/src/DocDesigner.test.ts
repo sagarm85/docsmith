@@ -881,7 +881,7 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
-  it('adding a "2 columns" Section (memory.md D-037) converts reportHeader to grid and adds a row of 2 empty cells', async () => {
+  it('adding a "2 columns" Section (memory.md D-037/D-048) converts reportHeader to grid and adds a row of 2 empty cells, with its own independent column layout', async () => {
     const el = await mountWithEntitySelected();
 
     el.shadowRoot!
@@ -893,21 +893,23 @@ describe('<doc-designer>', () => {
       el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
         arrangement?: string;
         gridColumns?: number[];
+        sectionColumns?: Record<number, number[]>;
         elements: Array<{ row?: number; col?: number }>;
       };
     expect(reportHeader().arrangement).toBe('grid');
-    expect(reportHeader().gridColumns).toStrictEqual([50, 50]);
+    expect(reportHeader().sectionColumns?.[0]).toStrictEqual([50, 50]);
     expect(reportHeader().elements).toHaveLength(2);
     expect(reportHeader().elements[0]).toMatchObject({ row: 0, col: 0 });
     expect(reportHeader().elements[1]).toMatchObject({ row: 0, col: 1 });
 
-    // Adding a second section appends another row rather than replacing —
-    // reportHeader is already 'grid', so it's a straight row append.
+    // Adding a second section appends another row with its OWN column
+    // layout (memory.md D-048) — the first section's [50, 50] is untouched.
     el.shadowRoot!
       .querySelector<HTMLButtonElement>('[aria-label="Add 1 column section to report header"]')!
       .click();
     await nextTick();
-    expect(reportHeader().gridColumns).toStrictEqual([100]);
+    expect(reportHeader().sectionColumns?.[0]).toStrictEqual([50, 50]);
+    expect(reportHeader().sectionColumns?.[1]).toStrictEqual([100]);
     expect(reportHeader().elements).toHaveLength(3);
     expect(reportHeader().elements[2]).toMatchObject({ row: 1, col: 0 });
 

@@ -54,12 +54,13 @@
     onElementEditText: (elementId: string, text: string) => void;
     /** Cursor-drag column resize (memory.md D-044, the "Confluence-style
      * column divider" affordance) — called continuously during a drag with
-     * the whole `gridColumns` array so the parent can live-apply it (no
-     * history push per tick, same pattern as FreeElement's onChange).
-     * Undefined disables the resize handles entirely (matches the
-     * BandProps.svelte column-width editor also being the only way to
+     * the row index and its whole new columns array so the parent can
+     * live-apply it to that row's own `sectionColumns` entry (memory.md
+     * D-048; no history push per tick, same pattern as FreeElement's
+     * onChange). Undefined disables the resize handles entirely (matches
+     * the BandProps.svelte column-width editor also being the only way to
      * resize when this isn't wired). */
-    onGridColumnsChange?: (gridColumns: number[]) => void;
+    onGridColumnsChange?: (row: number, columns: number[]) => void;
     /** Batches the whole resize gesture into one undo step, same
      * onDragStart/onDragEnd pattern FreeElement.svelte uses for move/resize
      * (memory.md D-020) — DocDesigner reuses its existing element-drag
@@ -96,33 +97,43 @@
     pageFooter: 'repeat',
   };
 
-  const numCols = $derived(band.gridColumns?.length ? band.gridColumns.length : 1);
-  const colWidths = $derived(band.gridColumns?.length ? band.gridColumns : [100]);
-  const gridTemplateColumns = $derived(colWidths.map((w) => `${w}%`).join(' '));
   const bordered = $derived(Boolean(band.gridBorder));
 
+  // Each row ("section", memory.md D-037/D-048) can have its own independent
+  // column layout — a row missing from `sectionColumns` falls back to the
+  // band's own `gridColumns` (or a single 100% column), same fallback
+  // core.renderGridBand uses.
+  function resolveRowColumns(row: number): number[] {
+    const cols = band.sectionColumns?.[row];
+    if (cols?.length) return cols;
+    return band.gridColumns?.length ? band.gridColumns : [100];
+  }
+
   // Cumulative left-edge percent of each internal column boundary (between
-  // column i and i+1) — where the resize handle overlay sits (memory.md D-044).
-  const boundaries = $derived.by(() => {
+  // column i and i+1) within ONE row's own columns — where that row's resize
+  // handle overlay sits (memory.md D-044/D-048).
+  function boundariesFor(cols: number[]): number[] {
     const cum: number[] = [];
     let sum = 0;
-    for (let i = 0; i < colWidths.length - 1; i++) {
-      sum += colWidths[i] as number;
+    for (let i = 0; i < cols.length - 1; i++) {
+      sum += cols[i] as number;
       cum.push(sum);
     }
     return cum;
-  });
+  }
 
   // A cell can hold more than one stacked element (memory.md D-045, "add
   // multiple fields to one section column") — grouped by (row, col), not one
   // element each.
   type Cell = { kind: 'group'; elements: FreeElement[]; span: number } | { kind: 'empty'; row: number; col: number };
+  type Row = { cols: number[]; cells: Cell[] };
 
   // One entry per (row, col) — the group of elements starting there (all
   // sharing the first element's `colSpan` via CSS `grid-column`), or an
   // "empty" placeholder cell for any column no element covers. Re-implements
   // the same row/col grouping core.renderGridBand uses, since the designer
-  // doesn't import core's render.ts internals.
+  // doesn't import core's render.ts internals. Each row resolves its OWN
+  // column count independently (memory.md D-048).
   const rows = $derived.by(() => {
     const byRowCol = new Map<string, FreeElement[]>();
     let maxRow = -1;
@@ -135,22 +146,23 @@
       else byRowCol.set(key, [el]);
       maxRow = Math.max(maxRow, r);
     }
-    const out: Cell[][] = [];
+    const out: Row[] = [];
     for (let r = 0; r <= maxRow; r++) {
-      const row: Cell[] = [];
+      const cols = resolveRowColumns(r);
+      const cells: Cell[] = [];
       let c = 0;
-      while (c < numCols) {
+      while (c < cols.length) {
         const group = byRowCol.get(`${r}:${c}`);
         if (group && group.length > 0) {
-          const span = Math.max(1, Math.min(group[0]!.colSpan ?? 1, numCols - c));
-          row.push({ kind: 'group', elements: group, span });
+          const span = Math.max(1, Math.min(group[0]!.colSpan ?? 1, cols.length - c));
+          cells.push({ kind: 'group', elements: group, span });
           c += span;
         } else {
-          row.push({ kind: 'empty', row: r, col: c });
+          cells.push({ kind: 'empty', row: r, col: c });
           c += 1;
         }
       }
-      out.push(row);
+      out.push({ cols, cells });
     }
     return out;
   });
@@ -332,22 +344,34 @@
     return el.kind === 'text' && !el.text;
   }
 
-  // ── Cursor-drag column resize (memory.md D-044) ─────────────────────────
+  // ── Cursor-drag column resize (memory.md D-044/D-048) ───────────────────
+  // Resizing is per-row/"section" now — each row has its own independent
+  // columns, so a drag only ever touches the one row it started on.
   const MIN_COL_PERCENT = 8;
-  let gridRowsWrapEl: HTMLDivElement | undefined = $state();
-  type ResizeState = { index: number; startX: number; leftOriginal: number; rightOriginal: number; wrapWidthPx: number };
+  type ResizeState = {
+    rowIndex: number;
+    colIndex: number;
+    startX: number;
+    leftOriginal: number;
+    rightOriginal: number;
+    wrapWidthPx: number;
+    baseCols: number[];
+  };
   let resizing = $state<ResizeState | null>(null);
 
-  function handleResizePointerDown(e: PointerEvent, index: number) {
+  function handleResizePointerDown(e: PointerEvent, rowIndex: number, colIndex: number, cols: number[]) {
     e.preventDefault();
     e.stopPropagation();
-    if (!gridRowsWrapEl) return;
+    const wrapEl = (e.currentTarget as HTMLElement).closest('.dd-grid-row-wrap');
+    if (!wrapEl) return;
     resizing = {
-      index,
+      rowIndex,
+      colIndex,
       startX: e.clientX,
-      leftOriginal: colWidths[index] as number,
-      rightOriginal: colWidths[index + 1] as number,
-      wrapWidthPx: gridRowsWrapEl.getBoundingClientRect().width,
+      leftOriginal: cols[colIndex] as number,
+      rightOriginal: cols[colIndex + 1] as number,
+      wrapWidthPx: wrapEl.getBoundingClientRect().width,
+      baseCols: cols,
     };
     onColumnResizeStart?.();
     window.addEventListener('pointermove', handleResizePointerMove);
@@ -362,10 +386,10 @@
       MIN_COL_PERCENT,
       Math.min(pairTotal - MIN_COL_PERCENT, resizing.leftOriginal + deltaPercent),
     );
-    const next = [...colWidths];
-    next[resizing.index] = Math.round(newLeft * 10) / 10;
-    next[resizing.index + 1] = Math.round((pairTotal - newLeft) * 10) / 10;
-    onGridColumnsChange?.(next);
+    const next = [...resizing.baseCols];
+    next[resizing.colIndex] = Math.round(newLeft * 10) / 10;
+    next[resizing.colIndex + 1] = Math.round((pairTotal - newLeft) * 10) / 10;
+    onGridColumnsChange?.(resizing.rowIndex, next);
   }
 
   function handleResizePointerUp() {
@@ -406,10 +430,12 @@
         Add a row, then drag header fields into its cells.
       </p>
     {:else}
-      <div class="dd-grid-rows-wrap" bind:this={gridRowsWrapEl}>
+      <div class="dd-grid-rows-wrap">
       {#each rows as row, rowIndex (rowIndex)}
-        <div class="dd-grid-row" style="grid-template-columns:{gridTemplateColumns}">
-          {#each row as cell (cell.kind === 'group' ? cell.elements[0]!.id : `${cell.row}:${cell.col}`)}
+        {@const rowBoundaries = boundariesFor(row.cols)}
+        <div class="dd-grid-row-wrap">
+        <div class="dd-grid-row" style="grid-template-columns:{row.cols.map((w) => `${w}%`).join(' ')}">
+          {#each row.cells as cell (cell.kind === 'group' ? cell.elements[0]!.id : `${cell.row}:${cell.col}`)}
             {#if cell.kind === 'group' && !(cell.elements.length === 1 && isPlaceholder(cell.elements[0]!))}
               {@const group = cell.elements}
               {@const groupCol = group[0]!.col ?? 0}
@@ -599,26 +625,26 @@
             {/if}
           {/each}
         </div>
-      {/each}
-      {#if onGridColumnsChange && boundaries.length > 0}
-        <!-- Confluence-style column-resize dividers: a wide invisible
-             pointer target with a thin line revealed on hover/drag
-             (memory.md D-044). Spans the whole rows-wrap height, not just
-             one row, since gridColumns is a band-level (not per-row)
-             property. -->
-        <div class="dd-grid-resize-overlay">
-          {#each boundaries as leftPercent, i (i)}
-            <button
-              type="button"
-              class="dd-grid-resize-handle"
-              class:dd-grid-resize-handle--active={resizing?.index === i}
-              style="left:{leftPercent}%"
-              aria-label={`Resize column ${i + 1}`}
-              onpointerdown={(e) => handleResizePointerDown(e, i)}
-            ></button>
-          {/each}
+        {#if onGridColumnsChange && rowBoundaries.length > 0}
+          <!-- Confluence-style column-resize dividers: a wide invisible
+               pointer target with a thin line revealed on hover/drag
+               (memory.md D-044) — scoped to THIS row/section's own columns,
+               since each one is independent (memory.md D-048). -->
+          <div class="dd-grid-resize-overlay">
+            {#each rowBoundaries as leftPercent, i (i)}
+              <button
+                type="button"
+                class="dd-grid-resize-handle"
+                class:dd-grid-resize-handle--active={resizing?.rowIndex === rowIndex && resizing?.colIndex === i}
+                style="left:{leftPercent}%"
+                aria-label={`Resize column ${i + 1} in section ${rowIndex + 1}`}
+                onpointerdown={(e) => handleResizePointerDown(e, rowIndex, i, row.cols)}
+              ></button>
+            {/each}
+          </div>
+        {/if}
         </div>
-      {/if}
+      {/each}
       </div>
     {/if}
     <button type="button" class="dd-grid-add-row" onclick={handleAddRow}>
@@ -714,10 +740,16 @@
   }
 
   .dd-grid-rows-wrap {
-    position: relative;
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  /* Each row/"section" (memory.md D-048) owns its own resize overlay,
+     scoped to its own columns — sections are independent, not one shared
+     column grid for the whole band. */
+  .dd-grid-row-wrap {
+    position: relative;
   }
 
   .dd-grid-row {
@@ -727,8 +759,7 @@
 
   /* Confluence-style column-resize dividers (memory.md D-044): a wide
      invisible pointer target (::after) with a thin accent line revealed on
-     hover/drag, spanning the full rows-wrap height (gridColumns is
-     band-level, not per-row). */
+     hover/drag, spanning this row's own height only. */
   .dd-grid-resize-overlay {
     position: absolute;
     inset: 0;

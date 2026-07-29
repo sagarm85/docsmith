@@ -47,7 +47,7 @@
     onAddSection: (bandId: string, columns: number[]) => void;
     /** Cursor-drag column resize (memory.md D-044) — same reportHeader/
      * totals-only scope as onAddSection above. */
-    onGridColumnsChange: (bandId: string, gridColumns: number[]) => void;
+    onGridColumnsChange: (bandId: string, row: number, columns: number[]) => void;
     onColumnResizeStart: () => void;
     onColumnResizeEnd: () => void;
     /** Stack-arrangement bands replace their whole `elements` array per edit
@@ -242,7 +242,7 @@
             onElementDelete={(id) => onElementDelete('reportHeader', id)}
             onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
             onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
-            onGridColumnsChange={(cols) => onGridColumnsChange('reportHeader', cols)}
+            onGridColumnsChange={(row, cols) => onGridColumnsChange('reportHeader', row, cols)}
             {onColumnResizeStart}
             {onColumnResizeEnd}
           />
@@ -314,7 +314,7 @@
             onElementDelete={(id) => onElementDelete('totals', id)}
             onElementDuplicate={(id) => onElementDuplicate('totals', id)}
             onElementEditText={(id, text) => onElementEditText('totals', id, text)}
-            onGridColumnsChange={(cols) => onGridColumnsChange('totals', cols)}
+            onGridColumnsChange={(row, cols) => onGridColumnsChange('totals', row, cols)}
             {onColumnResizeStart}
             {onColumnResizeEnd}
           />

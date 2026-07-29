@@ -298,6 +298,80 @@ describe('renderToHtml — "grid" arrangement (memory.md D-034)', () => {
   });
 });
 
+describe('renderToHtml — FreeBand.sectionColumns, per-section independent columns (memory.md D-048)', () => {
+  it('renders two sections with different column counts as two separate <table>s, each with its own <colgroup>', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            arrangement: 'grid' as const,
+            gridColumns: [100],
+            sectionColumns: { 0: [50, 50] },
+            elements: [
+              { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Left', row: 0, col: 0 },
+              { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Right', row: 0, col: 1 },
+              { id: 'c', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Full width', row: 1, col: 0 },
+            ] as FreeElement[],
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    const tables = out.html.match(/<table class="grid-table">.*?<\/table>/gs) ?? [];
+    expect(tables).toHaveLength(2);
+    expect(tables[0]).toContain('<col style="width:50%"/>');
+    expect(tables[0]).toContain('Left');
+    expect(tables[0]).toContain('Right');
+    expect(tables[1]).toContain('<col style="width:100%"/>');
+    expect(tables[1]).toContain('Full width');
+  });
+
+  it('merges consecutive rows sharing the same resolved columns into ONE <table> (native border-collapse stays seamless)', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            arrangement: 'grid' as const,
+            gridColumns: [50, 50],
+            sectionColumns: {},
+            elements: [
+              { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Row 0', row: 0, col: 0 },
+              { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Row 1', row: 1, col: 0 },
+            ] as FreeElement[],
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    const tables = out.html.match(/<table class="grid-table">.*?<\/table>/gs) ?? [];
+    expect(tables).toHaveLength(1);
+    expect((tables[0]!.match(/<tr>/g) ?? []).length).toBe(2);
+  });
+
+  it('a row missing from sectionColumns falls back to gridColumns', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            arrangement: 'grid' as const,
+            gridColumns: [70, 30],
+            sectionColumns: { 1: [50, 50] },
+            elements: [
+              { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Uses gridColumns', row: 0, col: 0 },
+              { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Uses sectionColumns', row: 1, col: 0 },
+            ] as FreeElement[],
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    const tables = out.html.match(/<table class="grid-table">.*?<\/table>/gs) ?? [];
+    expect(tables).toHaveLength(2);
+    expect(tables[0]).toContain('<col style="width:70%"/>');
+    expect(tables[1]).toContain('<col style="width:50%"/>');
+  });
+});
+
 describe('convertBandArrangement', () => {
   function band(): FreeBand {
     return {
@@ -400,6 +474,29 @@ describe('convertBandArrangement', () => {
     expect(next.elements[0]).toMatchObject({ row: 0, w: 60 });
     expect(next.elements[1]).toMatchObject({ row: 0, w: 40 });
     expect(next.elements.every((e) => e.col === undefined && e.colSpan === undefined)).toBe(true);
+  });
+
+  it('grid -> free reads each row\'s OWN sectionColumns override, not just the band-wide gridColumns (memory.md D-048)', () => {
+    const grid: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 120,
+      arrangement: 'grid',
+      gridColumns: [60, 40],
+      // Row 1 overrides to a totally different split than the band default.
+      sectionColumns: { 1: [30, 70] },
+      elements: [
+        { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Uses band default', row: 0, col: 0 },
+        { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Override left', row: 1, col: 0 },
+        { id: 'c', kind: 'text', x: 0, y: 0, w: 0, h: 20, text: 'Override right', row: 1, col: 1 },
+      ],
+    };
+    const next = convertBandArrangement(grid, 'free', 1000, 'px');
+    const [row0, overrideLeft, overrideRight] = next.elements;
+    expect(row0?.w).toBe(600); // row 0 falls back to gridColumns [60, 40] -> 60% of 1000
+    expect(overrideLeft?.w).toBe(300); // row 1's own sectionColumns [30, 70] -> 30%
+    expect(overrideRight?.x).toBe(300);
+    expect(overrideRight?.w).toBe(700);
   });
 
   it('stack -> grid gives each row its own grid row in a single full-width column', () => {

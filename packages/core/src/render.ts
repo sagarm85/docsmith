@@ -246,70 +246,101 @@ function renderGridCellContent(el: FreeElement, data: DocumentData, fmtOpts: For
 // row-only `groupIntoRows` used by stack bands can't express, and which the
 // OLD one-element-per-<td> version of this function silently skipped
 // entirely (a latent misalignment bug whenever a row didn't fill every
-// column, fixed as part of this same change).
+// column, fixed alongside D-045).
 type GridRowCell = { span: number; elements: FreeElement[] } | null;
 
-function buildGridRows(elements: readonly FreeElement[], numCols: number): GridRowCell[][] {
-  const byRowCol = new Map<string, FreeElement[]>();
-  let maxRow = -1;
-  for (const el of elements) {
-    const r = el.row ?? 0;
+// Builds one row's cells against that row's OWN column count — each
+// "section" (memory.md D-048) can have a different one, so this is called
+// once per row, not once for the whole band.
+function buildGridRowCells(rowElements: readonly FreeElement[], numCols: number): GridRowCell[] {
+  const byCol = new Map<number, FreeElement[]>();
+  for (const el of rowElements) {
     const c = el.col ?? 0;
-    const key = `${r}:${c}`;
-    const group = byRowCol.get(key);
+    const group = byCol.get(c);
     if (group) group.push(el);
-    else byRowCol.set(key, [el]);
-    maxRow = Math.max(maxRow, r);
+    else byCol.set(c, [el]);
   }
-  const rows: GridRowCell[][] = [];
-  for (let r = 0; r <= maxRow; r++) {
-    const row: GridRowCell[] = [];
-    let c = 0;
-    while (c < numCols) {
-      const group = byRowCol.get(`${r}:${c}`);
-      if (group && group.length > 0) {
-        const span = Math.max(1, Math.min(group[0]!.colSpan ?? 1, numCols - c));
-        row.push({ span, elements: group });
-        c += span;
-      } else {
-        row.push(null);
-        c += 1;
-      }
+  const row: GridRowCell[] = [];
+  let c = 0;
+  while (c < numCols) {
+    const group = byCol.get(c);
+    if (group && group.length > 0) {
+      const span = Math.max(1, Math.min(group[0]!.colSpan ?? 1, numCols - c));
+      row.push({ span, elements: group });
+      c += span;
+    } else {
+      row.push(null);
+      c += 1;
     }
-    rows.push(row);
   }
-  return rows;
+  return row;
+}
+
+/** A row missing from `sectionColumns` falls back to the band's own
+ * `gridColumns` (or a single 100% column) — see FreeBand.sectionColumns'
+ * doc comment for why independent per-row columns need independent
+ * `<table>`s rather than one shared `<colgroup>`. */
+function resolveSectionColumns(band: FreeBand, row: number): number[] {
+  const cols = band.sectionColumns?.[row];
+  if (cols?.length) return cols;
+  return band.gridColumns?.length ? band.gridColumns : [100];
+}
+
+function sameColumns(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((w, i) => w === b[i]);
 }
 
 function renderGridBand(band: FreeBand, data: DocumentData, fmtOpts: FormatOptions, extraClass = ''): string {
   if (band.enabled === false) return '';
-  const cols = band.gridColumns?.length ? band.gridColumns : [100];
   const cellBorder = band.gridBorder ? `border:${band.gridBorder}` : 'border:none';
-  const colgroup = cols.map((w) => `<col style="width:${w}%"/>`).join('');
-  const rowsHtml = buildGridRows(band.elements, cols.length)
-    .map((row) => {
-      const cellsHtml = row
-        .map((cell) => {
-          if (!cell) return `<td style="${cellBorder}"></td>`;
-          const span = cell.span > 1 ? ` colspan="${cell.span}"` : '';
-          // Each stacked element gets its own style wrapper — a cell holding
-          // multiple elements can't apply one shared style to a single <td>
-          // the way the single-element case used to.
-          const contentHtml = cell.elements
-            .map((el) => {
-              const raw = el.kind === 'field' && el.binding ? resolveBindingRaw(el.binding, data) : undefined;
-              const elStyle = styleToCss(resolveConditionalStyle(el.style, el.conditionalFormat, raw));
-              return `<div style="${elStyle}">${renderGridCellContent(el, data, fmtOpts)}</div>`;
+
+  const rowIndexes = [...new Set(band.elements.map((e) => e.row ?? 0))].sort((a, b) => a - b);
+
+  // Consecutive rows sharing the same resolved columns render as ONE
+  // `<table>` (native `border-collapse` gives perfectly shared borders
+  // between them, same as before D-048) — a new table only starts where a
+  // section's columns genuinely differ from the row above it, since a
+  // native `<colgroup>` can't express two different column grids in one
+  // table.
+  const runs: Array<{ cols: number[]; rows: number[] }> = [];
+  for (const rowIdx of rowIndexes) {
+    const cols = resolveSectionColumns(band, rowIdx);
+    const last = runs[runs.length - 1];
+    if (last && sameColumns(last.cols, cols)) last.rows.push(rowIdx);
+    else runs.push({ cols, rows: [rowIdx] });
+  }
+
+  const tablesHtml = runs
+    .map((run) => {
+      const colgroup = run.cols.map((w) => `<col style="width:${w}%"/>`).join('');
+      const trsHtml = run.rows
+        .map((rowIdx) => {
+          const rowElements = band.elements.filter((e) => (e.row ?? 0) === rowIdx);
+          const cellsHtml = buildGridRowCells(rowElements, run.cols.length)
+            .map((cell) => {
+              if (!cell) return `<td style="${cellBorder}"></td>`;
+              const span = cell.span > 1 ? ` colspan="${cell.span}"` : '';
+              // Each stacked element gets its own style wrapper — a cell
+              // holding multiple elements can't apply one shared style to
+              // a single <td> the way the single-element case used to.
+              const contentHtml = cell.elements
+                .map((el) => {
+                  const raw = el.kind === 'field' && el.binding ? resolveBindingRaw(el.binding, data) : undefined;
+                  const elStyle = styleToCss(resolveConditionalStyle(el.style, el.conditionalFormat, raw));
+                  return `<div style="${elStyle}">${renderGridCellContent(el, data, fmtOpts)}</div>`;
+                })
+                .join('');
+              return `<td${span} style="${cellBorder}">${contentHtml}</td>`;
             })
             .join('');
-          return `<td${span} style="${cellBorder}">${contentHtml}</td>`;
+          return `<tr>${cellsHtml}</tr>`;
         })
         .join('');
-      return `<tr>${cellsHtml}</tr>`;
+      return `<table class="grid-table"><colgroup>${colgroup}</colgroup><tbody>${trsHtml}</tbody></table>`;
     })
     .join('');
   const st = styleToCss(band.style);
-  return `<div class="band band-${band.type} band-grid ${extraClass}" data-band="${band.type}" style="${st}"><table class="grid-table"><colgroup>${colgroup}</colgroup><tbody>${rowsHtml}</tbody></table></div>`;
+  return `<div class="band band-${band.type} band-grid ${extraClass}" data-band="${band.type}" style="${st}">${tablesHtml}</div>`;
 }
 
 function renderFreeBand(
@@ -462,6 +493,11 @@ ${fillPageCss}
 .band-grid { position: static; }
 table.grid-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.grid-table td { padding: 8px 10px; vertical-align: top; word-wrap: break-word; }
+/* Only matters when adjacent sections have genuinely different column
+   layouts (memory.md D-048) — border-collapse already gives a seamless
+   shared border for a run of sections sharing the same columns, since
+   those render as one <table> with multiple <tr>s. */
+table.grid-table + table.grid-table { margin-top: 2px; }
 table.detail { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.detail th, table.detail td { padding: 6px 8px; border-bottom: var(--dd-cell-border, 1px solid #e2e5e9); vertical-align: top; word-wrap: break-word; }
 table.detail thead th { border-bottom: 1.5px solid #333; font-weight: 700; background: #f6f7f9; }

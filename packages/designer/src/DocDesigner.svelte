@@ -349,11 +349,20 @@
     const migrated =
       band.arrangement === 'grid' ? band : convertBandArrangement(band, 'grid', contentWidthPx, layoutUnit);
     const nextRow = migrated.elements.reduce((max, e) => Math.max(max, (e.row ?? 0) + 1), 0);
+    // Each new section gets its OWN column layout (memory.md D-048) — never
+    // overwrites the band's `gridColumns` (the fallback for older rows/
+    // templates), so an existing 1-column section and a freshly-added
+    // 2-column one can sit side by side instead of both being forced onto
+    // whatever layout was dropped last.
     commitTemplate({
       ...template,
       bands: template.bands.map((b) =>
         b.id === bandId
-          ? { ...migrated, gridColumns: columns, elements: [...migrated.elements, ...createSectionRow(columns, nextRow)] }
+          ? {
+              ...migrated,
+              sectionColumns: { ...migrated.sectionColumns, [nextRow]: columns },
+              elements: [...migrated.elements, ...createSectionRow(columns, nextRow)],
+            }
           : b,
       ),
     });
@@ -478,19 +487,21 @@
     }
   }
 
-  // Cursor-drag column resize (memory.md D-044) — live-applies gridColumns
-  // on every drag tick (no history push), same pattern as
-  // handleElementLiveChange; the gesture itself is batched into one undo
-  // step by reusing handleElementDragStart/End (they snapshot/commit the
-  // whole template regardless of what changed, so no dedicated pair is
-  // needed here).
-  function handleGridColumnsLiveChange(bandId: string, gridColumns: number[]) {
+  // Cursor-drag column resize (memory.md D-044/D-048) — live-applies the
+  // dragged row's own sectionColumns entry on every drag tick (no history
+  // push), same pattern as handleElementLiveChange; the gesture itself is
+  // batched into one undo step by reusing handleElementDragStart/End (they
+  // snapshot/commit the whole template regardless of what changed, so no
+  // dedicated pair is needed here).
+  function handleGridColumnsLiveChange(bandId: string, row: number, columns: number[]) {
     history = {
       ...history,
       present: {
         ...template,
         bands: template.bands.map((b): Band =>
-          b.id === bandId && !isDetailBand(b) ? { ...b, gridColumns } : b,
+          b.id === bandId && !isDetailBand(b)
+            ? { ...b, sectionColumns: { ...b.sectionColumns, [row]: columns } }
+            : b,
         ),
       },
     };

@@ -227,16 +227,26 @@ export function convertBandArrangement(
 
   let rows: Cell[][];
   if (current === 'grid') {
-    const cols = band.gridColumns?.length ? band.gridColumns : [100];
-    const offsets = gridColumnOffsets(cols);
-    rows = groupIntoRows(band.elements).map((row) =>
-      row.map((el) => {
+    // Each row resolves its OWN columns (memory.md D-048), keyed by the
+    // elements' actual `row` value — NOT the array position groupIntoRows
+    // returns them in, since row numbers need not be contiguous/ordered. A
+    // row missing from `sectionColumns` falls back to the band's
+    // `gridColumns`, same fallback core.renderGridBand/GridBand.svelte use.
+    rows = groupIntoRows(band.elements).map((row, i) => {
+      const actualRow = row[0]?.row ?? i;
+      const cols = band.sectionColumns?.[actualRow]?.length
+        ? band.sectionColumns[actualRow]!
+        : band.gridColumns?.length
+          ? band.gridColumns
+          : [100];
+      const offsets = gridColumnOffsets(cols);
+      return row.map((el) => {
         const col = el.col ?? 0;
         const span = Math.max(1, el.colSpan ?? 1);
         const wPercent = cols.slice(col, col + span).reduce((s, w) => s + w, 0);
         return { el, xPercent: offsets[col] ?? 0, wPercent };
-      }),
-    );
+      });
+    });
   } else if (current === 'stack') {
     rows = groupIntoRows(band.elements).map((row) => {
       let x = 0;
@@ -268,7 +278,11 @@ export function convertBandArrangement(
 
   if (target === 'grid') {
     const elements = rows.flatMap((row, i) => row.map(({ el }) => ({ ...el, row: i, col: 0, colSpan: 1 })));
-    return { ...band, arrangement: 'grid', gridColumns: [100], elements };
+    // Converting INTO grid always starts single-column with no per-row
+    // overrides (memory.md D-034/D-048) — any stale sectionColumns from a
+    // prior grid arrangement is cleared rather than silently reused against
+    // the freshly re-numbered rows above.
+    return { ...band, arrangement: 'grid', gridColumns: [100], sectionColumns: undefined, elements };
   }
 
   // target === 'free'

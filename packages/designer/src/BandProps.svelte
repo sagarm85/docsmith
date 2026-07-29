@@ -128,9 +128,11 @@
       {#if free.arrangement === 'grid'}
         <p class="dd-props-hint">
           An explicit row/column table — drop fields into cells, "Add row" on
-          the canvas for a new one. Height is intrinsic.
+          the canvas for a new one. Height is intrinsic. Each section can have
+          its own column layout — drag the divider between columns on the
+          canvas, or use the controls below for a new section.
         </p>
-        <Field label="Columns (%)" fieldId="dd-band-grid-columns">
+        <Field label="Default columns for new sections (%)" fieldId="dd-band-grid-columns">
           <div class="dd-grid-columns">
             {#each gridColumnsOf(free) as width, i (i)}
               <div class="dd-grid-column-row">

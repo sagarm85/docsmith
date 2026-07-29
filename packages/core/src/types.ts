@@ -245,16 +245,30 @@ export type FreeBand = {
    * that would otherwise need pixel-perfect manual border-matching in
    * 'free'. */
   arrangement?: 'free' | 'stack' | 'grid';
-  /** Only read when `arrangement === 'grid'`: column widths as percentages
-   * of the band's content width (e.g. `[60, 20, 20]`, summing to ~100).
-   * Absent defaults to a single 100%-wide column. */
+  /** Only read when `arrangement === 'grid'`: the DEFAULT column widths (as
+   * percentages of the band's content width, e.g. `[60, 20, 20]`, summing
+   * to ~100) for any row that has no entry in `sectionColumns` below.
+   * Absent defaults to a single 100%-wide column. Kept for backward
+   * compatibility with templates saved before `sectionColumns` existed
+   * (memory.md D-048), where every row shared one column layout. */
   gridColumns?: number[];
+  /** Only read when `arrangement === 'grid'`: per-row column widths,
+   * keyed by row index — lets each "section" (memory.md D-037/D-048) have
+   * its own independent column count/widths (a 1-column section next to a
+   * 2-column one), rather than every row in the band sharing one layout.
+   * A row missing from this map falls back to `gridColumns` (or a single
+   * 100% column). `core.renderGridBand` renders each row as its own
+   * `<table>` — a native `<colgroup>` only applies to one shared column
+   * grid, so genuinely independent per-row columns need genuinely separate
+   * tables, stacked. */
+  sectionColumns?: Record<number, number[]>;
   /** Only read when `arrangement === 'grid'`: a CSS `border` shorthand
    * (e.g. `"1px solid #1a1c22"`) applied to every cell via the grid's
    * underlying `<table>` + `border-collapse` — one band-level setting
    * instead of matching border style/position by hand per element (the
    * point of the grid arrangement). Absent/empty means no cell borders
-   * (the "Sections" / column-layout look, memory.md D-034). */
+   * (the "Sections" / column-layout look, memory.md D-034). Applies
+   * uniformly across every section in the band, unlike `sectionColumns`. */
   gridBorder?: string;
 };
 
