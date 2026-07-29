@@ -101,7 +101,7 @@
     if (blockRaw) {
       try {
         const payload = JSON.parse(blockRaw) as BlockDragPayload;
-        onAddElement(createBlockElement(payload.kind, band.elements));
+        onAddElement(createBlockElement(payload.kind, band.elements, contentWidthPx, unit));
       } catch {
         /* malformed payload — ignore, nothing to add */
       }

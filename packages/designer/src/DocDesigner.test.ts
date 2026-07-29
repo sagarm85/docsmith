@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { waitFor, fireEvent } from '@testing-library/svelte';
 import { StaticAdapter } from '@docsmith/adapters';
 import type { Template } from '@docsmith/core';
+import { pageDimensionsPx } from './geometry.js';
 import './DocDesigner.svelte'; // side effect: registers <doc-designer>
 
 // Svelte's custom-element wrapper defers instantiation by one microtask on
@@ -340,11 +341,15 @@ describe('<doc-designer>', () => {
     addBtn!.click();
     await nextTick();
 
-    const reportHeader = el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+    const template = el.getTemplate?.() as Template;
+    const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as {
       elements: Array<{ kind: string; w: number; h: number }>;
     };
     expect(reportHeader.elements).toHaveLength(1);
-    expect(reportHeader.elements[0]).toMatchObject({ kind: 'box', w: 100, h: 60 });
+    // A newly-dropped box always spans the band's full content width — see
+    // template-edits.ts's createBlockElement doc comment.
+    const contentWidthPx = pageDimensionsPx(template.printSetup).width;
+    expect(reportHeader.elements[0]).toMatchObject({ kind: 'box', w: contentWidthPx, h: 60 });
 
     el.remove();
   });

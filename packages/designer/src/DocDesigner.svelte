@@ -305,7 +305,11 @@
       handleAddElement('reportHeader', createStackBlockElement(kind, nextStackRow(reportHeader.elements)));
       return;
     }
-    handleAddElement('reportHeader', createBlockElement(kind, reportHeader?.elements ?? []));
+    const contentWidthPx = pageDimensionsPx(template.printSetup).width;
+    handleAddElement(
+      'reportHeader',
+      createBlockElement(kind, reportHeader?.elements ?? [], contentWidthPx, template.layoutUnit ?? 'px'),
+    );
   }
 
   // ── Keyboard drag-alternative (design.md §12) ───────────────────────────────
@@ -353,11 +357,12 @@
       }
       case 'block': {
         const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+        const contentWidthPx = pageDimensionsPx(template.printSetup).width;
         handleAddElement(
           bandId,
           band?.arrangement === 'stack'
             ? createStackBlockElement(picked.kind, nextStackRow(band.elements))
-            : createBlockElement(picked.kind, band?.elements ?? []),
+            : createBlockElement(picked.kind, band?.elements ?? [], contentWidthPx, template.layoutUnit ?? 'px'),
         );
         break;
       }

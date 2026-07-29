@@ -127,7 +127,13 @@ describe('Band', () => {
   it('accepts a block drop (Text/Image/Line/Box) and appends the right element kind', async () => {
     const onAddElement = vi.fn();
     render(Band, {
-      props: { band: emptyBand(), onAddElement, onInvalidDrop: vi.fn(), ...selectionCallbacks() },
+      props: {
+        band: emptyBand(),
+        contentWidthPx: 793.7,
+        onAddElement,
+        onInvalidDrop: vi.fn(),
+        ...selectionCallbacks(),
+      },
     });
 
     const dropzone = screen.getByRole('group', { name: 'Report Header band' });
@@ -136,7 +142,9 @@ describe('Band', () => {
     });
 
     expect(onAddElement).toHaveBeenCalledTimes(1);
-    expect(onAddElement.mock.calls[0]?.[0]).toMatchObject({ kind: 'box', w: 100, h: 60 });
+    // A newly-dropped box always spans the band's full content width — see
+    // template-edits.ts's createBlockElement doc comment.
+    expect(onAddElement.mock.calls[0]?.[0]).toMatchObject({ kind: 'box', w: 793.7, h: 60 });
   });
 
   it('stacks a second added element below the first', () => {

@@ -21,19 +21,30 @@ function stackY(existingElements: readonly FreeElement[]): number {
  * palette group). Never a "field" kind — that's always adapter-bound. */
 export type BlockKind = Exclude<ElementKind, 'field'>;
 
-const BLOCK_DEFAULTS: Record<BlockKind, Pick<FreeElement, 'w' | 'h'>> = {
+const BLOCK_DEFAULTS: Record<Exclude<BlockKind, 'box'>, Pick<FreeElement, 'w' | 'h'>> = {
   text: { w: 200, h: 20 },
   image: { w: 120, h: 60 },
   line: { w: 200, h: 1 },
-  box: { w: 100, h: 60 },
 };
 
-/** Appends a new static block element stacked below the band's existing elements. */
+const BOX_DEFAULT_HEIGHT = 60;
+
+/** Appends a new static block element stacked below the band's existing
+ * elements. A `'box'` always starts full-span (the whole band's content
+ * width — matching D-028's x/w basis) since it's most often used as a
+ * background/divider rectangle; the user resizes it down afterward via the
+ * normal drag handles if they want something narrower. Other block kinds
+ * keep their fixed starting size. */
 export function createBlockElement(
   kind: BlockKind,
   existingElements: readonly FreeElement[],
+  contentWidthPx: number,
+  unit: 'px' | '%',
 ): FreeElement {
   const y = stackY(existingElements);
+  if (kind === 'box') {
+    return { id: newId(), kind, x: 0, y, w: unit === '%' ? 100 : contentWidthPx, h: BOX_DEFAULT_HEIGHT };
+  }
   const { w, h } = BLOCK_DEFAULTS[kind];
   const base = { id: newId(), kind, x: 0, y, w, h } as const;
   if (kind === 'text') return { ...base, text: 'Text' };
@@ -100,7 +111,7 @@ export function createStackBlockElement(
   row: number,
   width: number = STACK_DEFAULT_WIDTH,
 ): FreeElement {
-  const { h } = BLOCK_DEFAULTS[kind];
+  const h = kind === 'box' ? BOX_DEFAULT_HEIGHT : BLOCK_DEFAULTS[kind].h;
   const base = { id: newId(), kind, x: 0, y: 0, w: width, h, row } as const;
   if (kind === 'text') return { ...base, text: 'Text' };
   if (kind === 'image') return { ...base, src: { kind: 'url', value: '' } };
