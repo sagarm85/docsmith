@@ -820,14 +820,17 @@ export function invoiceOrangeTemplate() {
           el('text', 0, 142, 90, 16, { text: 'Bank Details:', style: { fontSize: 9, bold: true } }),
           el('field', 90, 142, 190, 16, { binding: { source: 'header', column: 'bank_details', format: 'text' }, style: { fontSize: 9 } }),
 
-          el('text', 330, 10, 130, 20, { text: 'SUB TOTAL:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
-          el('field', 460, 10, 100, 20, { binding: { source: 'header', column: 'subtotal', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
-          el('text', 330, 32, 130, 20, { text: 'TAX & VAT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
-          el('field', 460, 32, 100, 20, { binding: { source: 'header', column: 'tax_vat', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
-          el('text', 330, 54, 130, 20, { text: 'DISCOUNT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
-          el('field', 460, 54, 100, 20, { binding: { source: 'header', column: 'discount', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
-          el('text', 330, 80, 130, 30, { text: 'GRAND TOTAL', style: { fontSize: 14, bold: true, color: '#fff', bg: dark, padding: 6 } }),
-          el('field', 460, 80, 100, 30, { binding: { source: 'header', column: 'grand_total', format: 'currency' }, style: { fontSize: 14, bold: true, align: 'right', color: '#fff', bg: dark, padding: 6 } }),
+          // Summary block flush toward the right margin (page content width
+          // ~794px at A4; right edge lands at 730px, safely inside the
+          // 16mm/~60px print margin) rather than sitting mid-page.
+          el('text', 500, 10, 130, 20, { text: 'SUB TOTAL:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
+          el('field', 630, 10, 100, 20, { binding: { source: 'header', column: 'subtotal', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
+          el('text', 500, 32, 130, 20, { text: 'TAX & VAT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
+          el('field', 630, 32, 100, 20, { binding: { source: 'header', column: 'tax_vat', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
+          el('text', 500, 54, 130, 20, { text: 'DISCOUNT:', style: { fontSize: 10, bold: true, bg: orange, padding: 4 } }),
+          el('field', 630, 54, 100, 20, { binding: { source: 'header', column: 'discount', format: 'currency' }, style: { fontSize: 10, align: 'right', bold: true, bg: orange, padding: 4 } }),
+          el('text', 500, 80, 130, 30, { text: 'GRAND TOTAL', style: { fontSize: 14, bold: true, color: '#fff', bg: dark, padding: 6 } }),
+          el('field', 630, 80, 100, 30, { binding: { source: 'header', column: 'grand_total', format: 'currency' }, style: { fontSize: 14, bold: true, align: 'right', color: '#fff', bg: dark, padding: 6 } }),
         ],
       },
       {
