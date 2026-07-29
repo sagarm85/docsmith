@@ -4,6 +4,7 @@
   import NumberInput from './ui/NumberInput.svelte';
   import Select from './ui/Select.svelte';
   import Icon from './ui/Icon.svelte';
+  import ConditionalRulesEditor from './ConditionalRulesEditor.svelte';
 
   let {
     column,
@@ -96,6 +97,11 @@
       }
     />
   </Field>
+
+  <ConditionalRulesEditor
+    rules={column.conditionalFormat ?? []}
+    onChange={(rules) => onChange({ conditionalFormat: rules })}
+  />
 </div>
 
 <style>

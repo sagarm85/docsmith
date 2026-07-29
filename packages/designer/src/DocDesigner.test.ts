@@ -667,6 +667,34 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('adding a conditional-formatting rule to a field element writes FreeElement.conditionalFormat (memory.md D-031)', async () => {
+    const el = await mountWithEntitySelected();
+
+    el.shadowRoot!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Invoice # to report header"]')!
+      .click();
+    await nextTick();
+
+    const elementBtn = Array.from(el.shadowRoot!.querySelectorAll('[role="button"]')).find((b) =>
+      b.getAttribute('aria-label')?.startsWith('Invoice # field'),
+    ) as HTMLElement;
+    elementBtn.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await nextTick();
+
+    findButton(el, 'Add rule')?.click();
+    await nextTick();
+
+    const reportHeader = () =>
+      el.getTemplate?.()?.bands.find((b) => b.id === 'reportHeader') as {
+        elements: Array<{ conditionalFormat?: unknown[] }>;
+      };
+    expect(reportHeader().elements[0]?.conditionalFormat).toStrictEqual([
+      { operator: 'gt', value: 0, style: { bold: true } },
+    ]);
+
+    el.remove();
+  });
+
   it('switching the layout unit to "%" migrates existing element coordinates (memory.md D-028)', async () => {
     const el = await mountWithEntitySelected();
 

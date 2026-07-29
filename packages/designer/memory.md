@@ -601,6 +601,41 @@ file, so it's out of scope for now rather than faked as "supported."
 so — the doc comment on `ValueFormat` and this entry are the "say so."
 `[status: locked]`
 
+### D-031 — Conditional formatting tests an element/column's OWN value only, style rules merge in array order, never a general expression language
+**Decision:** New `ConditionalRule = { operator, value?, style }` (operators:
+`eq`/`neq`/`gt`/`gte`/`lt`/`lte`/`contains`/`empty`/`notEmpty`) on
+`FreeElement` (`conditionalFormat?`, `kind:'field'` only) and `DetailColumn`
+(`conditionalFormat?`). Each rule tests **only that element's/column's own
+bound value** — never another field, never a computed expression. Multiple
+rules all evaluate independently against the same value; every *matching*
+rule's `style` merges over the base style in array order (later rules win
+for overlapping properties, like a CSS cascade) — not "first match wins."
+`core.resolveConditionalStyle()`/`matchesConditionalRule()` (in
+`format.ts`, alongside every other value-formatting helper) do the work;
+`render.ts` calls them for a field element's own style and per-cell in the
+detail table, using the raw (pre-`formatValue`) value.
+**Why:** claude.md's prime directives already settled that templates are
+"pure JSON... no functions" and that "computed expressions are Phase 3, and
+even then declarative" — a general expression/scripting engine (`row.qty *
+row.price > 100`, arbitrary cross-field logic) was never on the table.
+Restricting to "this element's own value, compared to a literal" keeps the
+feature fully declarative/JSON-serializable and trivially safe to evaluate
+(no `eval`, no sandboxing question) while still covering the overwhelming
+majority of real invoice/report needs (highlight overdue, negative amounts,
+large quantities, etc.). The designer UI (`ConditionalRulesEditor.svelte`,
+shared by `ElementProps.svelte`'s field-kind branch and `ColumnProps.svelte`)
+intentionally exposes only 3 style properties (text color, background,
+bold) rather than all of `ElementStyle` — the highest-value subset for
+"highlight this," not full styling control, to keep the rule-editor UI small.
+**Rejected:** a general field-to-field or expression-based rule engine
+(rejected outright — directly against claude.md's prime directives, and a
+real security/complexity surface for no v1 requirement); "first match wins"
+instead of merge-in-order (rejected — merging lets an author layer a
+"negative → red" rule with an unrelated "large → bold" rule without them
+fighting over which fires first, since they usually touch different style
+properties).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

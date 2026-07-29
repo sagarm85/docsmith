@@ -6,6 +6,7 @@
   import Button from './ui/Button.svelte';
   import Icon from './ui/Icon.svelte';
   import type { IconName } from './ui/icons.js';
+  import ConditionalRulesEditor from './ConditionalRulesEditor.svelte';
 
   const ELEMENT_ICON: Record<FreeElement['kind'], IconName> = {
     field: 'field',
@@ -174,6 +175,11 @@
           })}
       />
     </Field>
+
+    <ConditionalRulesEditor
+      rules={element.conditionalFormat ?? []}
+      onChange={(rules) => onChange({ conditionalFormat: rules })}
+    />
   {/if}
 
   {#if element.kind === 'image'}

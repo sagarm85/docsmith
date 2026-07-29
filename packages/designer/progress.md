@@ -243,6 +243,29 @@
   inline column header select. 31 core tests pass (was 27); 125 designer
   tests pass (was 124); lint/typecheck/build all green (`dist/doc-designer.js`
   ~320KB / ~76KB gzip).
+- **Now — Conditional formatting (D-031).** New `ConditionalRule` type
+  (operator + value + a style to apply on match) on `FreeElement`
+  (`kind:'field'` only) and `DetailColumn` — declarative only, tests an
+  element/column's own bound value, never another field and never a
+  computed expression, per claude.md's prime directives ("no functions...
+  computed expressions are Phase 3, and even then declarative"). New
+  `core.matchesConditionalRule()`/`resolveConditionalStyle()` in
+  `format.ts`; `render.ts` applies them for a field element's style and
+  per-cell in the detail table, merging every matching rule's style over
+  the base in array order (later wins, like a CSS cascade — not "first
+  match wins," so an author can layer independent rules). New
+  `ConditionalRulesEditor.svelte` (shared by `ElementProps.svelte`'s
+  field-kind branch and `ColumnProps.svelte`) exposes a focused 3-property
+  style subset (text color, background, bold) rather than full
+  `ElementStyle` control. Verified with core unit tests (every operator,
+  style merging, no-match reference equality, full `renderToHtml`
+  integration for both a field element and a detail column), a dedicated
+  `ConditionalRulesEditor.test.ts` (8 tests), a `DocDesigner.test.ts`
+  integration test, and a real-browser screenshot (Preview mode) showing a
+  totals field highlighted red/bold and only the qualifying detail rows'
+  Amount cells highlighted green/bold. 38 core tests pass (was 31); 134
+  designer tests pass (was 125); lint/typecheck/build all green
+  (`dist/doc-designer.js` ~328KB / ~78KB gzip).
 - **Pagination gate evidence (claude.md §8, 2026-07-28):** Built
   `@docsmith/render-service`, started it locally, and ran
   `RENDER_URL=http://localhost:8090 pnpm demo` to render the real 60-line
@@ -419,7 +442,11 @@
       a live `<tfoot>` preview computed via `core.aggregate()` against the same
       real sample rows already loaded (never fabricated). `core.renderToHtml`
       already rendered this — only the authoring UI was missing.
-- [ ] Conditional formatting (declarative rules)
+- [x] Conditional formatting (declarative rules) — `ConditionalRule` on
+      `FreeElement` (field kind) and `DetailColumn`; new
+      `ConditionalRulesEditor.svelte` (operator + value + text
+      color/background/bold), never a scripting/expression language — tests
+      only that element/column's own value, per claude.md's prime directives.
 - [ ] Barcode / QR element
 - [x] i18n + locale currency; amount-in-words — `PrintSetup.svelte` gained
       Locale/Currency selects (Page tab; `core.formatValue` already did the
@@ -452,6 +479,18 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Conditional formatting (D-031).** New `ConditionalRule` type
+  (operator/value/style) on `FreeElement` (field kind) and `DetailColumn` —
+  declarative only, tests an element/column's own value, never another
+  field or a computed expression (claude.md's prime directives). New
+  `core.matchesConditionalRule()`/`resolveConditionalStyle()`; `render.ts`
+  applies them for field elements and per detail-row cell, merging matching
+  rules' styles over the base in array order. New
+  `ConditionalRulesEditor.svelte` (shared by `ElementProps.svelte`/
+  `ColumnProps.svelte`) — text color/background/bold only, not full
+  `ElementStyle`. 38 core tests pass (was 31); 134 designer tests pass (was
+  125); lint/typecheck/build all green. Verified with a real-browser
+  screenshot (Preview mode) showing correct per-value highlighting.
 - **2026-07-29 — i18n locale/currency picker + amount-in-words.**
   `PrintSetup.svelte` gained "Locale"/"Currency" selects (a fixed reference
   list, same pattern as `PAGE_SIZE_OPTIONS`) — `core.formatValue` already

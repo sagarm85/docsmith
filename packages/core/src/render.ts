@@ -13,6 +13,7 @@
 import type {
   Align,
   Band,
+  Binding,
   DetailBand,
   DocumentData,
   ElementStyle,
@@ -23,7 +24,7 @@ import type {
   Template,
 } from './types.js';
 import { isDetailBand } from './types.js';
-import { aggregate, formatValue, type FormatOptions } from './format.js';
+import { aggregate, formatValue, resolveConditionalStyle, type FormatOptions } from './format.js';
 
 // ── html safety ──────────────────────────────────────────────────────────────
 function esc(s: unknown): string {
@@ -63,16 +64,19 @@ function styleToCss(s: ElementStyle | undefined): string {
 }
 
 // ── binding resolution ─────────────────────────────────────────────────────────
+function resolveBindingRaw(binding: Binding, data: DocumentData): unknown {
+  const record =
+    binding.source === 'header' ? data.header : (data.datasets[binding.source]?.[0] ?? {});
+  return record?.[binding.column];
+}
+
 function resolveElementValue(
   el: FreeElement,
   data: DocumentData,
   fmtOpts: FormatOptions,
 ): string {
   if (!el.binding) return '';
-  const { source, column, format } = el.binding;
-  const record =
-    source === 'header' ? data.header : (data.datasets[source]?.[0] ?? {});
-  return formatValue(record?.[column], format, fmtOpts);
+  return formatValue(resolveBindingRaw(el.binding, data), el.binding.format, fmtOpts);
 }
 
 // ── free-form elements ──────────────────────────────────────────────────────────
@@ -91,7 +95,13 @@ function renderFreeElement(
       return `<div class="el el-text" style="${style}">${esc(el.text ?? '')}</div>`;
     case 'field': {
       const v = resolveElementValue(el, data, fmtOpts);
-      return `<div class="el el-field" style="${style}">${esc(v)}</div>`;
+      // Conditional formatting (memory.md D-031) tests the field's own raw
+      // value and merges any matching rule's style over the element's base
+      // style — a separate style resolution from `style` above, since it
+      // only ever applies to 'field' elements.
+      const raw = el.binding ? resolveBindingRaw(el.binding, data) : undefined;
+      const fieldStyle = styleToCss(resolveConditionalStyle(el.style, el.conditionalFormat, raw));
+      return `<div class="el el-field" style="${pos};${fieldStyle}">${esc(v)}</div>`;
     }
     case 'image': {
       const src = el.src?.value ?? '';
@@ -224,10 +234,20 @@ function renderDetailBand(
         (r) =>
           `<tr${rowStyle}>` +
           cols
-            .map(
-              (c) =>
-                `<td style="text-align:${alignVal(c.align)}">${esc(formatValue(r[c.column], c.format, fmtOpts))}</td>`,
-            )
+            .map((c) => {
+              const raw = r[c.column];
+              // Conditional formatting (memory.md D-031) tests each row's
+              // own value in this column and merges onto a base style of
+              // just the alignment (detail cells have no other per-cell
+              // style today) — same resolveConditionalStyle used for field
+              // elements, so the two share behavior/tests.
+              const cellStyle = resolveConditionalStyle(
+                { align: alignVal(c.align) as Align },
+                c.conditionalFormat,
+                raw,
+              );
+              return `<td style="${styleToCss(cellStyle)}">${esc(formatValue(raw, c.format, fmtOpts))}</td>`;
+            })
             .join('') +
           `</tr>`,
       )

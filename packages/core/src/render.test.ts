@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { renderToHtml } from './render.js';
 import { newTemplate, convertLayoutUnit, convertBandArrangement } from './schema.js';
-import { formatValue, numberToWords } from './format.js';
-import type { DocumentData, FreeBand, FreeElement, Template } from './types.js';
+import { formatValue, numberToWords, matchesConditionalRule, resolveConditionalStyle } from './format.js';
+import type { Band, DetailBand, DocumentData, FreeBand, FreeElement, Template } from './types.js';
 
 function invoiceTemplate(): Template {
   const t = newTemplate('invoice', 'invoice');
@@ -241,6 +241,121 @@ describe('convertBandArrangement', () => {
     expect(below?.y).toBeGreaterThan(left!.y); // next row is lower
     expect(next.elements.every((e) => e.row === undefined)).toBe(true);
   });
+});
+
+describe('matchesConditionalRule / resolveConditionalStyle (memory.md D-031)', () => {
+  it('evaluates every operator', () => {
+    expect(matchesConditionalRule({ operator: 'eq', value: 'x', style: {} }, 'x')).toBe(true);
+    expect(matchesConditionalRule({ operator: 'eq', value: 'x', style: {} }, 'y')).toBe(false);
+    expect(matchesConditionalRule({ operator: 'neq', value: 'x', style: {} }, 'y')).toBe(true);
+    expect(matchesConditionalRule({ operator: 'gt', value: 10, style: {} }, 11)).toBe(true);
+    expect(matchesConditionalRule({ operator: 'gt', value: 10, style: {} }, 10)).toBe(false);
+    expect(matchesConditionalRule({ operator: 'gte', value: 10, style: {} }, 10)).toBe(true);
+    expect(matchesConditionalRule({ operator: 'lt', value: 10, style: {} }, 9)).toBe(true);
+    expect(matchesConditionalRule({ operator: 'lte', value: 10, style: {} }, 10)).toBe(true);
+    expect(matchesConditionalRule({ operator: 'contains', value: 'due', style: {} }, 'Overdue Invoice')).toBe(true);
+    expect(matchesConditionalRule({ operator: 'empty', style: {} }, '')).toBe(true);
+    expect(matchesConditionalRule({ operator: 'empty', style: {} }, 'x')).toBe(false);
+    expect(matchesConditionalRule({ operator: 'notEmpty', style: {} }, 'x')).toBe(true);
+  });
+
+  it('never crashes on an unparseable numeric comparison — just no match', () => {
+    expect(matchesConditionalRule({ operator: 'gt', value: 10, style: {} }, 'not a number')).toBe(false);
+  });
+
+  it('merges only matching rules over the base style, in array order (later wins)', () => {
+    const base = { fontSize: 12 };
+    const rules = [
+      { operator: 'gt' as const, value: 100, style: { color: 'red', bold: true } },
+      { operator: 'lt' as const, value: 100, style: { color: 'green' } },
+      { operator: 'gt' as const, value: 0, style: { italic: true } },
+    ];
+    expect(resolveConditionalStyle(base, rules, 150)).toStrictEqual({
+      fontSize: 12,
+      color: 'red',
+      bold: true,
+      italic: true,
+    });
+  });
+
+  it('returns the exact same base-style reference when there are no rules or none match', () => {
+    const base = { fontSize: 12 };
+    expect(resolveConditionalStyle(base, undefined, 150)).toBe(base);
+    expect(resolveConditionalStyle(base, [{ operator: 'eq', value: 'x', style: { color: 'red' } }], 'y')).toBe(base);
+  });
+});
+
+describe('renderToHtml — conditional formatting on a field element (memory.md D-031)', () => {
+  it("applies a matching rule's style, merged over the element's base style", () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            elements: (b as FreeBand).elements.map((e) =>
+              e.id === 'e2'
+                ? {
+                    ...e,
+                    conditionalFormat: [
+                      { operator: 'eq' as const, value: 'INV-1001', style: { color: '#b3261e', bold: true } },
+                    ],
+                  }
+                : e,
+            ),
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('color:#b3261e');
+    expect(out.html).toContain('font-weight:700');
+  });
+
+  it("skips a non-matching rule — the field keeps its plain base style", () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            elements: (b as FreeBand).elements.map((e) =>
+              e.id === 'e2'
+                ? { ...e, conditionalFormat: [{ operator: 'eq' as const, value: 'NOT-THIS', style: { color: 'red' } }] }
+                : e,
+            ),
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).not.toContain('color:red');
+  });
+});
+
+describe('renderToHtml — conditional formatting on a detail column (memory.md D-031)', () => {
+  it("highlights only the rows whose value in that column matches", () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      isDetailBandForTest(b)
+        ? {
+            ...b,
+            columns: b.columns.map((c) =>
+              c.column === 'qty'
+                ? { ...c, conditionalFormat: [{ operator: 'gt' as const, value: 3, style: { bold: true, bg: '#fee' } }] }
+                : c,
+            ),
+          }
+        : b,
+    );
+    // fatDocument's qty cycles 1..5 across 5 rows; only qty:4 and qty:5 rows should be bold.
+    // Scope the count to <tbody> only — reportHeader/totals elements in this
+    // fixture are independently bold, which would otherwise pollute the count.
+    const out = renderToHtml(t, fatDocument(5));
+    const tbody = out.html.slice(out.html.indexOf('<tbody>'), out.html.indexOf('</tbody>'));
+    const boldCells = (tbody.match(/font-weight:700/g) ?? []).length;
+    expect(boldCells).toBe(2);
+  });
+
+  function isDetailBandForTest(b: Band): b is DetailBand {
+    return b.type === 'detail';
+  }
 });
 
 describe('formatValue', () => {

@@ -100,6 +100,37 @@ export type Binding = {
   format?: ValueFormat;
 };
 
+export type ConditionOperator =
+  | 'eq'
+  | 'neq'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'contains'
+  | 'empty'
+  | 'notEmpty';
+
+/**
+ * One declarative conditional-formatting rule (memory.md D-031): tests a
+ * bound field/column's OWN raw value (never another field, never an
+ * expression) against `value`, applying `style` on match. Deliberately not
+ * a scripting/expression language — claude.md's prime directives already
+ * settled that ("computed expressions are Phase 3, and even then
+ * declarative"); this is the declarative form. Multiple rules on the same
+ * element/column all evaluate independently and merge in array order
+ * (later matches override earlier ones for overlapping style properties —
+ * simple last-write-wins, like a CSS cascade), so authors can layer rules
+ * rather than being limited to "first match wins."
+ */
+export type ConditionalRule = {
+  operator: ConditionOperator;
+  /** Unused for 'empty'/'notEmpty'. Compared as a number for gt/gte/lt/lte,
+   * as a case-insensitive substring for 'contains', as a string otherwise. */
+  value?: string | number;
+  style: ElementStyle;
+};
+
 export type ElementKind = 'text' | 'field' | 'image' | 'line' | 'box';
 
 /** A free-form, absolutely-positioned element (px, relative to its band). */
@@ -125,6 +156,9 @@ export type FreeElement = {
   label?: string; // kind:'field' — shown as {label} token in the designer
   binding?: Binding; // kind:'field'
   src?: { kind: 'url' | 'assetId'; value: string }; // kind:'image'
+  /** kind:'field' only (memory.md D-031) — tests this element's own bound
+   * value, applies `style` on match, merged over `style` above. */
+  conditionalFormat?: ConditionalRule[];
 };
 
 export type DetailColumn = {
@@ -133,6 +167,8 @@ export type DetailColumn = {
   width: number; // px
   align?: Align;
   format?: ValueFormat;
+  /** Tests this column's own value per row (memory.md D-031). */
+  conditionalFormat?: ConditionalRule[];
 };
 
 export type Aggregate = {

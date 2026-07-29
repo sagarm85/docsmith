@@ -443,11 +443,18 @@ Context-sensitive. Tabs: **Selection** and **Page**.
 **Selection tab** — depends on what's selected:
 - **Free-form element:** position (x/y/w/h), font (size, weight, style, color,
   align, line-height), background/border (for box), the **binding** (source +
-  column dropdown sourced from the palette fields + format), z-order, lock.
+  column dropdown sourced from the palette fields + format), z-order, lock. A
+  bound `field` element additionally gets **conditional formatting** (Phase 3,
+  memory.md D-031): a repeatable list of declarative rules (operator + value +
+  a style to apply on match — text color, background, bold), never a
+  scripting/expression language, per claude.md's prime directives.
 - **Text element:** the static text + typography (no binding).
 - **Image element:** source (URL now; upload in Phase 2), fit (contain/cover), alt.
-- **Detail column:** header text, width, align, format, aggregate.
-- **Band:** height (except detail), visibility (optional bands), background.
+- **Detail column:** header text, width, align, format, aggregate, and the same
+  conditional-formatting rule list (tests that column's own value per row).
+- **Band:** height (except detail), visibility (optional bands), background,
+  and (`reportHeader`/`totals` only) the free-form/stacked **arrangement**
+  toggle — §8.3.
 
 **Page tab (Print Setup):** page size, orientation, margins (mm, four inputs +
 presets), the element position/size unit (px/%, §8.3, D-028 — grouped here

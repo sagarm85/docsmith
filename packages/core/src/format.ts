@@ -1,7 +1,7 @@
 // @docsmith/core — value formatting. Deterministic, locale-aware, no external deps.
 // Used by the renderer (and mirrored by the designer's Properties preview).
 
-import type { ValueFormat } from './types.js';
+import type { ConditionalRule, ElementStyle, ValueFormat } from './types.js';
 
 export type FormatOptions = {
   locale?: string; // e.g. 'en-US', 'en-IN'
@@ -17,7 +17,7 @@ export function defaultFormatForType(type: string | undefined): ValueFormat {
   return 'text';
 }
 
-function toNumber(v: unknown): number | null {
+export function toNumber(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const n = typeof v === 'number' ? v : Number(String(v));
   return Number.isFinite(n) ? n : null;
@@ -154,4 +154,56 @@ export function aggregate(
   }
   if (fn === 'avg') return seen ? sum / seen : 0;
   return sum;
+}
+
+/** Tests one conditional-formatting rule against a raw (unformatted) value —
+ * memory.md D-031. Never throws: an unparseable numeric comparison or an
+ * unknown operator simply doesn't match, the same "never crash a render"
+ * posture as `formatValue`. */
+export function matchesConditionalRule(rule: ConditionalRule, raw: unknown): boolean {
+  const isEmpty = raw === null || raw === undefined || raw === '';
+  switch (rule.operator) {
+    case 'empty':
+      return isEmpty;
+    case 'notEmpty':
+      return !isEmpty;
+    case 'eq':
+      return String(raw ?? '') === String(rule.value ?? '');
+    case 'neq':
+      return String(raw ?? '') !== String(rule.value ?? '');
+    case 'contains':
+      return String(raw ?? '').toLowerCase().includes(String(rule.value ?? '').toLowerCase());
+    case 'gt':
+    case 'gte':
+    case 'lt':
+    case 'lte': {
+      const n = toNumber(raw);
+      const v = toNumber(rule.value ?? null);
+      if (n === null || v === null) return false;
+      if (rule.operator === 'gt') return n > v;
+      if (rule.operator === 'gte') return n >= v;
+      if (rule.operator === 'lt') return n < v;
+      return n <= v;
+    }
+    default:
+      return false;
+  }
+}
+
+/** Merges every matching rule's `style` over `baseStyle`, in array order
+ * (later matches win for overlapping properties — a simple CSS-cascade-like
+ * merge, per memory.md D-031). Returns `baseStyle` unchanged (same
+ * reference) when there are no rules or none match, so callers can skip
+ * extra work cheaply. */
+export function resolveConditionalStyle(
+  baseStyle: ElementStyle | undefined,
+  rules: ConditionalRule[] | undefined,
+  raw: unknown,
+): ElementStyle | undefined {
+  if (!rules?.length) return baseStyle;
+  let style = baseStyle;
+  for (const rule of rules) {
+    if (matchesConditionalRule(rule, raw)) style = { ...style, ...rule.style };
+  }
+  return style;
 }
