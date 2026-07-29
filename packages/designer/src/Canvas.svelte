@@ -14,6 +14,9 @@
     selection,
     onAddElement,
     onAddSection,
+    onSectionLayoutChange,
+    onDuplicateSection,
+    onDeleteSection,
     onGridColumnsChange,
     onColumnResizeStart,
     onColumnResizeEnd,
@@ -45,6 +48,11 @@
      * arrangement is offered on; same scope as the arrangement toggle in
      * BandProps.svelte). */
     onAddSection: (bandId: string, columns: number[]) => void;
+    /** Section hover toolbar (memory.md D-049) — same reportHeader/totals-
+     * only scope as onAddSection above. */
+    onSectionLayoutChange: (bandId: string, row: number, columns: number[]) => void;
+    onDuplicateSection: (bandId: string, row: number) => void;
+    onDeleteSection: (bandId: string, row: number) => void;
     /** Cursor-drag column resize (memory.md D-044) — same reportHeader/
      * totals-only scope as onAddSection above. */
     onGridColumnsChange: (bandId: string, row: number, columns: number[]) => void;
@@ -243,6 +251,9 @@
             onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
             onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
             onGridColumnsChange={(row, cols) => onGridColumnsChange('reportHeader', row, cols)}
+            onSectionLayoutChange={(row, cols) => onSectionLayoutChange('reportHeader', row, cols)}
+            onDuplicateSection={(row) => onDuplicateSection('reportHeader', row)}
+            onDeleteSection={(row) => onDeleteSection('reportHeader', row)}
             {onColumnResizeStart}
             {onColumnResizeEnd}
           />
@@ -315,6 +326,9 @@
             onElementDuplicate={(id) => onElementDuplicate('totals', id)}
             onElementEditText={(id, text) => onElementEditText('totals', id, text)}
             onGridColumnsChange={(row, cols) => onGridColumnsChange('totals', row, cols)}
+            onSectionLayoutChange={(row, cols) => onSectionLayoutChange('totals', row, cols)}
+            onDuplicateSection={(row) => onDuplicateSection('totals', row)}
+            onDeleteSection={(row) => onDeleteSection('totals', row)}
             {onColumnResizeStart}
             {onColumnResizeEnd}
           />

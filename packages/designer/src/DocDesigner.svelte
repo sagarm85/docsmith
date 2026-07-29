@@ -376,6 +376,63 @@
     addSectionToBand('reportHeader', columns);
   }
 
+  // ── Section hover toolbar (memory.md D-049): change layout / duplicate /
+  // delete a whole section (row) at once, each a single undo step. ────────
+
+  // Swapping a section's layout can shrink its column count — existing
+  // elements keep their content (never deleted) but get clamped into the
+  // last valid column, stacking there via D-045 if more than one lands in
+  // the same cell, rather than silently disappearing off the end.
+  function handleSectionLayoutChange(bandId: string, row: number, columns: number[]) {
+    const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+    if (!band) return;
+    const elements = band.elements.map((el) =>
+      (el.row ?? 0) === row ? { ...el, col: Math.min(el.col ?? 0, columns.length - 1), colSpan: 1 } : el,
+    );
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) =>
+        b.id === bandId && !isDetailBand(b)
+          ? { ...b, sectionColumns: { ...b.sectionColumns, [row]: columns }, elements }
+          : b,
+      ),
+    });
+  }
+
+  function handleDuplicateSection(bandId: string, row: number) {
+    const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+    if (!band) return;
+    const rowElements = band.elements.filter((el) => (el.row ?? 0) === row);
+    if (rowElements.length === 0) return;
+    const newRow = band.elements.reduce((max, e) => Math.max(max, (e.row ?? 0) + 1), 0);
+    const duplicated = rowElements.map((el) => ({ ...el, id: crypto.randomUUID(), row: newRow }));
+    const cols = band.sectionColumns?.[row] ?? (band.gridColumns?.length ? band.gridColumns : [100]);
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) =>
+        b.id === bandId && !isDetailBand(b)
+          ? { ...b, sectionColumns: { ...b.sectionColumns, [newRow]: cols }, elements: [...b.elements, ...duplicated] }
+          : b,
+      ),
+    });
+  }
+
+  function handleDeleteSection(bandId: string, row: number) {
+    const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
+    if (!band) return;
+    const removedIds = new Set(band.elements.filter((el) => (el.row ?? 0) === row).map((el) => el.id));
+    const elements = band.elements.filter((el) => !removedIds.has(el.id));
+    const { [row]: _removed, ...restSectionColumns } = band.sectionColumns ?? {};
+    void _removed;
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) =>
+        b.id === bandId && !isDetailBand(b) ? { ...b, sectionColumns: restSectionColumns, elements } : b,
+      ),
+    });
+    if (selection?.kind === 'element' && removedIds.has(selection.elementId)) selection = null;
+  }
+
   // ── Keyboard drag-alternative (design.md §12) ───────────────────────────────
   // Canvas.handlePageKeydown already rejects an invalid target band before ever
   // calling onKeyboardDrop, so construction here mirrors handlePaletteAddField/
@@ -806,6 +863,9 @@
             {selection}
             onAddElement={handleAddElement}
             onAddSection={addSectionToBand}
+            onSectionLayoutChange={handleSectionLayoutChange}
+            onDuplicateSection={handleDuplicateSection}
+            onDeleteSection={handleDeleteSection}
             onGridColumnsChange={handleGridColumnsLiveChange}
             onColumnResizeStart={handleElementDragStart}
             onColumnResizeEnd={handleElementDragEnd}

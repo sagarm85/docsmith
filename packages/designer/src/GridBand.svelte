@@ -5,6 +5,7 @@
     createGridBlockElement,
     createGridFieldElement,
     createGridPlaceholderElement,
+    SECTION_PRESETS,
     type BlockKind,
   } from './template-edits.js';
   import Icon from './ui/Icon.svelte';
@@ -35,6 +36,9 @@
     onGridColumnsChange,
     onColumnResizeStart,
     onColumnResizeEnd,
+    onSectionLayoutChange,
+    onDuplicateSection,
+    onDeleteSection,
     adapter,
     entity,
   }: {
@@ -68,6 +72,15 @@
      * changed, only when the gesture starts/ends. */
     onColumnResizeStart?: () => void;
     onColumnResizeEnd?: () => void;
+    /** Section hover toolbar (memory.md D-049) — "change layout" swaps a
+     * row's own `sectionColumns` entry to a different preset (existing
+     * elements keep their content, clamped into the new column count
+     * rather than disappearing); duplicate/delete act on the whole row at
+     * once. Undefined hides the toolbar entirely (same honest-disable
+     * pattern as every other optional capability here). */
+    onSectionLayoutChange?: (row: number, columns: number[]) => void;
+    onDuplicateSection?: (row: number) => void;
+    onDeleteSection?: (row: number) => void;
     /** Powers the click-to-add inline field/text picker (memory.md D-047) —
      * undefined disables the picker entirely (an empty cell falls back to
      * drag-and-drop only), matching every other "honestly disabled until
@@ -243,6 +256,22 @@
     onUpdateElements([...band.elements, createGridPlaceholderElement(nextRowIndex(), 0)]);
   }
 
+  // ── Section hover toolbar (memory.md D-049) ─────────────────────────────
+  let layoutPopoverRow = $state<number | null>(null);
+
+  function toggleLayoutPopover(row: number) {
+    layoutPopoverRow = layoutPopoverRow === row ? null : row;
+  }
+
+  function chooseLayout(row: number, columns: number[]) {
+    onSectionLayoutChange?.(row, columns);
+    layoutPopoverRow = null;
+  }
+
+  function sameColumns(a: number[], b: number[]): boolean {
+    return a.length === b.length && a.every((w, i) => w === b[i]);
+  }
+
   // ── Click-to-add inline picker (memory.md D-047) ────────────────────────
   // An easier alternative to drag-and-drop: click any empty cell to search
   // header fields or add plain text, without needing to drag anything.
@@ -318,10 +347,15 @@
   // (including the one that's opening/reopening the picker) is exempted so
   // the same click that opens a picker can't also immediately close it.
   function handleWindowClick(e: MouseEvent) {
-    if (!picker) return;
     const path = e.composedPath();
-    const clickedEmptyCell = path.some((n) => n instanceof Element && n.classList.contains('dd-grid-cell--empty'));
-    if (!clickedEmptyCell) closePicker();
+    if (picker) {
+      const clickedEmptyCell = path.some((n) => n instanceof Element && n.classList.contains('dd-grid-cell--empty'));
+      if (!clickedEmptyCell) closePicker();
+    }
+    if (layoutPopoverRow !== null) {
+      const clickedToolbar = path.some((n) => n instanceof Element && n.classList.contains('dd-section-toolbar'));
+      if (!clickedToolbar) layoutPopoverRow = null;
+    }
   }
 
   function handleBodyClick(e: MouseEvent) {
@@ -434,6 +468,61 @@
       {#each rows as row, rowIndex (rowIndex)}
         {@const rowBoundaries = boundariesFor(row.cols)}
         <div class="dd-grid-row-wrap">
+        {#if onSectionLayoutChange || onDuplicateSection || onDeleteSection}
+          <!-- Section hover toolbar (memory.md D-049) — revealed on hover/
+               focus-within, same visual language as FreeElement's D-036
+               toolbar. -->
+          <div class="dd-section-toolbar">
+            {#if onSectionLayoutChange}
+              <button
+                type="button"
+                class="dd-section-toolbar-btn"
+                aria-label={`Change layout for section ${rowIndex + 1}`}
+                title="Change layout"
+                onclick={() => toggleLayoutPopover(rowIndex)}
+              >
+                <Icon name="layers" size={12} />
+              </button>
+            {/if}
+            {#if onDuplicateSection}
+              <button
+                type="button"
+                class="dd-section-toolbar-btn"
+                aria-label={`Duplicate section ${rowIndex + 1}`}
+                title="Duplicate section"
+                onclick={() => onDuplicateSection?.(rowIndex)}
+              >
+                <Icon name="doc" size={12} />
+              </button>
+            {/if}
+            {#if onDeleteSection}
+              <button
+                type="button"
+                class="dd-section-toolbar-btn dd-section-toolbar-btn--danger"
+                aria-label={`Delete section ${rowIndex + 1}`}
+                title="Delete section"
+                onclick={() => onDeleteSection?.(rowIndex)}
+              >
+                <Icon name="trash" size={12} />
+              </button>
+            {/if}
+            {#if layoutPopoverRow === rowIndex}
+              <div class="dd-layout-popover" role="menu" aria-label="Choose a layout">
+                {#each SECTION_PRESETS as preset (preset.label)}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="dd-layout-popover-option"
+                    class:active={sameColumns(row.cols, preset.columns)}
+                    onclick={() => chooseLayout(rowIndex, preset.columns)}
+                  >
+                    {preset.label}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
         <div class="dd-grid-row" style="grid-template-columns:{row.cols.map((w) => `${w}%`).join(' ')}">
           {#each row.cells as cell (cell.kind === 'group' ? cell.elements[0]!.id : `${cell.row}:${cell.col}`)}
             {#if cell.kind === 'group' && !(cell.elements.length === 1 && isPlaceholder(cell.elements[0]!))}
@@ -750,6 +839,91 @@
      column grid for the whole band. */
   .dd-grid-row-wrap {
     position: relative;
+  }
+
+  /* Section hover toolbar (memory.md D-049) — same reveal language as
+     FreeElement.svelte's D-036 element toolbar. */
+  .dd-section-toolbar {
+    position: absolute;
+    top: -30px;
+    right: 0;
+    display: flex;
+    gap: 2px;
+    background: #1a1c22;
+    border-radius: 8px;
+    padding: 3px;
+    box-shadow: var(--dd-shadow);
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 6;
+  }
+
+  .dd-grid-row-wrap:hover .dd-section-toolbar,
+  .dd-grid-row-wrap:focus-within .dd-section-toolbar {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .dd-section-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .dd-section-toolbar-btn:hover {
+    background: #2b2e36;
+  }
+
+  .dd-section-toolbar-btn--danger:hover {
+    background: rgba(255, 107, 100, 0.2);
+    color: #ff8a80;
+  }
+
+  .dd-layout-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 140px;
+    background: var(--dd-panel);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    box-shadow: var(--dd-shadow);
+    padding: 4px;
+    z-index: 6;
+  }
+
+  .dd-layout-popover-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: none;
+    border-radius: var(--dd-radius-sm);
+    background: transparent;
+    color: var(--dd-text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .dd-layout-popover-option:hover {
+    background: var(--dd-panel-alt);
+  }
+
+  .dd-layout-popover-option.active {
+    color: var(--dd-accent-strong);
+    font-weight: 600;
+    background: var(--dd-accent-weak);
   }
 
   .dd-grid-row {

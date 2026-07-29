@@ -409,4 +409,56 @@ describe('GridBand', () => {
       expect(screen.queryByText('Invoice #')).toBeNull();
     });
   });
+
+  describe('section hover toolbar (memory.md D-049)', () => {
+    it('"Change layout" opens a preset popover; picking one calls onSectionLayoutChange', async () => {
+      const onSectionLayoutChange = vi.fn();
+      render(GridBand, {
+        props: { band: filledBand(), ...callbacks(), onSectionLayoutChange },
+      });
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Change layout for section 1' }));
+      expect(screen.getByRole('menuitem', { name: '1 column' })).toBeTruthy();
+
+      await fireEvent.click(screen.getByRole('menuitem', { name: 'Large + small' }));
+      expect(onSectionLayoutChange).toHaveBeenCalledWith(0, [65, 35]);
+    });
+
+    it('marks the currently-matching preset as active in the popover', async () => {
+      render(GridBand, {
+        props: { band: filledBand(), ...callbacks(), onSectionLayoutChange: vi.fn() },
+      });
+
+      // filledBand()'s row 1 uses gridColumns [60, 40] — not an exact
+      // SECTION_PRESETS match, so nothing should be marked active there.
+      await fireEvent.click(screen.getByRole('button', { name: 'Change layout for section 2' }));
+      const options = screen.getAllByRole('menuitem');
+      expect(options.every((o) => !o.className.includes('active'))).toBe(true);
+    });
+
+    it('"Duplicate section" copies every element in that row into a new row with the same columns', async () => {
+      const onDuplicateSection = vi.fn();
+      render(GridBand, {
+        props: { band: filledBand(), ...callbacks(), onDuplicateSection },
+      });
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Duplicate section 2' }));
+      expect(onDuplicateSection).toHaveBeenCalledWith(1);
+    });
+
+    it('"Delete section" removes the whole row at once', async () => {
+      const onDeleteSection = vi.fn();
+      render(GridBand, {
+        props: { band: filledBand(), ...callbacks(), onDeleteSection },
+      });
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Delete section 2' }));
+      expect(onDeleteSection).toHaveBeenCalledWith(1);
+    });
+
+    it('the toolbar is absent entirely when no section-toolbar callbacks are supplied', () => {
+      render(GridBand, { props: { band: filledBand(), ...callbacks() } });
+      expect(screen.queryByRole('button', { name: /Change layout|Duplicate section|Delete section/ })).toBeNull();
+    });
+  });
 });
