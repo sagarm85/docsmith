@@ -14,6 +14,9 @@
     selection,
     onAddElement,
     onAddSection,
+    onGridColumnsChange,
+    onColumnResizeStart,
+    onColumnResizeEnd,
     onUpdateElements,
     onAddColumn,
     onUpdateColumns,
@@ -42,6 +45,11 @@
      * arrangement is offered on; same scope as the arrangement toggle in
      * BandProps.svelte). */
     onAddSection: (bandId: string, columns: number[]) => void;
+    /** Cursor-drag column resize (memory.md D-044) — same reportHeader/
+     * totals-only scope as onAddSection above. */
+    onGridColumnsChange: (bandId: string, gridColumns: number[]) => void;
+    onColumnResizeStart: () => void;
+    onColumnResizeEnd: () => void;
     /** Stack-arrangement bands replace their whole `elements` array per edit
      * (memory.md D-029), same "whole collection" pattern as `onUpdateColumns`. */
     onUpdateElements: (bandId: string, elements: FreeElement[]) => void;
@@ -232,6 +240,9 @@
             onElementDelete={(id) => onElementDelete('reportHeader', id)}
             onElementDuplicate={(id) => onElementDuplicate('reportHeader', id)}
             onElementEditText={(id, text) => onElementEditText('reportHeader', id, text)}
+            onGridColumnsChange={(cols) => onGridColumnsChange('reportHeader', cols)}
+            {onColumnResizeStart}
+            {onColumnResizeEnd}
           />
         {:else}
           <Band
@@ -299,6 +310,9 @@
             onElementDelete={(id) => onElementDelete('totals', id)}
             onElementDuplicate={(id) => onElementDuplicate('totals', id)}
             onElementEditText={(id, text) => onElementEditText('totals', id, text)}
+            onGridColumnsChange={(cols) => onGridColumnsChange('totals', cols)}
+            {onColumnResizeStart}
+            {onColumnResizeEnd}
           />
         {:else}
           <Band

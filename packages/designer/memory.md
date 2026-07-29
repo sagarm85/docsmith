@@ -1264,6 +1264,121 @@ target on components that currently only expose per-cell drop zones —
 deferred as a known, honestly-scoped gap rather than attempted piecemeal).
 `[status: locked]`
 
+### D-044 — Confluence-style cursor-drag column resize for grid bands, live-applied and batched into one undo step
+**Decision:** `GridBand.svelte` renders a thin, invisible-until-hovered
+divider handle between every pair of adjacent columns (a wide `::after`-lined
+hit target, same visual pattern as Confluence's/Notion's own column-resize
+affordance) — dragging one adjusts only the two neighboring columns'
+percentages, clamped to a minimum 8% each, the rest of `gridColumns`
+untouched. New `onGridColumnsChange`/`onColumnResizeStart`/
+`onColumnResizeEnd` props: the first is called on every pointermove tick
+with the whole `gridColumns` array (`DocDesigner`'s new
+`handleGridColumnsLiveChange` live-applies it directly to `history.present`,
+no push, same as `handleElementLiveChange`); the other two are the *existing*
+`handleElementDragStart`/`handleElementDragEnd` snapshot/commit pair reused
+as-is (they don't care what changed, only when the gesture starts/ends), so
+resizing a column divider is exactly one undo step regardless of how many
+pixels it moved. Wired only for the **grid**-arrangement `GridBand`
+instances of `reportHeader`/`totals` (same scope boundary as D-037/D-043's
+Sections drag: `pageHeader`/`pageFooter` never get grid arrangement at
+all).
+**Why:** Asked directly ("like Confluence doc, these sections should be
+adjustable from the cursor") after the Sections feature (D-034/D-037)
+shipped only a numeric width editor in `BandProps.svelte` — real, but not
+the direct-manipulation interaction a column layout implies. Cumulative
+boundary percentages are computed from `gridColumns` itself (no duplicated
+column-width math); the resize math converts a raw pixel delta to a percent
+delta against the rows-wrap's own measured width, matching the same
+technique `FreeElement.svelte` already uses for drag math in `'%'` layout-
+unit mode (memory.md D-028).
+**Verified:** three new `GridBand.test.ts` tests (live `onGridColumnsChange`
+calls with the correct two adjacent widths; the minimum-width clamp; start/
+end batching), mocking `getBoundingClientRect` since jsdom has no real
+layout (same limitation this project has hit repeatedly, e.g. D-041). A
+real-browser Puppeteer mouse-drag confirmed the visible divider line, the
+live width change during the drag, and — critically — that the whole
+gesture is exactly **one** undo step (`gridColumns` reverted fully on a
+single Undo click), not one step per pixel.
+**Rejected:** a keyboard-resize equivalent (arrow keys to nudge column
+width) — offered no existing precedent to match against, since this
+codebase's own free-form element resize handles (`FreeElement.svelte`) are
+also mouse/pointer-only with no keyboard alternative for continuous resize
+(only move has a keyboard nudge); adding one here would be new scope beyond
+parity with what already ships. The BandProps.svelte numeric editor remains
+as the keyboard-operable path for exact values.
+`[status: locked]`
+
+### D-045 — Grid cells can hold more than one stacked element; dropping onto real content appends instead of replacing; fixed a latent gap-column rendering bug found while widening the model
+**Decision:** A grid cell (row, col) is no longer restricted to exactly one
+element. `core.render.ts` gains `buildGridRows()` (replacing the ad hoc
+row-only `groupIntoRows` call `renderGridBand` used to make) — groups
+`band.elements` by `` `${row}:${col}` ``, not just `row`, so multiple
+elements sharing a cell render as multiple stacked `<div>`s inside one
+`<td>` (each keeping its own conditional-formatting style, previously
+applied directly to the shared `<td>`). `GridBand.svelte`'s own `rows`
+$derived (re-implemented independently per the existing D-034 precedent,
+since the designer doesn't import core's render.ts internals) widens the
+same way, from `Map<string, FreeElement>` to `Map<string, FreeElement[]>`.
+Dropping a field/block onto a cell: if it holds exactly one untouched
+placeholder (`isPlaceholder`), the drop still **replaces** it in place —
+that's the whole point of a placeholder; onto any REAL content (one or more
+elements), it now **appends** instead of replacing, which is the actual
+mechanism behind "add multiple fields to one section column". Selection/
+duplicate/delete all move from the cell to each stacked sub-item
+(`.dd-grid-subitem`, a new independently focusable/selectable/hoverable
+element per stack entry) — the outer cell becomes a passive container that
+only owns the drop target and the colspan/border styling.
+**Real bug found and fixed alongside this:** widening `buildGridRows` to be
+(row, col)-aware surfaced that the OLD `renderGridBand` never actually
+looked at `col` at all — it emitted exactly one `<td>` per element in a row
+in array order, with no gap-filling for a column no element covered. A row
+with content only in column 2 (column 1 genuinely empty) would render as a
+single first-position `<td>`, landing in column 1's visual slot instead of
+column 2's — silently misaligned relative to what the design canvas (which
+*did* already gap-fill correctly) showed. `buildGridRows` fixes this for
+free as part of the same (row, col) grouping change: a genuinely-absent
+column now emits an empty `<td>` so column position and `<colgroup>` widths
+stay correct.
+**Why:** Asked directly ("And user can add multiple fields / placeholders
+in each section") once column-resize (D-044) was working — the underlying
+one-element-per-cell model was the actual blocker, since "Sections" is a
+real `<table>` (D-034) precisely so column/row semantics come free from the
+browser, and a `<td>` has always been able to hold more than one block of
+content; only this designer's own occupancy map (keyed exclusively by a
+single owning element) prevented it.
+**Verified:** two new core tests (multiple elements sharing one (row, col)
+render as one `<tr>`/one `<td>` with both text contents present, in
+insertion order; a genuine gap column renders as an empty `<td>` so a later
+real column keeps its true position) — 57 core tests pass (was 55). Four
+`GridBand.test.ts` tests replaced/added (append-not-replace onto real
+content; replace-still-works onto a lone placeholder; two stacked elements
+each independently clickable) — 177 designer tests pass (was 175, net +2
+after replacing the old "always replaces" test). A real-browser Puppeteer
+pass confirmed: dropping a second field onto an already-filled section cell
+stacks rather than replaces (in the actual live app, through native
+DragEvent dispatch, not just the designer's own model); both stacked fields
+render correctly in **Preview mode** (`core.renderToHtml`'s real output,
+not just the canvas approximation) as two `<div>`s inside one `<td>`. This
+verification pass caught a real process gap worth naming: the first
+attempt showed the bug BEFORE it was actually fixed, because `@docsmith/core`
+had not been rebuilt after editing `render.ts` — `@docsmith/designer`
+bundles from `packages/core/dist`, not `core/src`, so a designer-only
+`pnpm build` silently keeps testing the OLD renderer. `packages/core`
+must be rebuilt first whenever `core/src` changes and the designer bundle
+is about to be manually verified.
+**Rejected:** a per-stack-entry explicit "+" button to add another item to
+a specific cell (drag-and-drop append already covers it, and duplicating an
+existing sub-item — already free, since a grid element's `row`/`col` are
+preserved by the generic duplicate action — lands in the same cell too;
+a dedicated button would be a second way to do the same thing for no clear
+gain); keyboard-only insertion into a specific pre-existing cell (no
+existing keyboard-drop mechanism targets a *chosen* cell at all — the
+keyboard drag-alternative's `nextGridCell` always lands in the first
+genuinely-empty cell, unchanged by this decision, since appending onto an
+already-filled cell via a keyboard path with no visual target confirmation
+would be a surprising, hard-to-predict landing spot).
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

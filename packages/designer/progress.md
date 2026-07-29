@@ -681,6 +681,24 @@ already done. Tracked here with the same rigor as a phase checklist.
       a Text block dropped into a grid cell rendered as an indistinguishable
       "Drop a field here" ghost — `createGridBlockElement` now defaults new
       Text blocks to `text:'Text'`, matching the free-form/stack paths.
+- [x] **Cursor-drag column resize for grid bands (D-044)** — a Confluence-
+      style divider handle between adjacent columns in `GridBand.svelte`;
+      dragging adjusts the two neighboring columns' percentages (min 8%
+      each), live-applied via a new `onGridColumnsChange` prop and batched
+      into one undo step by reusing the existing element-drag snapshot/
+      commit handlers. The `BandProps.svelte` numeric width editor still
+      works exactly as before — this is an additional, faster interaction,
+      not a replacement.
+- [x] **Grid cells can hold multiple stacked elements (D-045)** — dropping a
+      second field/block onto an already-filled (non-placeholder) grid cell
+      now appends instead of replacing; each stacked element is its own
+      independently selectable/deletable sub-item. `core.render.ts`'s
+      `renderGridBand` widened from row-only grouping to (row, col)-aware
+      grouping via a new `buildGridRows()`, which also fixed a real latent
+      bug found while making the change: a row with a genuinely-empty
+      column previously rendered with NO gap `<td>` at all, silently
+      misaligning any later real column in that row — now fixed for free by
+      the same grouping rewrite.
 
 ---
 
@@ -704,6 +722,39 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Cursor-drag column resize (D-044); grid cells can hold
+  multiple stacked elements (D-045).** Two follow-up requests right after
+  D-043: "like Confluence doc, these sections should be adjustable from the
+  cursor," then "user can add multiple fields/placeholders in each
+  section." (D-044) `GridBand.svelte` gained a divider handle between every
+  pair of adjacent columns — dragging live-adjusts the two neighbors'
+  percentages (8% floor each) via a new `onGridColumnsChange` prop,
+  batched into one undo step by reusing the existing element-drag
+  snapshot/commit pair (`handleElementDragStart`/`End`), the same way
+  `FreeElement`'s own move/resize gestures are batched. (D-045) A grid
+  cell is no longer capped at one element: `core.render.ts`'s
+  `renderGridBand` now groups by `(row, col)`, not just `row`
+  (`buildGridRows()`), rendering multiple stacked elements inside one
+  `<td>`; `GridBand.svelte`'s own cell grouping widened the same way, and
+  dropping onto an already-filled (non-placeholder) cell now appends
+  instead of replacing — the actual mechanism for "multiple fields in one
+  section." Widening the grouping surfaced and fixed a real latent bug:
+  the old row-only grouping never looked at `col` at all, so a row with a
+  genuinely-empty column silently misaligned any later real column in that
+  row (no gap `<td>` was ever emitted) — now fixed for free. 57 core tests
+  pass (was 55); 177 designer tests pass (was 175, net +2 replacing the
+  old "drop onto a filled cell always replaces" test, which was the
+  behavior actually being changed). Caught and fixed a real process gap
+  during verification: `@docsmith/designer` bundles from
+  `packages/core/dist`, not `core/src`, so editing `render.ts` and running
+  only `pnpm --filter @docsmith/designer build` silently keeps testing the
+  OLD renderer — `core` must be rebuilt first. Verified end-to-end with
+  real-browser Puppeteer: a full mouse column-drag reverting in exactly
+  one Undo click; dropping a second field onto an already-filled section
+  cell via a real native DragEvent sequence (not just the model);
+  **Preview mode's actual rendered output** (`core.renderToHtml`, after
+  correctly rebuilding `core`) showing two stacked `<div>`s inside one
+  real `<td>`.
 - **2026-07-29 — Four real usability bugs from live dogfooding (D-043).**
   The user reported four separate problems while actually using the app:
   a black hover toolbar staying visible while dragging a field; dragging a

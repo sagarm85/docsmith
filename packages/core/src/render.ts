@@ -238,19 +238,71 @@ function renderGridCellContent(el: FreeElement, data: DocumentData, fmtOpts: For
   }
 }
 
+// A grid cell can hold more than one stacked element (memory.md D-045, "add
+// multiple fields to one section column") — grouped by (row, col), not just
+// row. `null` is a genuinely absent cell (no backing element; a neighboring
+// colSpan didn't reach this column), rendered as an empty `<td>` so the real
+// <colgroup> width still lands in the right table column — a gap the
+// row-only `groupIntoRows` used by stack bands can't express, and which the
+// OLD one-element-per-<td> version of this function silently skipped
+// entirely (a latent misalignment bug whenever a row didn't fill every
+// column, fixed as part of this same change).
+type GridRowCell = { span: number; elements: FreeElement[] } | null;
+
+function buildGridRows(elements: readonly FreeElement[], numCols: number): GridRowCell[][] {
+  const byRowCol = new Map<string, FreeElement[]>();
+  let maxRow = -1;
+  for (const el of elements) {
+    const r = el.row ?? 0;
+    const c = el.col ?? 0;
+    const key = `${r}:${c}`;
+    const group = byRowCol.get(key);
+    if (group) group.push(el);
+    else byRowCol.set(key, [el]);
+    maxRow = Math.max(maxRow, r);
+  }
+  const rows: GridRowCell[][] = [];
+  for (let r = 0; r <= maxRow; r++) {
+    const row: GridRowCell[] = [];
+    let c = 0;
+    while (c < numCols) {
+      const group = byRowCol.get(`${r}:${c}`);
+      if (group && group.length > 0) {
+        const span = Math.max(1, Math.min(group[0]!.colSpan ?? 1, numCols - c));
+        row.push({ span, elements: group });
+        c += span;
+      } else {
+        row.push(null);
+        c += 1;
+      }
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
 function renderGridBand(band: FreeBand, data: DocumentData, fmtOpts: FormatOptions, extraClass = ''): string {
   if (band.enabled === false) return '';
   const cols = band.gridColumns?.length ? band.gridColumns : [100];
   const cellBorder = band.gridBorder ? `border:${band.gridBorder}` : 'border:none';
   const colgroup = cols.map((w) => `<col style="width:${w}%"/>`).join('');
-  const rowsHtml = groupIntoRows(band.elements)
+  const rowsHtml = buildGridRows(band.elements, cols.length)
     .map((row) => {
       const cellsHtml = row
-        .map((el) => {
-          const raw = el.kind === 'field' && el.binding ? resolveBindingRaw(el.binding, data) : undefined;
-          const cellStyle = styleToCss(resolveConditionalStyle(el.style, el.conditionalFormat, raw));
-          const span = el.colSpan && el.colSpan > 1 ? ` colspan="${el.colSpan}"` : '';
-          return `<td${span} style="${cellBorder};${cellStyle}">${renderGridCellContent(el, data, fmtOpts)}</td>`;
+        .map((cell) => {
+          if (!cell) return `<td style="${cellBorder}"></td>`;
+          const span = cell.span > 1 ? ` colspan="${cell.span}"` : '';
+          // Each stacked element gets its own style wrapper — a cell holding
+          // multiple elements can't apply one shared style to a single <td>
+          // the way the single-element case used to.
+          const contentHtml = cell.elements
+            .map((el) => {
+              const raw = el.kind === 'field' && el.binding ? resolveBindingRaw(el.binding, data) : undefined;
+              const elStyle = styleToCss(resolveConditionalStyle(el.style, el.conditionalFormat, raw));
+              return `<div style="${elStyle}">${renderGridCellContent(el, data, fmtOpts)}</div>`;
+            })
+            .join('');
+          return `<td${span} style="${cellBorder}">${contentHtml}</td>`;
         })
         .join('');
       return `<tr>${cellsHtml}</tr>`;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import type { FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
   import {
     createGridBlockElement,
@@ -31,6 +32,9 @@
     onElementDelete,
     onElementDuplicate,
     onElementEditText,
+    onGridColumnsChange,
+    onColumnResizeStart,
+    onColumnResizeEnd,
   }: {
     band: FreeBand;
     selectedElementId?: string;
@@ -46,6 +50,21 @@
     onElementDelete: (elementId: string) => void;
     onElementDuplicate: (elementId: string) => void;
     onElementEditText: (elementId: string, text: string) => void;
+    /** Cursor-drag column resize (memory.md D-044, the "Confluence-style
+     * column divider" affordance) — called continuously during a drag with
+     * the whole `gridColumns` array so the parent can live-apply it (no
+     * history push per tick, same pattern as FreeElement's onChange).
+     * Undefined disables the resize handles entirely (matches the
+     * BandProps.svelte column-width editor also being the only way to
+     * resize when this isn't wired). */
+    onGridColumnsChange?: (gridColumns: number[]) => void;
+    /** Batches the whole resize gesture into one undo step, same
+     * onDragStart/onDragEnd pattern FreeElement.svelte uses for move/resize
+     * (memory.md D-020) — DocDesigner reuses its existing element-drag
+     * snapshot/commit handlers for this since they don't care what
+     * changed, only when the gesture starts/ends. */
+    onColumnResizeStart?: () => void;
+    onColumnResizeEnd?: () => void;
   } = $props();
 
   const bandLabel: Record<FreeBand['type'], string> = {
@@ -72,20 +91,38 @@
   const gridTemplateColumns = $derived(colWidths.map((w) => `${w}%`).join(' '));
   const bordered = $derived(Boolean(band.gridBorder));
 
-  type Cell = { kind: 'element'; el: FreeElement; span: number } | { kind: 'empty'; row: number; col: number };
+  // Cumulative left-edge percent of each internal column boundary (between
+  // column i and i+1) — where the resize handle overlay sits (memory.md D-044).
+  const boundaries = $derived.by(() => {
+    const cum: number[] = [];
+    let sum = 0;
+    for (let i = 0; i < colWidths.length - 1; i++) {
+      sum += colWidths[i] as number;
+      cum.push(sum);
+    }
+    return cum;
+  });
 
-  // One entry per (row, col) — an element starting there (spanning `colSpan`
-  // grid columns via CSS `grid-column`), or an "empty" placeholder cell for
-  // any column no element covers. Re-implements the same row/col grouping
-  // core.renderGridBand uses (col occupancy from row+col+colSpan), since the
-  // designer doesn't import core's render.ts internals.
+  // A cell can hold more than one stacked element (memory.md D-045, "add
+  // multiple fields to one section column") — grouped by (row, col), not one
+  // element each.
+  type Cell = { kind: 'group'; elements: FreeElement[]; span: number } | { kind: 'empty'; row: number; col: number };
+
+  // One entry per (row, col) — the group of elements starting there (all
+  // sharing the first element's `colSpan` via CSS `grid-column`), or an
+  // "empty" placeholder cell for any column no element covers. Re-implements
+  // the same row/col grouping core.renderGridBand uses, since the designer
+  // doesn't import core's render.ts internals.
   const rows = $derived.by(() => {
-    const byRowCol = new Map<string, FreeElement>();
+    const byRowCol = new Map<string, FreeElement[]>();
     let maxRow = -1;
     for (const el of band.elements) {
       const r = el.row ?? 0;
       const c = el.col ?? 0;
-      byRowCol.set(`${r}:${c}`, el);
+      const key = `${r}:${c}`;
+      const group = byRowCol.get(key);
+      if (group) group.push(el);
+      else byRowCol.set(key, [el]);
       maxRow = Math.max(maxRow, r);
     }
     const out: Cell[][] = [];
@@ -93,10 +130,10 @@
       const row: Cell[] = [];
       let c = 0;
       while (c < numCols) {
-        const el = byRowCol.get(`${r}:${c}`);
-        if (el) {
-          const span = Math.max(1, Math.min(el.colSpan ?? 1, numCols - c));
-          row.push({ kind: 'element', el, span });
+        const group = byRowCol.get(`${r}:${c}`);
+        if (group && group.length > 0) {
+          const span = Math.max(1, Math.min(group[0]!.colSpan ?? 1, numCols - c));
+          row.push({ kind: 'group', elements: group, span });
           c += span;
         } else {
           row.push({ kind: 'empty', row: r, col: c });
@@ -152,7 +189,12 @@
   function handleCellDragLeave() {
     dragOverKey = null;
   }
-  function handleCellDrop(e: DragEvent, row: number, col: number, replacingId: string | null) {
+  // Dropping onto a cell that already holds a lone, untouched placeholder
+  // (from "Add row"/a Section) replaces it in place — that's the whole point
+  // of a placeholder. Dropping onto a cell with REAL content instead appends
+  // (stacks) the new element alongside it (memory.md D-045) — the mechanism
+  // behind "add multiple fields to one section column".
+  function handleCellDrop(e: DragEvent, row: number, col: number, group: FreeElement[] | null) {
     e.preventDefault();
     e.stopPropagation();
     dragOverKey = null;
@@ -162,8 +204,9 @@
       return;
     }
     if (!el) return;
-    if (replacingId) {
-      onUpdateElements(band.elements.map((existing) => (existing.id === replacingId ? el : existing)));
+    const solePlaceholder = group?.length === 1 && isPlaceholder(group[0]!) ? group[0]! : null;
+    if (solePlaceholder) {
+      onUpdateElements(band.elements.map((existing) => (existing.id === solePlaceholder.id ? el : existing)));
     } else {
       onUpdateElements([...band.elements, el]);
     }
@@ -193,6 +236,55 @@
     return el.kind === 'text' && !el.text;
   }
 
+  // ── Cursor-drag column resize (memory.md D-044) ─────────────────────────
+  const MIN_COL_PERCENT = 8;
+  let gridRowsWrapEl: HTMLDivElement | undefined = $state();
+  type ResizeState = { index: number; startX: number; leftOriginal: number; rightOriginal: number; wrapWidthPx: number };
+  let resizing = $state<ResizeState | null>(null);
+
+  function handleResizePointerDown(e: PointerEvent, index: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!gridRowsWrapEl) return;
+    resizing = {
+      index,
+      startX: e.clientX,
+      leftOriginal: colWidths[index] as number,
+      rightOriginal: colWidths[index + 1] as number,
+      wrapWidthPx: gridRowsWrapEl.getBoundingClientRect().width,
+    };
+    onColumnResizeStart?.();
+    window.addEventListener('pointermove', handleResizePointerMove);
+    window.addEventListener('pointerup', handleResizePointerUp);
+  }
+
+  function handleResizePointerMove(e: PointerEvent) {
+    if (!resizing) return;
+    const deltaPercent = ((e.clientX - resizing.startX) / resizing.wrapWidthPx) * 100;
+    const pairTotal = resizing.leftOriginal + resizing.rightOriginal;
+    const newLeft = Math.max(
+      MIN_COL_PERCENT,
+      Math.min(pairTotal - MIN_COL_PERCENT, resizing.leftOriginal + deltaPercent),
+    );
+    const next = [...colWidths];
+    next[resizing.index] = Math.round(newLeft * 10) / 10;
+    next[resizing.index + 1] = Math.round((pairTotal - newLeft) * 10) / 10;
+    onGridColumnsChange?.(next);
+  }
+
+  function handleResizePointerUp() {
+    if (resizing) onColumnResizeEnd?.();
+    resizing = null;
+    window.removeEventListener('pointermove', handleResizePointerMove);
+    window.removeEventListener('pointerup', handleResizePointerUp);
+  }
+
+  onDestroy(() => {
+    window.removeEventListener('pointermove', handleResizePointerMove);
+    window.removeEventListener('pointerup', handleResizePointerUp);
+    if (resizing) onColumnResizeEnd?.();
+  });
+
   function elementAriaLabel(el: FreeElement): string {
     if (isPlaceholder(el)) return `Empty cell, ${bandLabel[band.type]}`;
     if (el.kind === 'field') return `${el.label ?? el.binding?.column ?? 'field'} field, ${bandLabel[band.type]}`;
@@ -216,95 +308,110 @@
         Add a row, then drag header fields into its cells.
       </p>
     {:else}
+      <div class="dd-grid-rows-wrap" bind:this={gridRowsWrapEl}>
       {#each rows as row, rowIndex (rowIndex)}
         <div class="dd-grid-row" style="grid-template-columns:{gridTemplateColumns}">
-          {#each row as cell (cell.kind === 'element' ? cell.el.id : `${cell.row}:${cell.col}`)}
-            {#if cell.kind === 'element' && !isPlaceholder(cell.el)}
-              {@const el = cell.el}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
+          {#each row as cell (cell.kind === 'group' ? cell.elements[0]!.id : `${cell.row}:${cell.col}`)}
+            {#if cell.kind === 'group' && !(cell.elements.length === 1 && isPlaceholder(cell.elements[0]!))}
+              {@const group = cell.elements}
+              {@const groupCol = group[0]!.col ?? 0}
+              <!-- A cell can hold more than one stacked element (memory.md
+                   D-045) — the cell itself is just a drop target for
+                   appending another one; each sub-item below is its own
+                   independently selectable/editable/deletable element. -->
               <div
                 class="dd-grid-cell dd-grid-cell--filled"
                 class:dd-grid-cell--bordered={bordered}
-                class:dd-grid-cell--selected={selectedElementId === el.id}
-                class:dd-grid-cell--dragover={dragOverKey === `${rowIndex}:${el.col ?? 0}`}
+                class:dd-grid-cell--dragover={dragOverKey === `${rowIndex}:${groupCol}`}
                 style="grid-column: span {cell.span}"
-                role="button"
-                tabindex="0"
-                aria-label={elementAriaLabel(el)}
-                aria-pressed={selectedElementId === el.id}
-                onclick={(e) => {
-                  e.stopPropagation();
-                  onSelectElement(el.id);
-                }}
-                ondblclick={() => handleDblClick(el)}
-                ondragover={(e) => handleCellDragOver(e, rowIndex, el.col ?? 0)}
+                role="group"
+                aria-label={`${bandLabel[band.type]} cell`}
+                ondragover={(e) => handleCellDragOver(e, rowIndex, groupCol)}
                 ondragleave={handleCellDragLeave}
-                ondrop={(e) => handleCellDrop(e, rowIndex, el.col ?? 0, el.id)}
+                ondrop={(e) => handleCellDrop(e, rowIndex, groupCol, group)}
               >
-                {#if el.kind === 'field'}
-                  <span class="dd-stack-token">
-                    <Icon name="field" size={10} />
-                    {el.label ?? el.binding?.column}
-                  </span>
-                {:else if el.kind === 'text'}
-                  {#if editingId === el.id}
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <span
-                      class="dd-stack-text-edit"
-                      role="textbox"
-                      aria-label={`Edit text for ${bandLabel[band.type]} element`}
-                      tabindex="0"
-                      contenteditable="true"
-                      onblur={(e) => commitTextEdit(el, e)}
-                      onclick={(e) => e.stopPropagation()}
-                    >{el.text}</span>
-                  {:else}
-                    <span>{el.text}</span>
-                  {/if}
-                {:else if el.kind === 'image'}
-                  {#if el.src?.value}
-                    <img class="dd-stack-image" src={el.src.value} alt="" />
-                  {:else}
-                    <span class="dd-stack-placeholder">
-                      <Icon name="image" size={16} />
-                      Image
-                    </span>
-                  {/if}
-                {:else if el.kind === 'line'}
-                  <span class="dd-stack-line"></span>
-                {:else if el.kind === 'box'}
-                  <span class="dd-stack-box"></span>
-                {/if}
+                {#each group as el (el.id)}
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <div
+                    class="dd-grid-subitem"
+                    class:dd-grid-subitem--selected={selectedElementId === el.id}
+                    role="button"
+                    tabindex="0"
+                    aria-label={elementAriaLabel(el)}
+                    aria-pressed={selectedElementId === el.id}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      onSelectElement(el.id);
+                    }}
+                    ondblclick={() => handleDblClick(el)}
+                  >
+                    {#if el.kind === 'field'}
+                      <span class="dd-stack-token">
+                        <Icon name="field" size={10} />
+                        {el.label ?? el.binding?.column}
+                      </span>
+                    {:else if el.kind === 'text'}
+                      {#if editingId === el.id}
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <span
+                          class="dd-stack-text-edit"
+                          role="textbox"
+                          aria-label={`Edit text for ${bandLabel[band.type]} element`}
+                          tabindex="0"
+                          contenteditable="true"
+                          onblur={(e) => commitTextEdit(el, e)}
+                          onclick={(e) => e.stopPropagation()}
+                        >{el.text}</span>
+                      {:else}
+                        <span>{el.text}</span>
+                      {/if}
+                    {:else if el.kind === 'image'}
+                      {#if el.src?.value}
+                        <img class="dd-stack-image" src={el.src.value} alt="" />
+                      {:else}
+                        <span class="dd-stack-placeholder">
+                          <Icon name="image" size={16} />
+                          Image
+                        </span>
+                      {/if}
+                    {:else if el.kind === 'line'}
+                      <span class="dd-stack-line"></span>
+                    {:else if el.kind === 'box'}
+                      <span class="dd-stack-box"></span>
+                    {/if}
 
-                <span class="dd-stack-el-actions">
-                  <button
-                    type="button"
-                    class="dd-stack-el-action"
-                    aria-label="Duplicate"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      onElementDuplicate(el.id);
-                    }}
-                  >
-                    <Icon name="doc" size={11} />
-                  </button>
-                  <button
-                    type="button"
-                    class="dd-stack-el-action dd-stack-el-action--danger"
-                    aria-label="Delete"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      onElementDelete(el.id);
-                    }}
-                  >
-                    <Icon name="close" size={11} />
-                  </button>
-                </span>
+                    <span class="dd-stack-el-actions">
+                      <button
+                        type="button"
+                        class="dd-stack-el-action"
+                        aria-label="Duplicate"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          onElementDuplicate(el.id);
+                        }}
+                      >
+                        <Icon name="doc" size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        class="dd-stack-el-action dd-stack-el-action--danger"
+                        aria-label="Delete"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          onElementDelete(el.id);
+                        }}
+                      >
+                        <Icon name="close" size={11} />
+                      </button>
+                    </span>
+                  </div>
+                {/each}
               </div>
             {:else}
               {@const emptyRow = cell.kind === 'empty' ? cell.row : rowIndex}
-              {@const emptyCol = cell.kind === 'empty' ? cell.col : (cell.el.col ?? 0)}
-              {@const placeholderId = cell.kind === 'element' ? cell.el.id : null}
+              {@const emptyCol = cell.kind === 'empty' ? cell.col : (cell.elements[0]!.col ?? 0)}
+              {@const placeholderGroup = cell.kind === 'group' ? cell.elements : null}
+              {@const placeholderId = placeholderGroup ? placeholderGroup[0]!.id : null}
               <!-- A placeholder cell (real `text:''` element, e.g. from "Add
                    row"/a Sections drop) is deletable like any other element —
                    a genuinely-absent gap cell (no backing element, from a
@@ -318,7 +425,7 @@
                 aria-label={`Empty cell, ${bandLabel[band.type]}, drop a field here`}
                 ondragover={(e) => handleCellDragOver(e, emptyRow, emptyCol)}
                 ondragleave={handleCellDragLeave}
-                ondrop={(e) => handleCellDrop(e, emptyRow, emptyCol, placeholderId)}
+                ondrop={(e) => handleCellDrop(e, emptyRow, emptyCol, placeholderGroup)}
               >
                 Drop a field here
                 {#if placeholderId}
@@ -341,6 +448,26 @@
           {/each}
         </div>
       {/each}
+      {#if onGridColumnsChange && boundaries.length > 0}
+        <!-- Confluence-style column-resize dividers: a wide invisible
+             pointer target with a thin line revealed on hover/drag
+             (memory.md D-044). Spans the whole rows-wrap height, not just
+             one row, since gridColumns is a band-level (not per-row)
+             property. -->
+        <div class="dd-grid-resize-overlay">
+          {#each boundaries as leftPercent, i (i)}
+            <button
+              type="button"
+              class="dd-grid-resize-handle"
+              class:dd-grid-resize-handle--active={resizing?.index === i}
+              style="left:{leftPercent}%"
+              aria-label={`Resize column ${i + 1}`}
+              onpointerdown={(e) => handleResizePointerDown(e, i)}
+            ></button>
+          {/each}
+        </div>
+      {/if}
+      </div>
     {/if}
     <button type="button" class="dd-grid-add-row" onclick={handleAddRow}>
       <Icon name="plus" size={12} />
@@ -434,9 +561,63 @@
     font-style: italic;
   }
 
+  .dd-grid-rows-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   .dd-grid-row {
     display: grid;
     gap: 8px;
+  }
+
+  /* Confluence-style column-resize dividers (memory.md D-044): a wide
+     invisible pointer target (::after) with a thin accent line revealed on
+     hover/drag, spanning the full rows-wrap height (gridColumns is
+     band-level, not per-row). */
+  .dd-grid-resize-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .dd-grid-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    margin-left: -6px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: col-resize;
+    pointer-events: auto;
+  }
+
+  .dd-grid-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--dd-accent);
+    border-radius: 1px;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+  }
+
+  .dd-grid-resize-handle:hover::after,
+  .dd-grid-resize-handle:focus-visible::after,
+  .dd-grid-resize-handle--active::after {
+    opacity: 1;
+  }
+
+  .dd-grid-resize-handle:focus-visible {
+    outline: none;
   }
 
   .dd-grid-cell {
@@ -457,20 +638,33 @@
     border-radius: 2px;
   }
 
+  /* A filled cell is a passive container — each stacked element inside it
+     (.dd-grid-subitem) is its own independently selectable/hoverable item
+     (memory.md D-045). */
   .dd-grid-cell--filled {
-    cursor: pointer;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
   }
 
-  .dd-grid-cell--filled:hover {
+  .dd-grid-subitem {
+    position: relative;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: var(--dd-radius-sm);
+    padding: 2px 4px;
+  }
+
+  .dd-grid-subitem:hover {
     border-color: var(--dd-border);
   }
 
-  .dd-grid-cell--filled:focus-visible {
+  .dd-grid-subitem:focus-visible {
     outline: 2px solid var(--dd-accent);
     outline-offset: 1px;
   }
 
-  .dd-grid-cell--selected {
+  .dd-grid-subitem--selected {
     border-color: var(--dd-accent) !important;
     box-shadow: 0 0 0 3px var(--dd-accent-weak);
   }
@@ -503,9 +697,9 @@
     gap: 3px;
   }
 
-  .dd-grid-cell--filled:hover .dd-stack-el-actions,
-  .dd-grid-cell--filled:focus-within .dd-stack-el-actions,
-  .dd-grid-cell--selected .dd-stack-el-actions {
+  .dd-grid-subitem:hover .dd-stack-el-actions,
+  .dd-grid-subitem:focus-within .dd-stack-el-actions,
+  .dd-grid-subitem--selected .dd-stack-el-actions {
     display: flex;
   }
 

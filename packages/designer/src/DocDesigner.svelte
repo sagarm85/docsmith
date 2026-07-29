@@ -478,6 +478,24 @@
     }
   }
 
+  // Cursor-drag column resize (memory.md D-044) — live-applies gridColumns
+  // on every drag tick (no history push), same pattern as
+  // handleElementLiveChange; the gesture itself is batched into one undo
+  // step by reusing handleElementDragStart/End (they snapshot/commit the
+  // whole template regardless of what changed, so no dedicated pair is
+  // needed here).
+  function handleGridColumnsLiveChange(bandId: string, gridColumns: number[]) {
+    history = {
+      ...history,
+      present: {
+        ...template,
+        bands: template.bands.map((b): Band =>
+          b.id === bandId && !isDetailBand(b) ? { ...b, gridColumns } : b,
+        ),
+      },
+    };
+  }
+
   function handleElementDelete(bandId: string, elementId: string) {
     commitTemplate(updateBandElements(bandId, (els) => els.filter((e) => e.id !== elementId)));
     if (selection?.kind === 'element' && selection.elementId === elementId) selection = null;
@@ -777,6 +795,9 @@
             {selection}
             onAddElement={handleAddElement}
             onAddSection={addSectionToBand}
+            onGridColumnsChange={handleGridColumnsLiveChange}
+            onColumnResizeStart={handleElementDragStart}
+            onColumnResizeEnd={handleElementDragEnd}
             onUpdateElements={handleUpdateElements}
             onAddColumn={handleAddColumn}
             onUpdateColumns={handleUpdateColumns}

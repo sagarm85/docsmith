@@ -252,6 +252,50 @@ describe('renderToHtml — "grid" arrangement (memory.md D-034)', () => {
     const out = renderToHtml(t, fatDocument(1));
     expect(out.html).not.toContain('band-pageHeader band-grid');
   });
+
+  it('stacks multiple elements sharing one (row, col) inside a single <td> (memory.md D-045)', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            arrangement: 'grid' as const,
+            gridColumns: [100],
+            elements: [
+              { id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Line one', row: 0, col: 0 },
+              { id: 'b', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Line two', row: 0, col: 0 },
+            ] as FreeElement[],
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    const gridTableHtml = out.html.slice(out.html.indexOf('<table class="grid-table">'), out.html.indexOf('</table>'));
+    // Exactly one <tr> (both elements share row 0, col 0 — one cell, not two).
+    expect((gridTableHtml.match(/<tr>/g) ?? []).length).toBe(1);
+    expect((gridTableHtml.match(/<td/g) ?? []).length).toBe(1);
+    expect(gridTableHtml).toContain('Line one');
+    expect(gridTableHtml).toContain('Line two');
+    expect(gridTableHtml.indexOf('Line one')).toBeLessThan(gridTableHtml.indexOf('Line two'));
+  });
+
+  it('renders a genuinely-absent gap column as an empty <td> so later columns keep their real position (fixed alongside D-045)', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.id === 'reportHeader'
+        ? {
+            ...(b as FreeBand),
+            arrangement: 'grid' as const,
+            gridColumns: [50, 50],
+            // Only column 1 is filled in this row — column 0 is a genuine gap.
+            elements: [{ id: 'a', kind: 'text', x: 0, y: 0, w: 0, h: 0, text: 'Right side', row: 0, col: 1 }] as FreeElement[],
+          }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    const gridTableHtml = out.html.slice(out.html.indexOf('<table class="grid-table">'), out.html.indexOf('</table>'));
+    expect((gridTableHtml.match(/<td/g) ?? []).length).toBe(2);
+    expect(gridTableHtml).toMatch(/<td[^>]*><\/td>\s*<td[^>]*>.*Right side/s);
+  });
 });
 
 describe('convertBandArrangement', () => {
