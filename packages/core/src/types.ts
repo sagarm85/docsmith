@@ -68,6 +68,18 @@ export type PrintSetup = {
   /** ISO 4217 code + locale for currency formatting, e.g. { currency:'USD', locale:'en-US' }. */
   currency?: string;
   locale?: string;
+  /** Stretches the in-flow content (reportHeader + detail + totals) to fill
+   * at least one page's content height, pushing the last flowing band (the
+   * one at the very end of `.doc-flow` — normally `totals`) to the bottom
+   * of the page via `margin-top:auto`, even when there's only a handful of
+   * rows (memory.md D-040). A pure CSS flex-fill technique — correct and
+   * exact for a single-page document, or the LAST page of a multi-page one;
+   * NOT page-break-aware (unlike carried-forward subtotals, D-033, this
+   * does not attempt to repeat the effect on every page of a multi-page
+   * document — `core.renderToHtml` has no concept of page breaks at all).
+   * Absent/false leaves today's default (totals sits directly after the
+   * last row) untouched. */
+  fillPage?: boolean;
 };
 
 export type DatasetRef =

@@ -468,6 +468,35 @@ describe('renderToHtml — DetailColumn.format:"image" (memory.md D-039)', () =>
   });
 });
 
+describe('renderToHtml — printSetup.fillPage (memory.md D-040)', () => {
+  it('is a no-op (no flex/min-height CSS at all) when unset', () => {
+    const out = renderToHtml(invoiceTemplate(), fatDocument(1));
+    expect(out.css).not.toContain('min-height');
+    expect(out.css).not.toContain('margin-top: auto');
+  });
+
+  it('emits a min-height on .doc-flow matching the page content height, and a margin-top:auto rule for the last flow child', () => {
+    const t = invoiceTemplate();
+    t.printSetup = { ...t.printSetup, fillPage: true };
+    const out = renderToHtml(t, fatDocument(1));
+    // A4 portrait, default 20/18/20/18mm margins (from newTemplate) — but
+    // invoiceTemplate() only overrides bands, so printSetup keeps
+    // newTemplate()'s DEFAULT_PRINT_SETUP margins (20mm top/bottom).
+    // Content height = (297 - 20 - 20) * 96/25.4 ≈ 971.34px.
+    expect(out.css).toMatch(/\.doc-flow \{ display: flex; flex-direction: column; min-height: 9\d\d\.\d+px; \}/);
+    expect(out.css).toContain('.doc-flow > *:last-child { margin-top: auto; }');
+  });
+
+  it('accounts for landscape orientation (uses the shorter dimension as page height)', () => {
+    const t = invoiceTemplate();
+    t.printSetup = { ...t.printSetup, fillPage: true, orientation: 'landscape' };
+    const out = renderToHtml(t, fatDocument(1));
+    // A4 landscape: page height becomes 210mm (the shorter side) instead of 297mm.
+    // Content height = (210 - 20 - 20) * 96/25.4 ≈ 641.9px.
+    expect(out.css).toMatch(/min-height: 6\d\d\.\d+px/);
+  });
+});
+
 describe('matchesConditionalRule / resolveConditionalStyle (memory.md D-031)', () => {
   it('evaluates every operator', () => {
     expect(matchesConditionalRule({ operator: 'eq', value: 'x', style: {} }, 'x')).toBe(true);

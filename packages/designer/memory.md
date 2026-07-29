@@ -1032,6 +1032,84 @@ a name pattern like "url"/"photo" risks false positives on an ordinary
 text column that happens to be named that).
 `[status: locked]`
 
+### D-040 — `printSetup.fillPage`: single/last-page CSS flex-fill, explicitly NOT page-break-aware
+**Decision:** New `PrintSetup.fillPage?: boolean` (default false/unset —
+today's behavior, totals sits directly after the last row, is completely
+unchanged). When true, `core.renderToHtml` gives `.doc-flow` `display:flex;
+flex-direction:column; min-height:{page content height in px}` and adds
+`.doc-flow > *:last-child { margin-top: auto; }` — a pure CSS selector, so
+no JS logic is needed to know which band is actually last (some templates
+omit `totals` entirely). The min-height is computed from a small,
+intentionally duplicated `MM_TO_PX`/`PAGE_SIZES_MM` pair in `render.ts`
+itself (same acceptable-duplication precedent as `packages/designer/src/
+geometry.ts` and `packages/render-service/src/pagination.ts`, D-033) —
+`core` needed this specific conversion for the first time here; `pageCss()`
+itself never needed it since `@page {size:A4}` lets the browser handle
+physical page dimensions natively. A checkbox ("Fill page height (pin
+totals to the bottom)") in `PrintSetup.svelte`'s existing "Print behaviour"
+fieldset, patched through the already-generic `onPrintSetupChange` (unlike
+`keepRowTogether`/`layoutUnit`, `fillPage` is a real `PrintSetup` field, so
+no dedicated handler was needed).
+**Why:** Asked directly, with an explicit acknowledgment up front that the
+*full* version (page-pinned on every page of a multi-page document) needs
+render-service-side page-break awareness — the same class of problem as
+carried-forward subtotals (D-033) — and was out of scope for this pass.
+This ships the half that's genuinely simple: exact and correct for a
+single-page document or the last page of a multi-page one, honestly not
+attempting more.
+**Verified:** three core tests (no CSS emitted when unset; correct
+min-height for A4 portrait; correct min-height for landscape, using the
+shorter dimension as page height) and a `PrintSetup.test.ts` toggle test.
+**Rejected:** attempting the multi-page-aware version now (a real,
+separate, bigger piece of work — flagged honestly rather than either
+skipping the easy win entirely or half-building the hard version).
+`[status: locked]`
+
+### D-041 — Real bug found while verifying D-040: `white-space:pre-wrap` on `.dd-el` preserved a template-whitespace text node as a rendered line break, desyncing content from the selection box
+**Decision:** `FreeElement.svelte`'s `.dd-el` no longer sets
+`white-space: pre-wrap`; it moved to `.dd-el-body` (the actual content
+wrapper introduced by D-036), which is where it belongs semantically (only
+free-form text content needs multi-line whitespace preservation — the
+toolbar's icon buttons never did).
+**Why:** The user reported "weird selection" while dragging a field —
+screenshots showed the selection outline/resize handles anchored correctly
+to the element's real box, while the *visible chip content* rendered
+~14px below it, looking like a duplicate/offset selection. Root-caused via
+a real-browser Puppeteer reproduction (not a code-reading guess): a plain
+HTML/CSS file constructed from the *actual compiled* markup/CSS extracted
+live from the running app confirmed `.dd-el-body.offsetTop === 14`,
+matching one line-height. `.dd-el`'s DOM has a toolbar `<div>` and a
+content `<div>` as siblings, separated in Svelte's compiled template
+output by an ordinary whitespace/newline text node — normally invisible
+(collapsed) in default `white-space:normal` block layout, but D-036's
+toolbar addition put `.dd-el-body` after that toolbar div for the first
+time, and `.dd-el`'s pre-existing `white-space:pre-wrap` (needed since
+Phase 2, for multi-line text elements) made that inter-element whitespace
+*significant* — rendered as a real preserved line break, pushing the
+content box down by ~one line-height while the selection outline/handles/
+toolbar (all sized directly against `.dd-el`'s own, unshifted CSS box)
+stayed correctly positioned. This is exactly why jsdom-based component
+tests (all passing throughout) never caught it: jsdom doesn't perform real
+box-model/whitespace-collapsing layout, so `offsetTop` there is always 0
+regardless of this class of bug — only an actual browser layout engine
+reveals it, which is why this session's practice of a real-browser
+Puppeteer visual pass before calling a UI change done has repeatedly
+caught bugs (D-025's dark-mode band tint, D-027's dev-mode `@import`, and
+now this) that the automated test suite structurally cannot.
+**Verified:** the same real-browser Puppeteer reproduction, re-run after
+the fix, confirms `.dd-el` and `.dd-el-body`'s `getBoundingClientRect()`
+now match exactly, and a screenshot of the exact drag interaction the user
+reported shows the selection box, resize handles, and visible content all
+correctly aligned. No test suite regression (171 designer tests still
+pass, since jsdom can't observe this bug either way).
+**Rejected:** template-level whitespace management (deleting the newline/
+indentation between the toolbar and content markup) — technically also
+fixes it, but fragile: any future edit reformatting the template could
+silently reintroduce the exact same class of bug. Scoping the CSS property
+to only where it's semantically needed is the durable fix.
+`[status: locked]`
+
+
 ---
 
 ## Open items (decide, then move to a D-entry)

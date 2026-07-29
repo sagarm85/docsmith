@@ -125,4 +125,11 @@ describe('PrintSetup', () => {
     expect(onKeepRowTogetherChange).toHaveBeenCalledWith(false);
     expect(onPrintSetupChange).not.toHaveBeenCalled();
   });
+
+  it('"Fill page height" toggles printSetup.fillPage (memory.md D-040) — off by default', async () => {
+    const { template, onPrintSetupChange } = setup();
+    expect((screen.getByLabelText(/Fill page height/) as HTMLInputElement).checked).toBe(false);
+    await fireEvent.click(screen.getByLabelText(/Fill page height/));
+    expect(onPrintSetupChange).toHaveBeenCalledWith({ ...template.printSetup, fillPage: true });
+  });
 });

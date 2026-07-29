@@ -37,7 +37,29 @@ function esc(s: unknown): string {
 }
 
 // ── page geometry ──────────────────────────────────────────────────────────────
-// CSS understands the A4/Letter/A5/Legal keywords for @page `size`.
+// CSS understands the A4/Letter/A5/Legal keywords for @page `size`, so the
+// print output itself never needs manual mm->px math. `fillPage` (D-040) is
+// the one exception: `.doc-flow`'s `min-height` needs a real px number, so
+// this constant/table are duplicated here rather than shared — the same
+// small, stable-value duplication already accepted for
+// packages/designer/src/geometry.ts (design-canvas-only) and
+// packages/render-service/src/pagination.ts (D-033).
+const MM_TO_PX = 96 / 25.4;
+const PAGE_SIZES_MM: Record<string, { width: number; height: number }> = {
+  A4: { width: 210, height: 297 },
+  Letter: { width: 215.9, height: 279.4 },
+  A5: { width: 148, height: 210 },
+  Legal: { width: 215.9, height: 355.6 },
+};
+
+/** The printable content height in px (page height minus top/bottom
+ * margins, orientation-aware) — only used for `fillPage`'s `min-height`. */
+function printableContentHeightPx(p: PrintSetup): number {
+  const size = PAGE_SIZES_MM[p.pageSize] ?? PAGE_SIZES_MM.A4!;
+  const ph = p.orientation === 'landscape' ? Math.min(size.width, size.height) : Math.max(size.width, size.height);
+  return (ph - p.margins.top - p.margins.bottom) * MM_TO_PX;
+}
+
 function pageCss(p: PrintSetup): string {
   const { top, right, bottom, left } = p.margins;
   const size = `${p.pageSize} ${p.orientation}`;
@@ -360,12 +382,25 @@ function renderBand(
 }
 
 // ── base stylesheet ──────────────────────────────────────────────────────────────
-function baseCss(runningTop: number, runningBottom: number): string {
+// `fillPageMinHeight` (memory.md D-040) is undefined unless
+// `printSetup.fillPage` is set — when present, `.doc-flow` becomes a flex
+// column stretched to at least one page's content height, and its LAST
+// child (whichever in-flow band renders last — normally `totals`) gets
+// `margin-top:auto`, pushing it to the bottom of the page. `:last-child` is
+// a pure CSS selector, so this needs no JS knowledge of which band is
+// actually last (some templates omit `totals`, e.g.).
+function baseCss(runningTop: number, runningBottom: number, fillPageMinHeight?: number): string {
+  const fillPageCss =
+    fillPageMinHeight != null
+      ? `.doc-flow { display: flex; flex-direction: column; min-height: ${fillPageMinHeight}px; }
+.doc-flow > *:last-child { margin-top: auto; }`
+      : '';
   return `
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #111; }
 .doc-flow { padding-top: ${runningTop}px; padding-bottom: ${runningBottom}px; }
+${fillPageCss}
 .band { position: relative; }
 .el { position: absolute; }
 .el-field, .el-text { white-space: pre-wrap; }
@@ -427,7 +462,10 @@ export function renderToHtml(template: Template, data: DocumentData): RenderResu
     (pageHeader ? renderFreeBand(pageHeader, data, fmtOpts, layoutUnit, 'running running-top') : '') +
     (pageFooter ? renderFreeBand(pageFooter, data, fmtOpts, layoutUnit, 'running running-bottom') : '');
 
-  const css = `${pageCss(template.printSetup)}\n${baseCss(runningTop, runningBottom)}`;
+  const fillPageMinHeight = template.printSetup.fillPage
+    ? printableContentHeightPx(template.printSetup)
+    : undefined;
+  const css = `${pageCss(template.printSetup)}\n${baseCss(runningTop, runningBottom, fillPageMinHeight)}`;
   const html = `${runningHtml}\n<div class="page"><div class="doc-flow">${flowHtml}</div></div>`;
 
   const document = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}</body></html>`;

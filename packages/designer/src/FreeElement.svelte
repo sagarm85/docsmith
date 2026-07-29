@@ -467,14 +467,27 @@
     position: absolute;
     font-size: 12px;
     color: #222;
-    white-space: pre-wrap;
     cursor: grab;
   }
 
+  /* white-space:pre-wrap lives here, not on .dd-el, and this is not just
+     cosmetic scoping: .dd-el's children include this content div AND the
+     toolbar div, both separated by an ordinary whitespace/newline text node
+     from the template. white-space:pre-wrap makes that whitespace
+     SIGNIFICANT (like a <pre>) — on .dd-el itself, that stray newline
+     rendered as a real preserved line break, silently pushing this whole
+     content box down by one line-height, which desynced the element's
+     visible content from its own selection outline/resize handles/hover
+     toolbar position (all sized against .dd-el's real, unshifted box).
+     Scoping the property to just this leaf avoids the whitespace-between-
+     siblings hazard entirely, and is also more correct: the toolbar's icon
+     buttons never needed multi-line text preservation, only actual
+     free-form text content does. */
   .dd-el-body {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    white-space: pre-wrap;
   }
 
   .dd-el:active {

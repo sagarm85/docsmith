@@ -633,12 +633,25 @@ already done. Tracked here with the same rigor as a phase checklist.
       fabricated. Verified end-to-end with a real-browser screenshot of
       both the canvas and the actual Preview-mode output (via
       `core.renderToHtml`, not just the designer's own approximation).
-- [ ] Full-height table + page-pinned summary (table area fills to the
-      bottom of the page, summary/totals block pinned there even with one
-      row) — feasible today for a single/last page via a CSS flex-fill
-      technique; guaranteeing it on every page of a multi-page document
-      needs render-service-side page-break awareness, the same class of
-      problem as carried-forward subtotals (D-033). Not yet built either way.
+- [x] Full-height table + page-pinned summary (D-040) — new
+      `printSetup.fillPage`; when set, `.doc-flow` becomes a flex column at
+      least one page's content height tall, with the last in-flow band
+      pinned to the bottom via `margin-top:auto`. Exact and correct for a
+      single-page document or the last page of a multi-page one; explicitly
+      NOT page-break-aware across multiple pages (same class of problem as
+      carried-forward subtotals, D-033) — honestly scoped, not silently
+      half-built.
+- [x] **Bug found and fixed while verifying the above** (D-041, unrelated to
+      `fillPage` itself): the user reported "weird selection" while dragging
+      a field — the D-036 hover-toolbar change had left `white-space:
+      pre-wrap` on `.dd-el` (needed for multi-line text elements), which
+      turned an ordinary template whitespace/newline between the toolbar and
+      content `<div>`s into a *rendered* line break, pushing visible content
+      ~14px below its own selection outline/resize handles. Root-caused via
+      a real-browser Puppeteer reproduction built from the actual compiled
+      markup/CSS (jsdom-based tests can't see this class of bug at all —
+      no real box-model layout). Fixed by moving `white-space:pre-wrap` to
+      `.dd-el-body`, where it's semantically correct anyway.
 
 ---
 
@@ -662,6 +675,36 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Full-height table + page-pinned summary (D-040); real
+  selection/content-desync bug found and fixed (D-041); post-Phase-3
+  design-review list complete.** New `printSetup.fillPage` — `.doc-flow`
+  becomes a flex column stretched to at least one page's content height,
+  with the last in-flow band pinned to the bottom via `margin-top:auto`.
+  Correct for a single-page document or the last page of a multi-page one;
+  explicitly not page-break-aware across multiple pages (same class of gap
+  as carried-forward subtotals, D-033) — flagged honestly, not silently
+  half-built. While verifying it, the user reported a real regression: a
+  field's selection outline/resize handles no longer matched its visible
+  content position while dragging. Root-caused via a real-browser Puppeteer
+  reproduction built from the actual compiled markup (not a guess): D-036's
+  hover toolbar had left `white-space:pre-wrap` on `.dd-el`, which turned
+  an ordinary template whitespace/newline between the toolbar and content
+  `<div>`s into a rendered line break, pushing content ~14px down while the
+  selection box (sized against `.dd-el`'s own unshifted CSS box) stayed
+  put. jsdom-based tests never caught it — no real box-model layout there —
+  underscoring why this session's practice of a real-browser screenshot
+  pass before calling a UI change done matters. Fixed by moving
+  `white-space:pre-wrap` to `.dd-el-body`, where it's semantically correct.
+  55 core tests pass (was 52); 171 designer tests pass (was 170, including
+  a new `PrintSetup.test.ts` toggle test); lint/typecheck/build all green.
+  Verified with a real-browser screenshot of the exact drag interaction the
+  user reported, confirming the fix. This closed out every item from the
+  original post-Phase-3 design-review conversation — six mocked ideas
+  (borderless table, hover toolbar, Sections palette, alignment guides,
+  product images, full-height layout), all built, tested, and verified
+  against the real rendered output, not just the designer's approximation
+  of it. (A further Palette visual-polish gap was raised immediately after
+  this, tracked separately as D-042 in a follow-up change.)
 - **2026-07-29 — Product image per line item (D-039), post-Phase-3.**
   `ValueFormat` gains `'image'` — a real per-row bound value (a plain URL
   string, same shape the adapter returns for any other column), not a new

@@ -237,6 +237,14 @@
       />
       Keep line rows together
     </label>
+    <label class="dd-toggle">
+      <input
+        type="checkbox"
+        checked={printSetup.fillPage ?? false}
+        onchange={(e) => patch({ fillPage: (e.currentTarget as HTMLInputElement).checked })}
+      />
+      Fill page height (pin totals to the bottom)
+    </label>
   </fieldset>
 </section>
 
