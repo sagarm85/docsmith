@@ -61,6 +61,14 @@
 
   let dragOver = $state(false);
 
+  // Alignment guides (memory.md D-038) — ephemeral, drag-time-only state
+  // owned here (never lifted to DocDesigner/persisted): whichever element is
+  // currently being dragged reports its computed guide positions on every
+  // pointermove tick via onGuides, and clears them (`{x:null,y:null}`) on
+  // drag end. Only one element can be dragging at a time, so one shared
+  // slot is enough.
+  let guides = $state<{ x: number | null; y: number | null }>({ x: null, y: null });
+
   const bandLabel: Record<FreeBand['type'], string> = {
     reportHeader: 'Report Header',
     pageHeader: 'Page Header',
@@ -173,6 +181,7 @@
           {unit}
           {contentWidthPx}
           bandHeightPx={band.height}
+          siblings={band.elements}
           onSelect={() => onSelectElement(el.id)}
           onChange={(patch) => onElementLiveChange(el.id, patch)}
           onDragStart={onElementDragStart}
@@ -182,8 +191,15 @@
           onBringForward={() => onElementBringForward(el.id)}
           onSendBack={() => onElementSendBack(el.id)}
           onEditText={(text) => onElementEditText(el.id, text)}
+          onGuides={(g) => (guides = g)}
         />
       {/each}
+    {/if}
+    {#if guides.x !== null}
+      <div class="dd-align-guide dd-align-guide--v" style="left:{guides.x}{unit}"></div>
+    {/if}
+    {#if guides.y !== null}
+      <div class="dd-align-guide dd-align-guide--h" style="top:{guides.y}{unit}"></div>
     {/if}
   </div>
 </div>
@@ -246,6 +262,27 @@
     position: relative;
     background: #fff;
     padding-left: 3px;
+  }
+
+  /* Alignment guides (memory.md D-038) — ephemeral drag-time overlay, never
+     part of the template. Distinct pink so it never reads as UI chrome. */
+  .dd-align-guide {
+    position: absolute;
+    background: #ec4899;
+    pointer-events: none;
+    z-index: 8;
+  }
+
+  .dd-align-guide--v {
+    top: 0;
+    bottom: 0;
+    width: 1.5px;
+  }
+
+  .dd-align-guide--h {
+    left: 0;
+    right: 0;
+    height: 1.5px;
   }
 
   .dd-band--dragover .dd-band-body {

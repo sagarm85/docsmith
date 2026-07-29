@@ -934,6 +934,55 @@ click-to-add-then-manually-move already covers, and none of the reference
 templates in the original conversation needed it on a non-default band).
 `[status: locked]`
 
+### D-038 — Alignment guides: left/center/right + top/center/bottom edge matching against band siblings, computed in `FreeElement.svelte`, rendered by `Band.svelte`
+**Decision:** `FreeElement.svelte` gains a `siblings` prop (the containing
+band's full `elements` array — already in the same unit as the dragged
+element's own `x`/`y`/`w`/`h`, so no conversion is needed to compare edges
+directly, unlike position math elsewhere that has to account for D-028's
+px/% split). On every move-drag `pointermove` tick, the dragged element's
+three X edges (left, center, right) and three Y edges (top, center, bottom)
+are compared against the same six edges of every other element in the
+band; the closest match within a tolerance (4px in `'px'` mode, 0.6% in
+`'%'` mode — deliberately smaller than the existing 4px/0.5%-step grid
+snap, so a genuine alignment always wins over the coarser grid when both
+apply) snaps that axis to the sibling's exact position, bypassing the
+ordinary grid-snap for that axis only. The computed guide position (or
+`null`) is reported on every tick via a new `onGuides` callback, and once
+more with `{x:null,y:null}` on drag end (both the normal `pointerup` path
+and the `onDestroy` mid-drag-unmount path, mirroring the existing window-
+listener cleanup). `Band.svelte` owns the actual guide-line rendering: a
+single `$state` slot (only one element can be dragging at a time) fed by
+every `FreeElementView`'s `onGuides`, rendered as one absolutely-positioned
+pink (`#ec4899`) line per axis spanning the full band. Purely a drag-time
+visual aid — never written to the template, same "ephemeral" framing as
+the original mockup's own caption. Only applies to free-form bands; grid
+cells are already auto-aligned by construction (D-034) and stack rows have
+no x/y to align.
+**Why:** The user showed a reference screenshot (Figma/Sketch-style pink
+snap line + a ghost of the original position) and asked for exactly this
+after the earlier design-review mockup had proposed it. Left/center/right
+(not just left-to-left) matches every real case shown across the
+conversation's reference images, including centering a title over a column
+of fields, not just left-aligning a column of labels.
+**Verified:** `FreeElement.test.ts` (snap-to-sibling-edge with the exact
+snapped value and reported guide position; falls back to the ordinary grid
+snap when no sibling is within tolerance), `Band.test.ts` (the actual
+`.dd-align-guide` line renders during a drag with the correct `left`
+position, and is removed from the DOM on drop) — and a real-browser
+Puppeteer mouse-drag screenshot (jsdom's synthetic events can't be trusted
+for real drag-and-drop visual verification) confirming the pink line
+renders at exactly the sibling's edge, matching the reference image
+pixel-for-pixel in spirit.
+**Rejected:** a fixed single-edge-type match (left-to-left only) — real
+tools and the reference images both needed center/right matching too, and
+the extra comparisons are cheap (a handful of siblings × 3 edges × 3
+edges, recomputed only on pointermove, not every frame); showing a
+numeric gap-distance chip next to the guide line (present in the original
+mockup's illustration) — deferred as a pure polish addition with no
+functional value beyond the line itself, not required for the feature to
+work, can be added later without changing the underlying snap logic.
+`[status: locked]`
+
 ---
 
 ## Open items (decide, then move to a D-entry)

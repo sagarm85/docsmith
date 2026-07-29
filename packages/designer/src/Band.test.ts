@@ -16,6 +16,19 @@ function emptyBand(type: FreeBand['type'] = 'reportHeader'): FreeBand {
   return { id: type, type, height: 140, elements: [] };
 }
 
+// jsdom has no real PointerEvent, and fireEvent.pointerDown falls back to a
+// bare Event with no clientX/clientY — dispatch a real MouseEvent directly
+// instead, same pattern as FreeElement.test.ts.
+function pointerDownAt(el: Element, clientX: number, clientY: number) {
+  el.dispatchEvent(new MouseEvent('pointerdown', { clientX, clientY, bubbles: true }));
+}
+function pointerMoveTo(clientX: number, clientY: number) {
+  window.dispatchEvent(new MouseEvent('pointermove', { clientX, clientY }));
+}
+function nextTick(): Promise<void> {
+  return Promise.resolve();
+}
+
 function selectionCallbacks() {
   return {
     onSelectElement: vi.fn(),
@@ -198,5 +211,35 @@ describe('Band', () => {
     });
     await fireEvent.click(screen.getByRole('group', { name: 'Report Header band' }));
     expect(callbacks.onDeselect).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders an alignment guide line while dragging one element toward another\'s edge, and removes it on drop (memory.md D-038)', async () => {
+    const band: FreeBand = {
+      id: 'reportHeader',
+      type: 'reportHeader',
+      height: 140,
+      elements: [
+        { id: 'a', kind: 'field', x: 40, y: 40, w: 100, h: 20, label: 'A' },
+        { id: 'b', kind: 'field', x: 102, y: 200, w: 100, h: 20, label: 'Sibling' },
+      ],
+    };
+    render(Band, {
+      props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...selectionCallbacks() },
+    });
+
+    expect(document.querySelector('.dd-align-guide')).toBeNull();
+
+    const el = screen.getByRole('button', { name: /A field, Report Header/ });
+    pointerDownAt(el, 100, 100);
+    pointerMoveTo(100 + (102 - 40), 100); // drags element a's left edge onto b's left edge (102)
+    await nextTick();
+
+    const guide = document.querySelector('.dd-align-guide--v') as HTMLElement | null;
+    expect(guide).toBeTruthy();
+    expect(guide!.style.left).toBe('102px');
+
+    window.dispatchEvent(new MouseEvent('pointerup'));
+    await nextTick();
+    expect(document.querySelector('.dd-align-guide')).toBeNull();
   });
 });

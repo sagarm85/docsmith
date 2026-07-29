@@ -14,6 +14,7 @@
     unit = 'px',
     contentWidthPx = 0,
     bandHeightPx = 0,
+    siblings = [],
     onSelect,
     onChange,
     onDragStart,
@@ -23,6 +24,7 @@
     onBringForward,
     onSendBack,
     onEditText,
+    onGuides,
   }: {
     element: FreeElement;
     selected: boolean;
@@ -40,6 +42,11 @@
     unit?: 'px' | '%';
     contentWidthPx?: number;
     bandHeightPx?: number;
+    /** Every other element in the same band (this element included — filtered
+     * out by id) — used only to compute alignment guides while dragging
+     * (memory.md D-038). Already in the same unit as `element.x/y/w/h`, so
+     * no conversion needed to compare edges. */
+    siblings?: FreeElement[];
     onSelect: () => void;
     /** Called continuously during a move/resize drag — the parent applies this
      * live (no history push) so undo/redo sees the whole drag as one step. */
@@ -54,6 +61,12 @@
     onBringForward: () => void;
     onSendBack: () => void;
     onEditText?: (text: string) => void;
+    /** Fired on every move-drag tick with the current alignment-guide
+     * positions (already in `unit`-space, ready to use as a CSS left/top
+     * value), and once more with `{x:null,y:null}` on drag end. The parent
+     * (Band.svelte) renders the actual guide-line overlay — ephemeral,
+     * drag-time-only, never written to the template. */
+    onGuides?: (guides: { x: number | null; y: number | null }) => void;
   } = $props();
 
   // px<->% conversion (memory.md D-028). No-ops in 'px' mode. x/w use the
@@ -73,6 +86,53 @@
   }
   const minW = $derived(fromPx(MIN_SIZE, contentWidthPx));
   const minH = $derived(fromPx(MIN_SIZE, bandHeightPx));
+
+  // Alignment guides while dragging (memory.md D-038): snap-to-sibling on
+  // left/center/right (x) and top/center/bottom (y) edges independently —
+  // matching Figma/Sketch-style smart guides. Tolerance is in `unit`-space
+  // (same idea as snapX/snapY's own px-vs-% split above) since edges in the
+  // same band already share one basis (contentWidthPx for x, bandHeightPx
+  // for y), so comparing raw stored values works with no conversion.
+  const ALIGN_TOLERANCE = $derived(unit === '%' ? 0.6 : 4);
+
+  function computeAlignSnap(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ): { x: number | null; y: number | null; snappedX: number; snappedY: number } {
+    const myXs = [x, x + w / 2, x + w];
+    const myYs = [y, y + h / 2, y + h];
+    let bestX: { guide: number; delta: number } | null = null;
+    let bestY: { guide: number; delta: number } | null = null;
+    for (const sib of siblings) {
+      if (sib.id === element.id) continue;
+      const sibXs = [sib.x, sib.x + sib.w / 2, sib.x + sib.w];
+      const sibYs = [sib.y, sib.y + sib.h / 2, sib.y + sib.h];
+      for (const mx of myXs) {
+        for (const sx of sibXs) {
+          const delta = sx - mx;
+          if (Math.abs(delta) <= ALIGN_TOLERANCE && (!bestX || Math.abs(delta) < Math.abs(bestX.delta))) {
+            bestX = { guide: sx, delta };
+          }
+        }
+      }
+      for (const my of myYs) {
+        for (const sy of sibYs) {
+          const delta = sy - my;
+          if (Math.abs(delta) <= ALIGN_TOLERANCE && (!bestY || Math.abs(delta) < Math.abs(bestY.delta))) {
+            bestY = { guide: sy, delta };
+          }
+        }
+      }
+    }
+    return {
+      x: bestX ? bestX.guide : null,
+      y: bestY ? bestY.guide : null,
+      snappedX: bestX ? x + bestX.delta : x,
+      snappedY: bestY ? y + bestY.delta : y,
+    };
+  }
 
   type DragState =
     | { kind: 'move'; startX: number; startY: number; ox: number; oy: number }
@@ -132,7 +192,14 @@
     const dy = fromPx(dyRaw, bandHeightPx);
 
     if (drag.kind === 'move') {
-      onChange({ x: Math.max(0, snapX(drag.ox + dx)), y: Math.max(0, snapY(drag.oy + dy)) });
+      const rawX = Math.max(0, drag.ox + dx);
+      const rawY = Math.max(0, drag.oy + dy);
+      const align = computeAlignSnap(rawX, rawY, element.w, element.h);
+      onGuides?.({ x: align.x, y: align.y });
+      onChange({
+        x: Math.max(0, align.x !== null ? align.snappedX : snapX(rawX)),
+        y: Math.max(0, align.y !== null ? align.snappedY : snapY(rawY)),
+      });
       return;
     }
 
@@ -172,6 +239,7 @@
 
   function handlePointerUp() {
     if (drag) onDragEnd?.();
+    if (drag?.kind === 'move') onGuides?.({ x: null, y: null });
     drag = null;
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
@@ -184,6 +252,7 @@
   onDestroy(() => {
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
+    if (drag?.kind === 'move') onGuides?.({ x: null, y: null });
   });
 
   // Each key-nudge is its own discrete undo step (unlike a pointer drag, which

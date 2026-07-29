@@ -588,8 +588,17 @@ already done. Tracked here with the same rigor as a phase checklist.
       (`top:-34px`) and the existing resize handles (small negative
       offsets) — split element content into an inner `.dd-el-body` that
       owns the clip, leaving `.dd-el` itself unclipped for its decorations.
-- [ ] Alignment guides while dragging (snap lines + gap distance against
-      sibling elements) — mocked, not yet built.
+- [x] Alignment guides while dragging (memory.md D-038) — `FreeElement.svelte`
+      now takes every sibling in its band and, on each move-drag tick,
+      checks the dragged element's left/center/right and top/center/bottom
+      edges against each sibling's same edges; a match within tolerance
+      (4px, or 0.6% in `%` layoutUnit mode) snaps to it exactly and reports
+      the guide position up to `Band.svelte`, which renders the actual pink
+      overlay line spanning the band. Ephemeral — never written to the
+      template, cleared on drag end (and on mid-drag unmount, a real edge
+      case fixed alongside it). Grid arrangement is unaffected (cells are
+      already auto-aligned by construction) — this only applies to free-form
+      bands.
 - [x] Borderless/styled detail table option — new `DetailBand.cellBorder`
       (a CSS `border-bottom` shorthand override via a `--dd-cell-border`
       custom property in `core`'s base stylesheet; the header's own border
@@ -643,6 +652,21 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-29 — Alignment guides while dragging (D-038), post-Phase-3.**
+  `FreeElement.svelte` compares the dragged element's left/center/right and
+  top/center/bottom edges against every sibling in the band on each
+  move-drag tick; a match within tolerance (4px, or 0.6% in `%` mode)
+  snaps exactly to it, overriding the coarser grid snap for that axis.
+  `Band.svelte` renders the actual pink guide line (spanning the full band)
+  from a small piece of local, ephemeral state — never written to the
+  template. Grid-arranged bands are unaffected (cells already auto-align).
+  169 designer tests pass (was 166, including two new `FreeElement.test.ts`
+  snap-behavior tests and a `Band.test.ts` test asserting the actual guide
+  line renders with the correct position and clears on drop). Verified
+  with a real-browser Puppeteer mouse-drag screenshot — jsdom's synthetic
+  pointer events aren't trustworthy for this class of visual verification —
+  confirming the line renders exactly at the sibling's edge, matching the
+  reference image the user provided.
 - **2026-07-29 — "Sections" palette group (D-037), post-Phase-3.** On
   closer inspection the palette already had collapsible icon-labeled groups
   and per-type field glyphs before this session — corrected the earlier
