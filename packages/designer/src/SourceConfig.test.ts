@@ -111,6 +111,10 @@ describe('SourceConfig', () => {
       dataSource: { entity: 'invoice', key: 'id', datasets: [] },
       onDataSourceChange,
     });
+    // The SQL dataset form lives behind the "Advanced"
+    // collapsible (v2 simplification) — open it first.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Advanced/ })).toBeTruthy());
+    await fireEvent.click(screen.getByRole('button', { name: /Advanced/ }));
     await waitFor(() => expect(screen.getByText('Add a custom (SQL) dataset')).toBeTruthy());
     return { adapter, rerender };
   }

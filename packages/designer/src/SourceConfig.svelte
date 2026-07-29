@@ -3,6 +3,7 @@
   import Select from './ui/Select.svelte';
   import Skeleton from './ui/Skeleton.svelte';
   import ErrorInline from './ui/ErrorInline.svelte';
+  import Collapsible from './ui/Collapsible.svelte';
 
   let {
     adapter,
@@ -206,30 +207,35 @@
         </ul>
       {/if}
 
-      <div class="dd-sql-form">
-        <h4 class="dd-sql-form-title">Add a custom (SQL) dataset</h4>
-        <p class="dd-sql-form-hint">
-          Declares a named dataset your adapter's <code>fetchDocument</code> is expected
-          to populate by this id — the designer never runs this query itself.
-        </p>
-        <label class="dd-sql-field">
-          <span>Dataset id</span>
-          <input type="text" bind:value={sqlId} placeholder="e.g. top_customers" />
-        </label>
-        <label class="dd-sql-field">
-          <span>Label</span>
-          <input type="text" bind:value={sqlLabel} placeholder="e.g. Top Customers" />
-        </label>
-        <label class="dd-sql-field">
-          <span>SQL query</span>
-          <textarea bind:value={sqlQuery} rows="3" placeholder="SELECT ..."></textarea>
-        </label>
-        {#if sqlError}
-          <p class="dd-sql-error" role="alert">{sqlError}</p>
-        {/if}
-        <button type="button" class="dd-sql-add" onclick={addSqlDataset}>
-          + Add SQL dataset
-        </button>
+      <div class="dd-advanced">
+        <Collapsible title="Advanced" icon="database" open={false}>
+          <div class="dd-sql-form">
+            <h4 class="dd-sql-form-title">Add a custom (SQL) dataset</h4>
+            <p class="dd-sql-form-hint">
+              Declares a named dataset your adapter's <code>fetchDocument</code> is expected
+              to populate by this id — the designer never runs this query itself.
+              For technical setup only — most templates won't need this.
+            </p>
+            <label class="dd-sql-field">
+              <span>Dataset id</span>
+              <input type="text" bind:value={sqlId} placeholder="e.g. top_customers" />
+            </label>
+            <label class="dd-sql-field">
+              <span>Label</span>
+              <input type="text" bind:value={sqlLabel} placeholder="e.g. Top Customers" />
+            </label>
+            <label class="dd-sql-field">
+              <span>SQL query</span>
+              <textarea bind:value={sqlQuery} rows="3" placeholder="SELECT ..."></textarea>
+            </label>
+            {#if sqlError}
+              <p class="dd-sql-error" role="alert">{sqlError}</p>
+            {/if}
+            <button type="button" class="dd-sql-add" onclick={addSqlDataset}>
+              + Add SQL dataset
+            </button>
+          </div>
+        </Collapsible>
       </div>
     </div>
   {/if}
@@ -341,13 +347,16 @@
     padding: 1px 4px;
   }
 
+  .dd-advanced {
+    margin-top: 10px;
+    border-top: 1px solid var(--dd-border);
+    padding-top: 4px;
+  }
+
   .dd-sql-form {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--dd-border);
   }
 
   .dd-sql-form-title {
