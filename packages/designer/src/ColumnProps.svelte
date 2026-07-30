@@ -96,33 +96,39 @@
     />
   </Field>
 
-  <Field label="Aggregate (footer)" fieldId="dd-col-aggregate">
-    <Select
-      id="dd-col-aggregate"
-      ariaLabel="Column aggregate"
-      value={aggregate ?? 'none'}
-      options={AGGREGATE_OPTIONS}
-      onchange={(v) =>
-        onAggregateChange?.(v === 'none' ? null : (v as 'sum' | 'count' | 'avg'))
-      }
-    />
-  </Field>
+  {#if column.format === 'number' || column.format === 'currency'}
+    <!-- Sum/Average only make sense for a numeric column — hidden rather
+         than just disabled for Text/Date/Words/Image, per direct request
+         ("it only applicable to number field"), rather than showing a
+         control whose options don't apply to the column's own data. -->
+    <Field label="Aggregate (footer)" fieldId="dd-col-aggregate">
+      <Select
+        id="dd-col-aggregate"
+        ariaLabel="Column aggregate"
+        value={aggregate ?? 'none'}
+        options={AGGREGATE_OPTIONS}
+        onchange={(v) =>
+          onAggregateChange?.(v === 'none' ? null : (v as 'sum' | 'count' | 'avg'))
+        }
+      />
+    </Field>
 
-  <Field label="Carry forward (page breaks)" fieldId="dd-col-carry-forward">
-    <Select
-      id="dd-col-carry-forward"
-      ariaLabel="Column carry-forward across page breaks"
-      value={carryForward ?? 'none'}
-      options={AGGREGATE_OPTIONS}
-      onchange={(v) =>
-        onCarryForwardChange?.(v === 'none' ? null : (v as 'sum' | 'count' | 'avg'))
-      }
-    />
-    <p class="dd-col-hint">
-      Adds "Carried forward" / "Brought forward" rows at each page break in the exported PDF
-      (not shown in preview).
-    </p>
-  </Field>
+    <Field label="Carry forward (page breaks)" fieldId="dd-col-carry-forward">
+      <Select
+        id="dd-col-carry-forward"
+        ariaLabel="Column carry-forward across page breaks"
+        value={carryForward ?? 'none'}
+        options={AGGREGATE_OPTIONS}
+        onchange={(v) =>
+          onCarryForwardChange?.(v === 'none' ? null : (v as 'sum' | 'count' | 'avg'))
+        }
+      />
+      <p class="dd-col-hint">
+        Adds "Carried forward" / "Brought forward" rows at each page break in the exported PDF
+        (not shown in preview).
+      </p>
+    </Field>
+  {/if}
 
   <ConditionalRulesEditor
     rules={column.conditionalFormat ?? []}

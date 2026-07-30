@@ -41,4 +41,19 @@ describe('ColumnProps — aggregate (design.md §8.5 Phase 3)', () => {
     });
     expect(onAggregateChange).toHaveBeenCalledWith(null);
   });
+
+  it('hides Aggregate/Carry-forward entirely for a non-numeric column (Sum/Average don\'t apply to text/date)', () => {
+    render(ColumnProps, {
+      props: { column: { ...column(), format: 'text' }, onChange: vi.fn() },
+    });
+    expect(screen.queryByLabelText('Column aggregate')).toBeNull();
+    expect(screen.queryByLabelText('Column carry-forward across page breaks')).toBeNull();
+  });
+
+  it('shows Aggregate/Carry-forward for a currency column too', () => {
+    render(ColumnProps, {
+      props: { column: { ...column(), format: 'currency' }, onChange: vi.fn() },
+    });
+    expect(screen.getByLabelText('Column aggregate')).toBeTruthy();
+  });
 });

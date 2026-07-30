@@ -1971,6 +1971,35 @@ typecheck` and designer `pnpm lint` green.
 
 ---
 
+### D-061 — Column "Aggregate (footer)"/"Carry forward" only shown for number/currency columns
+**Decision:** User clarified their earlier "total row should be
+configurable" ask: the Aggregate control was already correctly
+per-column and off-by-default (D-046 era), but it showed for EVERY
+column regardless of format — Sum/Average on a `'text'`/`'date'` column
+never made sense (only Count arguably would, and even that's a rarer
+need not worth keeping the whole control visible for). `ColumnProps.svelte`
+now wraps both the "Aggregate (footer)" and "Carry forward (page breaks)"
+`Field`s in `{#if column.format === 'number' || column.format === 'currency'}`
+— hidden entirely (not just disabled) for Text/Date/Words/Image, exactly
+matching the direct request ("it only applicable to number field").
+**Why:** Two-step conversation: user first thought the total-row toggle
+didn't exist at all (already confirmed working end-to-end, D-058's
+changelog entry), then — once shown where it lives — refined the actual
+ask to "shouldn't be offered on non-numeric columns," which is the real,
+separate gap this closes.
+**Verified:** two new `ColumnProps.test.ts` cases (hidden for `'text'`,
+shown for `'currency'`); one existing `DocDesigner.test.ts` integration
+test previously exercised the aggregate flow against a `'text'`
+("description") column — switched to a newly-added numeric ("amount")
+dataset field, since summing a text column was never a real scenario,
+just a convenient pre-existing fixture. 195 designer tests (was 193),
+`pnpm -r typecheck` and designer `pnpm lint` green. Live Puppeteer check
+against the real Invoice (Orange) template confirms: hidden for "Item
+Description" (text), shown for "Total" (currency).
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

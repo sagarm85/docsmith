@@ -520,7 +520,10 @@ describe('<doc-designer>', () => {
           datasets: [
             {
               meta: { id: 'invoice_items', label: 'Line items' },
-              fields: [{ name: 'description', label: 'Description', type: 'text', kind: 'system' }],
+              fields: [
+                { name: 'description', label: 'Description', type: 'text', kind: 'system' },
+                { name: 'amount', label: 'Amount', type: 'number', kind: 'system' },
+              ],
             },
           ],
           documents: {},
@@ -638,14 +641,16 @@ describe('<doc-designer>', () => {
   it('setting a column aggregate writes DetailBand.aggregates keyed by column (design.md §8.5 Phase 3)', async () => {
     const el = await mountWithEntityAndDataset();
 
+    // Aggregate/Carry-forward only show for a numeric column (Sum/Average
+    // don't apply to text) — "Amount", not "Description".
     el.shadowRoot!
-      .querySelector<HTMLButtonElement>('[aria-label="Add Description column"]')!
+      .querySelector<HTMLButtonElement>('[aria-label="Add Amount column"]')!
       .click();
     await nextTick();
 
     el.shadowRoot!.querySelector<HTMLTableCellElement>('th')!.click();
     await nextTick();
-    expect(el.shadowRoot?.textContent).toContain('Column: description');
+    expect(el.shadowRoot?.textContent).toContain('Column: amount');
 
     const aggSelect = el.shadowRoot!.querySelector<HTMLSelectElement>(
       '[aria-label="Column aggregate"]',
@@ -658,7 +663,7 @@ describe('<doc-designer>', () => {
     const detail = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
       aggregates?: Array<{ column: string; fn: string; into: string }>;
     };
-    expect(detail.aggregates).toStrictEqual([{ column: 'description', fn: 'sum', into: 'tfoot' }]);
+    expect(detail.aggregates).toStrictEqual([{ column: 'amount', fn: 'sum', into: 'tfoot' }]);
 
     // Switching back to "None" removes the entry rather than leaving a stale one.
     aggSelect!.value = 'none';

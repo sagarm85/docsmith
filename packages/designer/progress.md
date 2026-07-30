@@ -62,8 +62,14 @@
   "align" to its own empty box-left/-center, nowhere near any actual
   text. Fixed: only the one edge the element's `align` anchors its
   content to is now compared (image/line/box kinds, with no text to
-  anchor, keep all three edges). The rest of this section (below) is
-  historical Phase 0–3 journal, kept for reference.
+  anchor, keep all three edges).
+  Pass 6, same session (D-061): user refined the earlier "total row
+  should be configurable" ask (already confirmed working, D-058) — the
+  Aggregate/Carry-forward controls showed for EVERY column format, not
+  just numeric ones, which didn't make sense (Sum/Average on a text/date
+  column). Now hidden entirely unless the column's format is number or
+  currency. The rest of this section (below) is historical Phase 0–3
+  journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -838,6 +844,21 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Column "Aggregate (footer)"/"Carry forward" hidden for
+  non-numeric columns (D-061).** User refined the earlier "total row
+  should be configurable" request — already confirmed working
+  end-to-end and per-column, but it showed on every column regardless of
+  format, and Sum/Average on a text/date column never made sense.
+  `ColumnProps.svelte` now only renders those two controls when
+  `column.format` is `'number'` or `'currency'`. Added two `ColumnProps`
+  tests (hidden for text, shown for currency); updated one
+  `DocDesigner.test.ts` integration test that had been exercising the
+  aggregate flow against a text ("description") column — added a numeric
+  ("amount") field to its fixture and switched to that, since summing
+  text was never a real scenario. 195 designer tests (was 193), `pnpm -r
+  typecheck` and designer `pnpm lint` green; live Puppeteer check against
+  the real Invoice (Orange) template confirms hidden for "Item
+  Description," shown for "Total."
 - **2026-07-30 — Alignment guide compares content edges, not raw box
   edges, for text/field elements (D-060).** Immediately after the D-059
   tolerance fix, user said the guide was "not helpful" — two targeted
