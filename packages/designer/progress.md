@@ -116,8 +116,22 @@
   iframe edge-to-edge — two different coordinate origins for one page,
   invisible before D-053/D-054 since both used to span their container by
   default. `.running` now gets the same width + auto-centering `.page`
-  has. The rest of this section (below) is historical Phase 0–3 journal,
-  kept for reference.
+  has.
+  Also this session: committed the previously-published Artifact-format
+  DocSmith Designer Guide into the repo itself at
+  `docs/designer-guide/index.html` (+ `docs/designer-guide/images/*.png`,
+  10 screenshots) per explicit request — same content, now versioned with
+  the code instead of only living behind a shared Artifact link. Verified
+  all 10 images resolve with no console errors via a real headless-browser
+  load of the committed file before pushing.
+  Pass 12, same session (D-069): actioned the previously-offered, not-yet-
+  confirmed item — right-aligned the Purchase Order (Blue/Peach) totals to
+  match the Invoice (Orange) treatment (D-053-era fix). Both PO variants
+  share one `purchaseOrderTemplate()` factory, so one fixture edit covers
+  both. Verified with real Preview-iframe measurements (Puppeteer): totals
+  labels/values now line up with the detail table's Qty+Unit Price/Total
+  columns to within ~1px, matching the Invoice's own treatment. The rest of
+  this section (below) is historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic

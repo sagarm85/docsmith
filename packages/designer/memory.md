@@ -2230,6 +2230,37 @@ green.
 
 ---
 
+### D-069 — Purchase Order (Blue/Peach) totals realigned to match the Invoice's detail-table-continuation treatment
+**Decision:** Previously offered, not yet confirmed (see progress.md's Pass 11
+note); actioned as a follow-up fix. The Purchase Order totals block
+(SUBTOTAL/TAX/SHIPPING/OTHER/TOTAL) used arbitrary `x:330,w:140` (label) /
+`x:480,w:100` (value) coordinates that didn't line up with anything in the
+detail table above them. Applied the exact same technique D-053's era fix
+used for the Invoice (Orange) template: the detail table's declared
+90/260/60/100/100px columns (`table-layout:fixed`) act as RATIOS of the real
+673px print content width, not literal pixels — Qty+Unit Price render at
+~386-563px, Total at ~563-673px. Repositioned every totals label to
+`x:386,w:177` and every value to `x:563,w:110`, so labels sit under Qty/Unit
+Price and values sit under Total, right edge flush with the table's own right
+edge (673px) — same as the Invoice. Also added the TOTAL row's missing
+`padding:4` on its value field (it had `bg` but no padding, unlike its label,
+which would have looked cramped against the highlight color — the exact class
+of bug fixed generally in D-067).
+**Why:** Purchase Order (Blue) and Peach share one `purchaseOrderTemplate()`
+factory in `examples/reference-templates/fixtures.mjs`, so the fix applies to
+both variants from a single change.
+**Verified:** real Preview-iframe measurements via Puppeteer against the
+Purchase Order (Blue) reference template — SUBTOTAL/TAX/SHIPPING/OTHER/TOTAL
+labels measured at iframe-x 834-1011px, values at 1011-1121px, matching the
+detail table's own Qty+Unit Price (834-1010px) and Total (1010-1120px) column
+boundaries to within ~1px (subpixel rounding). Screenshot confirms the totals
+block now reads as a natural continuation of the line-item table, not a
+floating box. `pnpm --filter @docsmith/core test` (67 tests) unaffected —
+fixture-data-only change, no `core`/`designer` source touched.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

@@ -647,16 +647,25 @@ function purchaseOrderTemplate(id, name, entity, accent, accentText = '#ffffff')
         elements: [
           el('text', 0, 10, 280, 18, { text: 'Comments or Special Instructions', style: { fontSize: 10, bg: accent, color: accentText, bold: true, padding: 4 } }),
           el('field', 0, 32, 280, 50, { binding: { source: 'header', column: 'comments', format: 'text' }, style: { fontSize: 9, color: '#555' } }),
-          el('text', 330, 10, 140, 18, { text: 'SUBTOTAL', style: { fontSize: 10, bold: true } }),
-          el('field', 480, 10, 100, 18, { binding: { source: 'header', column: 'subtotal', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
-          el('text', 330, 30, 140, 18, { text: 'TAX', style: { fontSize: 10, bold: true } }),
-          el('field', 480, 30, 100, 18, { binding: { source: 'header', column: 'tax', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
-          el('text', 330, 50, 140, 18, { text: 'SHIPPING', style: { fontSize: 10, bold: true } }),
-          el('field', 480, 50, 100, 18, { binding: { source: 'header', column: 'shipping', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
-          el('text', 330, 70, 140, 18, { text: 'OTHER', style: { fontSize: 10, bold: true } }),
-          el('field', 480, 70, 100, 18, { binding: { source: 'header', column: 'other', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
-          el('text', 330, 94, 140, 24, { text: 'TOTAL', style: { fontSize: 12, bold: true, bg: '#f4c542', padding: 4 } }),
-          el('field', 480, 94, 100, 24, { binding: { source: 'header', column: 'total', format: 'currency' }, style: { fontSize: 12, bold: true, align: 'right', bg: '#f4c542' } }),
+          // Label/value columns match the detail table's own Qty+Unit Price /
+          // Total column boundaries (same technique as the Invoice reference
+          // template's totals block — see its own comment for the full
+          // reasoning): this template's detail columns are 90/260/60/100/100
+          // declared px under table-layout:fixed, which act as RATIOS of the
+          // real 673px print content width, not literal pixels. Qty+Unit
+          // Price render at ~386-563px, Total at ~563-673px, so the label
+          // column (386-563) and value column (563-673) below reproduce that
+          // exactly, keeping the totals block flush with the table above it.
+          el('text', 386, 10, 177, 18, { text: 'SUBTOTAL', style: { fontSize: 10, bold: true } }),
+          el('field', 563, 10, 110, 18, { binding: { source: 'header', column: 'subtotal', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 386, 30, 177, 18, { text: 'TAX', style: { fontSize: 10, bold: true } }),
+          el('field', 563, 30, 110, 18, { binding: { source: 'header', column: 'tax', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 386, 50, 177, 18, { text: 'SHIPPING', style: { fontSize: 10, bold: true } }),
+          el('field', 563, 50, 110, 18, { binding: { source: 'header', column: 'shipping', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 386, 70, 177, 18, { text: 'OTHER', style: { fontSize: 10, bold: true } }),
+          el('field', 563, 70, 110, 18, { binding: { source: 'header', column: 'other', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 386, 94, 177, 24, { text: 'TOTAL', style: { fontSize: 12, bold: true, bg: '#f4c542', padding: 4 } }),
+          el('field', 563, 94, 110, 24, { binding: { source: 'header', column: 'total', format: 'currency' }, style: { fontSize: 12, bold: true, align: 'right', bg: '#f4c542', padding: 4 } }),
           el('text', 0, 116, 560, 16, { text: 'Approved by:', style: { fontSize: 9, color: '#888' } }),
           el('field', 90, 116, 200, 16, { binding: { source: 'header', column: 'approved_by', format: 'text' }, style: { fontSize: 9 } }),
         ],
