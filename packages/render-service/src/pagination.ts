@@ -22,6 +22,7 @@ import type { Page } from 'puppeteer';
 import {
   aggregate,
   formatValue,
+  freeBandHeightPx,
   isDetailBand,
   type Align,
   type DetailBand,
@@ -145,7 +146,12 @@ export async function applyCarryForward(page: Page, template: Template, data: Do
   const pageFooter = template.bands.find(
     (b) => b.type === 'pageFooter' && (b as FreeBand).enabled !== false,
   ) as FreeBand | undefined;
-  const pageBudgetPx = heightPx - (pageHeader?.height ?? 0) - (pageFooter?.height ?? 0);
+  // freeBandHeightPx (memory.md D-066): a pageHeader/pageFooter's real
+  // rendered height is its stored `height` treated as a minimum, growing to
+  // fit content past it — must match here or the carry-forward budget would
+  // under-reserve space for a grown header/footer.
+  const pageBudgetPx =
+    heightPx - (pageHeader ? freeBandHeightPx(pageHeader) : 0) - (pageFooter ? freeBandHeightPx(pageFooter) : 0);
 
   // Resize to the real print content width so text wrapping (and thus row
   // height) matches what page.pdf() will actually produce — page.pdf() itself

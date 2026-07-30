@@ -283,4 +283,21 @@ describe('Band', () => {
     await nextTick();
     expect(document.querySelector('.dd-align-guide')).toBeNull();
   });
+
+  it('renders at its stored height when content fits, and grows past it when content extends lower (memory.md D-066)', () => {
+    const band: FreeBand = {
+      id: 'totals',
+      type: 'totals',
+      height: 90,
+      elements: [{ id: 'a', kind: 'field', x: 0, y: 150, w: 100, h: 20, label: 'Note' }],
+    };
+    render(Band, {
+      props: { band, onAddElement: vi.fn(), onInvalidDrop: vi.fn(), ...selectionCallbacks() },
+    });
+    const body = screen.getByRole('group', { name: 'Totals band' }) as HTMLElement;
+    // y:150 + h:20 = 170, past the stored height:90 -> renders at 170, the
+    // exact same growth core.renderToHtml's freeBandHeightPx would produce
+    // for the same band, so the canvas matches the real output.
+    expect(body.style.height).toBe('170px');
+  });
 });

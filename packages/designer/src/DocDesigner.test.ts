@@ -405,7 +405,7 @@ describe('<doc-designer>', () => {
     await nextTick();
 
     expect(el.shadowRoot?.textContent).toContain('Totals band');
-    expect(el.shadowRoot!.querySelector('[aria-label="Band height"]')).toBeTruthy();
+    expect(el.shadowRoot!.querySelector('[aria-label="Band minimum height"]')).toBeTruthy();
 
     el.remove();
   });

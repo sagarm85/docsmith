@@ -189,10 +189,14 @@
     {/if}
 
     {#if (free.arrangement ?? 'free') === 'free'}
-      <Field label="Height (px)" fieldId="dd-band-height">
+      <Field
+        label="Minimum height (px)"
+        fieldId="dd-band-height"
+        hint="The band grows past this automatically if you place content lower than it — this only sets a floor."
+      >
         <NumberInput
           id="dd-band-height"
-          ariaLabel="Band height"
+          ariaLabel="Band minimum height"
           min={20}
           max={2000}
           value={free.height}

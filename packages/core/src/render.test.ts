@@ -624,6 +624,43 @@ describe('renderToHtml — DetailColumn.format:"image" (memory.md D-039)', () =>
   });
 });
 
+describe('renderToHtml — free-arrangement band height is a minimum, not a ceiling (memory.md D-066)', () => {
+  it('renders the band at its stored height when content fits within it', () => {
+    const out = renderToHtml(invoiceTemplate(), fatDocument(1));
+    // totals: height 90, element t1 at y:8 h:22 -> extent 30, well under 90.
+    expect(out.html).toContain('band band-totals');
+    expect(out.html).toMatch(/band-totals[^>]*style="[^"]*height:90px/);
+  });
+
+  it('grows past the stored height when an element extends beyond it', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) =>
+      b.type === 'totals'
+        ? { ...(b as FreeBand), elements: [...(b as FreeBand).elements, { id: 't2', kind: 'text', x: 0, y: 150, w: 100, h: 20, text: 'Note' }] }
+        : b,
+    );
+    const out = renderToHtml(t, fatDocument(1));
+    // y:150 + h:20 = 170, past the band's stored height:90 -> renders at 170.
+    expect(out.html).toMatch(/band-totals[^>]*style="[^"]*height:170px/);
+  });
+
+  it('reserves matching .doc-flow padding when a pageFooter grows past its stored height', () => {
+    const t = invoiceTemplate();
+    t.bands.push({
+      id: 'pageFooter',
+      type: 'pageFooter',
+      height: 20,
+      enabled: true,
+      elements: [{ id: 'f1', kind: 'text', x: 0, y: 40, w: 100, h: 20, text: 'Footer' }],
+    });
+    const out = renderToHtml(t, fatDocument(1));
+    // y:40 + h:20 = 60, past the stored height:20 -> both the footer's own
+    // box AND the reserved .doc-flow padding-bottom must use 60, not 20.
+    expect(out.html).toMatch(/band-pageFooter[^>]*style="[^"]*height:60px/);
+    expect(out.css).toContain('padding-bottom: 60px');
+  });
+});
+
 describe('renderToHtml — printSetup.fillPage (memory.md D-040)', () => {
   it('is a no-op (no flex/min-height CSS at all) when unset', () => {
     const out = renderToHtml(invoiceTemplate(), fatDocument(1));

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
+  import { freeBandHeightPx, type FreeBand, type FreeElement, type ValueFormat } from '@docsmith/core';
   import { createBlockElement, createFieldElement, type BlockKind } from './template-edits.js';
   import FreeElementView from './FreeElement.svelte';
   import Icon from './ui/Icon.svelte';
@@ -196,7 +196,7 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="dd-band-body"
-    style="height:{band.height}px"
+    style="height:{freeBandHeightPx(band)}px"
     role="group"
     aria-label={`${bandLabel[band.type]} band`}
     ondragover={handleDragOver}
@@ -217,7 +217,7 @@
           bandLabel={bandLabel[band.type]}
           {unit}
           {contentWidthPx}
-          bandHeightPx={band.height}
+          bandHeightPx={freeBandHeightPx(band)}
           siblings={band.elements}
           suppressToolbar={anyDragging}
           onSelect={() => onSelectElement(el.id)}

@@ -375,6 +375,27 @@ function renderGridBand(band: FreeBand, data: DocumentData, fmtOpts: FormatOptio
   return `<div class="band band-${band.type} band-grid ${extraClass}" data-band="${band.type}" style="${st}">${tablesHtml}</div>`;
 }
 
+/** The height a 'free'-arrangement band's own box actually renders at.
+ * `band.height` (D-066) is a MINIMUM, not a hard ceiling — content can grow
+ * past it. Previously it was a fixed height: placing an element below
+ * `y + h > band.height` didn't move/clamp it (nothing ever clamped Y), but
+ * it rendered past the band's own colored background/box into whatever
+ * came next, looking broken — reported directly, alongside the observation
+ * that a printed document already spans as many physical pages as it
+ * needs regardless of any one band's height, so there's no reason a band's
+ * stored number should silently restrict what an author can place in it.
+ * `arrangement === 'grid'`/`'stack'` bands already auto-size natively
+ * (table/flex) and never call this — only the default 'free' path
+ * (reportHeader-if-free, totals, pageHeader, pageFooter) needs it.
+ * Exported so the Design canvas (Band.svelte) renders the exact same
+ * effective height while editing that this function will actually
+ * produce, and so `renderToHtml` can reserve the matching amount of
+ * `.doc-flow` padding for a pageHeader/pageFooter's fixed position. */
+export function freeBandHeightPx(band: FreeBand): number {
+  const contentHeight = band.elements.reduce((max, el) => Math.max(max, el.y + el.h), 0);
+  return Math.max(band.height, contentHeight);
+}
+
 function renderFreeBand(
   band: FreeBand,
   data: DocumentData,
@@ -393,7 +414,9 @@ function renderFreeBand(
   const st = styleToCss(band.style);
   // Band height always stays px (design.md: it's the outer box for its own
   // elements, not content relative to something else — see core/types.ts's
-  // Template.layoutUnit doc comment).
+  // Template.layoutUnit doc comment). `freeBandHeightPx` (D-066): the
+  // rendered height is `band.height` treated as a MINIMUM, growing to fit
+  // content that extends past it rather than clipping/restricting it.
   //
   // `position` must NOT be forced to `relative` here for a running
   // (pageHeader/pageFooter) band: an inline style always wins specificity
@@ -407,7 +430,7 @@ function renderFreeBand(
   // instead of at the foot of the page.
   const isRunning = extraClass.includes('running');
   const posCss = isRunning ? '' : 'position:relative;';
-  return `<div class="band band-${band.type} ${extraClass}" data-band="${band.type}" style="${posCss}height:${band.height}px;${st}">${els}</div>`;
+  return `<div class="band band-${band.type} ${extraClass}" data-band="${band.type}" style="${posCss}height:${freeBandHeightPx(band)}px;${st}">${els}</div>`;
 }
 
 // ── detail band (the flowing, paginating line-item table) ───────────────────────
@@ -590,8 +613,8 @@ export function renderToHtml(template: Template, data: DocumentData): RenderResu
     (b) => b.type === 'pageFooter' && (b as FreeBand).enabled !== false,
   ) as FreeBand | undefined;
 
-  const runningTop = pageHeader ? pageHeader.height : 0;
-  const runningBottom = pageFooter ? pageFooter.height : 0;
+  const runningTop = pageHeader ? freeBandHeightPx(pageHeader) : 0;
+  const runningBottom = pageFooter ? freeBandHeightPx(pageFooter) : 0;
 
   // In-flow bands in print order: reportHeader, detail, totals (page h/f are fixed).
   const flowOrder: Band['type'][] = ['reportHeader', 'detail', 'totals'];

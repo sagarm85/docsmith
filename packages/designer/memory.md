@@ -2119,6 +2119,53 @@ stacked element in the targeted cell together.
 
 ---
 
+### D-066 — Free-form band `height` is now a MINIMUM, not a fixed ceiling — auto-grows to fit content past it
+**Decision:** Direct report: the totals band's box felt "restricted" —
+content placed below its stored height (150px, e.g.) wasn't blocked
+(nothing ever clamped Y — a deliberate D-057 choice), but it rendered
+past the band's own colored background into whatever came next, looking
+broken. Asked back explicitly (a real architecture choice, not a small
+implementation detail) whether to (a) auto-grow like `reportHeader`
+already effectively does under `grid`/`stack` arrangement, (b) keep a
+fixed height but add a drag-to-resize handle, or (c) something else.
+User picked auto-grow.
+Added `freeBandHeightPx(band)` (exported from `core/render.ts`):
+`Math.max(band.height, contentHeight)` where `contentHeight =
+max(el.y + el.h)` across the band's own elements. `arrangement:'grid'`/
+`'stack'` bands already auto-size natively (table/flex) and never called
+this; it only affects the default `'free'` path — `reportHeader`-if-free,
+`totals`, `pageHeader`, `pageFooter`. Wired into:
+- `renderFreeBand`'s own `<div>` height (the real rendered output).
+- `renderToHtml`'s `runningTop`/`runningBottom` (the `.doc-flow` padding
+  reserved for a pageHeader/pageFooter's fixed position) — these MUST
+  track the same grown height, or a grown pageFooter would overlap the
+  content above it instead of being reserved space for.
+- `render-service/pagination.ts`'s `pageBudgetPx` (the carry-forward
+  row-placement budget) — same reasoning, must match what `page.pdf()`
+  will actually produce.
+- Design canvas's `Band.svelte` (both the visual box height AND
+  `bandHeightPx` fed to `FreeElement`'s `'%'`-mode conversions) — so
+  editing shows the exact same effective height the real output uses.
+`DetailBand.height` doesn't exist (detail is always native-table
+auto-height already) — out of scope, nothing to change there.
+`BandProps.svelte`'s "Height (px)" field relabeled "Minimum height (px)"
+with a hint, since it's no longer the actual rendered height once
+content exceeds it.
+**Verified:** 3 new `render.test.ts` cases (66 core tests, was 63) —
+content-fits-within-stored-height is unchanged; content past it grows
+the band's own `<div>`; a grown pageFooter reserves matching
+`.doc-flow` padding-bottom. 1 new `Band.test.ts` case confirms the
+canvas computes the identical grown height. 198 designer tests (was
+197). `pnpm -r typecheck`, designer `pnpm lint`, and render-service
+`typecheck` all green. Live Puppeteer check: pushed an element to
+y:300 in the Invoice (Orange) totals band (stored height 150) —
+Design canvas box grew to 320px exactly, and the real Preview shows
+the note fully, with the page footer correctly pushed below it with
+no overlap.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

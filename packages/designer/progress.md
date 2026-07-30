@@ -94,8 +94,15 @@
   whether free-form bands (totals/pageHeader/pageFooter) should drop
   their fixed-height box model in favor of auto-growing, unbounded-by-a-
   single-page authoring — both are real architecture questions, not
-  small implementation details. The rest of this section (below) is
-  historical Phase 0–3 journal, kept for reference.
+  small implementation details.
+  Pass 9, same session (D-066): asked back, user picked auto-grow for
+  free-form bands. `core.freeBandHeightPx` now treats a band's stored
+  `height` as a MINIMUM, growing to fit content placed past it, wired
+  through the real renderer, the carry-forward pagination budget, and the
+  Design canvas so all three agree. The grid-section explicit-height +
+  proportional-child-resize half of the question remains open — not
+  addressed yet. The rest of this section (below) is historical Phase
+  0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -870,6 +877,33 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Free-form band height is now a minimum, not a fixed
+  ceiling (D-066).** Direct report: the totals band felt "restricted" —
+  content placed below its stored height wasn't actually blocked (Y was
+  never clamped), but rendered past the band's own colored background
+  into whatever came next, looking broken. Asked back explicitly since
+  this is a real architecture choice: auto-grow (like `reportHeader`
+  already effectively does under grid/stack), a resize handle on a still-
+  fixed box, or something else — user picked auto-grow. Added
+  `core.freeBandHeightPx(band)` = `max(band.height, max(el.y+el.h))`,
+  wired into the real renderer's own band `<div>`, `runningTop`/
+  `runningBottom` (the `.doc-flow` padding reserved for a pageHeader/
+  pageFooter's fixed position — must track the same grown height or a
+  grown footer would overlap content instead of being reserved space),
+  render-service's carry-forward pagination budget, and the Design
+  canvas's `Band.svelte` (both the visual box and the `%`-mode
+  conversion basis), so all four agree on the same effective height.
+  `BandProps`'s "Height (px)" field relabeled "Minimum height (px)" with
+  a hint. 3 new core render tests (66 total, was 63) — content-fits case
+  unchanged; content-past-height grows the div; a grown pageFooter
+  reserves matching padding. 1 new `Band.test.ts` case. 198 designer
+  tests (was 197). `pnpm -r typecheck` (including render-service), lint
+  all green. Live Puppeteer check: pushed an element to y:300 in a
+  150px-tall totals band — canvas box grew to exactly 320px, and the
+  real Preview shows the content fully with the footer correctly pushed
+  below it, no overlap. The related "grid sections should have an
+  explicit, adjustable height with children resizing proportionally"
+  half of the same conversation remains open, not addressed yet.
 - **2026-07-30 — Grid sections get an always-visible boundary and a
   whole-cell background fill (D-065).** Direct report with a screenshot:
   two stacked text elements in a grid section had no visible boundary at
