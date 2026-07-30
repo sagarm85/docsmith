@@ -171,6 +171,41 @@ describe('FreeElement', () => {
     expect(onGuides).toHaveBeenCalledWith({ x: null, y: null });
   });
 
+  it('alignment guides ignore a right-aligned sibling\'s box edges that its text never touches (memory.md D-060)', async () => {
+    const cb = callbacks();
+    const onGuides = vi.fn();
+    // Sibling's box spans 200-400, but it's right-aligned — its content
+    // only ever sits flush against x+w (400), never its box's left edge
+    // (200) or center (300).
+    const dragged = fieldElement({ id: 'a', x: 40, y: 40, w: 50, h: 20 });
+    const sibling = fieldElement({ id: 'b', x: 200, y: 500, w: 200, h: 20, label: 'Sibling', style: { align: 'right' } });
+    render(FreeElementView, {
+      props: {
+        element: dragged,
+        selected: false,
+        bandLabel: 'Report Header',
+        siblings: [dragged, sibling],
+        onGuides,
+        ...cb,
+      },
+    });
+    const el = screen.getByRole('button', { name: /Invoice #/ });
+    pointerDown(el, 100, 100);
+    // Land dragged's left edge exactly on the sibling's box's LEFT edge
+    // (200) — not a real content alignment, since the sibling's text sits
+    // at the far right of that box. Must NOT trigger a guide.
+    pointerMove(100 + (200 - 40), 100);
+    expect(onGuides).toHaveBeenCalledWith({ x: null, y: null });
+    pointerUp();
+
+    // Now land it on the sibling's ACTUAL content edge (x+w = 400) — this
+    // DOES correspond to where the sibling's text visually sits.
+    pointerDown(el, 100, 100);
+    pointerMove(100 + (400 - 40), 100);
+    expect(onGuides).toHaveBeenLastCalledWith({ x: 400, y: null });
+    expect(cb.onChange).toHaveBeenLastCalledWith({ x: 400, y: 40 });
+  });
+
   it('resize handles are only rendered when selected', () => {
     const { rerender } = render(FreeElementView, {
       props: { element: fieldElement(), selected: false, bandLabel: 'Report Header', ...callbacks() },

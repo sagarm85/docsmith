@@ -53,8 +53,17 @@
   off drag (inside the old miss zone) now shows the guide. Also pinned
   D-058's new grid overlay to an explicit low z-index defensively, so it
   can never end up stacked above real drag UI regardless of future DOM
-  reordering. The rest of this section (below) is historical Phase 0–3
-  journal, kept for reference.
+  reordering.
+  Pass 5, same session (D-060): immediately after the tolerance fix, user
+  pinpointed a deeper, more precise problem via two follow-up questions —
+  the guide compared raw box edges (`x`, `x+w/2`, `x+w`) regardless of a
+  text/field element's own alignment, so a right-aligned field whose box
+  is wider than its content (e.g. a 200px box holding a 50px label) could
+  "align" to its own empty box-left/-center, nowhere near any actual
+  text. Fixed: only the one edge the element's `align` anchors its
+  content to is now compared (image/line/box kinds, with no text to
+  anchor, keep all three edges). The rest of this section (below) is
+  historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -829,6 +838,23 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Alignment guide compares content edges, not raw box
+  edges, for text/field elements (D-060).** Immediately after the D-059
+  tolerance fix, user said the guide was "not helpful" — two targeted
+  `AskUserQuestion` follow-ups pinned down exactly why: "field is of
+  200px but label is 50px, then vertical alignment help line does not
+  helpful." `computeAlignSnap` compared all three box edges (`x`,
+  `x+w/2`, `x+w`) regardless of the element's own text alignment — a
+  right-aligned field whose box is wider than its content only ever
+  visually sits flush against `x+w`; its box's left edge and center are
+  just empty space, not anything the eye lines up against. Fixed:
+  `contentXEdges()` returns only the one edge a `'text'`/`'field'`
+  element's own `align` (left/center/right) anchors its content to;
+  image/line/box kinds (no text to anchor) keep all three edges as
+  before. New test drags onto a right-aligned wider-than-content
+  sibling's empty box-left edge (confirms no guide) and then its real
+  content edge (confirms the guide fires there). 193 designer tests (was
+  192), `pnpm -r typecheck` and designer `pnpm lint` green.
 - **2026-07-30 — Alignment-guide tolerance widened; grid overlay pinned
   to a low z-index (D-059).** Same live-editing session, continued: user
   reported the alignment-guide line from D-038 wasn't appearing while

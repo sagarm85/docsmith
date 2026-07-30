@@ -118,19 +118,38 @@
   // (memory.md D-059). Widened to a still-tight-feeling but achievable 8px.
   const ALIGN_TOLERANCE = $derived(unit === '%' ? 1.2 : 8);
 
+  // Which x-position(s) of an element are actually meaningful to compare
+  // for the alignment guide. A 'text'/'field' element's box can be wider
+  // than its content — a right-aligned 200px field showing a 50px label
+  // has that label sitting flush against the box's RIGHT edge only; its
+  // box's left edge and center are just empty space, not where anything
+  // visually lines up. Comparing all three box edges regardless of the
+  // element's own alignment produced guides that didn't correspond to
+  // where the text actually sits (reported directly). Only the edge the
+  // text is actually anchored to (per its own `style.align`) is eligible.
+  // Kinds with no text content (image/line/box) have no such distinction
+  // — their full box stays eligible on all three edges.
+  function contentXEdges(el: FreeElement, x: number, w: number): number[] {
+    if (el.kind !== 'text' && el.kind !== 'field') return [x, x + w / 2, x + w];
+    const align = el.style?.align ?? 'left';
+    if (align === 'center') return [x + w / 2];
+    if (align === 'right') return [x + w];
+    return [x];
+  }
+
   function computeAlignSnap(
     x: number,
     y: number,
     w: number,
     h: number,
   ): { x: number | null; y: number | null; snappedX: number; snappedY: number } {
-    const myXs = [x, x + w / 2, x + w];
+    const myXs = contentXEdges(element, x, w);
     const myYs = [y, y + h / 2, y + h];
     let bestX: { guide: number; delta: number } | null = null;
     let bestY: { guide: number; delta: number } | null = null;
     for (const sib of siblings) {
       if (sib.id === element.id) continue;
-      const sibXs = [sib.x, sib.x + sib.w / 2, sib.x + sib.w];
+      const sibXs = contentXEdges(sib, sib.x, sib.w);
       const sibYs = [sib.y, sib.y + sib.h / 2, sib.y + sib.h];
       for (const mx of myXs) {
         for (const sx of sibXs) {

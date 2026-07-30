@@ -1943,6 +1943,34 @@ now shows the guide.
 
 ---
 
+### D-060 — Alignment guide compares content edges, not raw box edges, for text/field elements
+**Decision:** Immediately after D-059's tolerance fix, user reported the
+guide was "not helpful" — pin-pointed precisely via follow-up
+`AskUserQuestion`s: "field is of 200px but label is 50px, then vertical
+alignment help line does not helpful." `computeAlignSnap` compared THREE
+edges per element (`[x, x+w/2, x+w]`) regardless of that element's own
+`style.align` — but a right-aligned field whose box is wider than its
+content only ever visually sits flush against `x+w`; its box's left edge
+and center are empty space, not anything the eye lines up against. The
+guide was firing for box-geometry coincidences that didn't correspond to
+where any text actually was, which is exactly what made it feel
+unhelpful/wrong rather than just imprecise (D-059's problem).
+Added `contentXEdges(el, x, w)`: for `'text'`/`'field'` kinds, returns
+ONLY the one edge that element's own `align` (`'left'`/`'center'`/
+`'right'`, default `'left'`) anchors its content to; other kinds
+(image/line/box, no text to anchor) keep all three box edges as before.
+Applied to both the dragged element and every sibling. Y-axis (top/
+middle/bottom) is unchanged — there's no vertical-align style in
+`ElementStyle` for this to apply to, only horizontal `align`.
+**Verified:** new test drags an element onto a right-aligned, wider-
+than-content sibling's box-left edge (200) — confirms NO guide fires —
+then onto that same sibling's real content edge (`x+w` = 400) — confirms
+the guide DOES fire there. 193 designer tests (was 192), `pnpm -r
+typecheck` and designer `pnpm lint` green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs
