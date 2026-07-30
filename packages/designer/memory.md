@@ -2085,6 +2085,40 @@ tint (row 2 of 3 tinted, rows 1/3 white).
 
 ---
 
+### D-065 — Grid sections get an always-visible boundary and a whole-cell background fill
+**Decision:** Direct report, with screenshot: two stacked "Text" elements
+in a grid section, no visible boundary at all, no way to select "the
+section" to configure it as a whole or give it one background. Two
+fixes:
+1. `.dd-grid-cell--filled` gets a light dashed boundary
+   (`var(--dd-border)`) whenever the template's own `gridBorder` (the
+   REAL printed border) isn't set — Design-canvas-only, purely decorative,
+   never serialized. Previously a section with no printed border was
+   completely invisible as a shape in the canvas; only the individual
+   elements stacked inside it showed at all.
+2. A "Fill" button (revealed on cell hover/focus, same reveal pattern as
+   the D-050 split handle) opens a small swatch popover and batch-applies
+   ONE `bg` to every element currently stacked in that cell at once, via
+   the existing `onUpdateElements` batch-replace callback — no new data
+   model needed. This is exactly the mechanism the reference templates
+   already use to make a cell read as one solid block (the Invoice
+   (Orange) header's BRANDNAME + slogan only LOOK like one dark box
+   because both elements independently share the same `bg`, D-063); this
+   just makes doing that to a whole cell at once a single action instead
+   of setting each element's background one at a time. Presets are the
+   same fixed hex palette as `ElementProps`' `COLOR_PRESETS` (D-062), plus
+   "No fill" and a custom picker.
+**Verified:** two new `GridBand.test.ts` cases — clicking a preset swatch
+batch-applies it to every element in that cell's group (and leaves a
+DIFFERENT row's elements untouched); "No fill" clears `bg` back to
+`undefined`. 197 designer tests (was 195), `pnpm -r typecheck` and
+designer `pnpm lint` green. Live Puppeteer check confirmed the fill
+button and popover render and the batch-apply visibly recolors every
+stacked element in the targeted cell together.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

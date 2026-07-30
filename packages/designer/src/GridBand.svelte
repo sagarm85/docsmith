@@ -288,6 +288,32 @@
     return a.length === b.length && a.every((w, i) => w === b[i]);
   }
 
+  // ── Cell background fill (memory.md D-065) ──────────────────────────────
+  // "Select the whole section and give it one background" — there's no
+  // separate per-cell style property; this batch-applies the SAME `bg` to
+  // every element currently stacked in that cell at once (reusing the
+  // per-element `style.bg` D-063 already added, the same mechanism the
+  // reference templates already use to make a cell look like one solid
+  // block — e.g. the Invoice (Orange) header's BRANDNAME + slogan, two
+  // separately-styled elements that only LOOK like one dark box because
+  // both share the same bg). Fixed preset swatches, same hex values as
+  // ElementProps' COLOR_PRESETS (memory.md D-062) for a consistent palette.
+  const CELL_BG_PRESETS = ['#14161b', '#2563eb', '#1a7f37', '#b3261e', '#9a6700'];
+  let bgPopoverCellKey = $state<string | null>(null);
+
+  function toggleBgPopover(rowIndex: number, groupCol: number) {
+    const key = `${rowIndex}:${groupCol}`;
+    bgPopoverCellKey = bgPopoverCellKey === key ? null : key;
+  }
+
+  function chooseCellBackground(group: FreeElement[], bg: string | undefined) {
+    const groupIds = new Set(group.map((el) => el.id));
+    onUpdateElements(
+      band.elements.map((el) => (groupIds.has(el.id) ? { ...el, style: { ...el.style, bg } } : el)),
+    );
+    bgPopoverCellKey = null;
+  }
+
   // ── Click-to-add inline picker (memory.md D-047) ────────────────────────
   // An easier alternative to drag-and-drop: click any empty cell to search
   // header fields or add plain text, without needing to drag anything.
@@ -371,6 +397,12 @@
     if (layoutPopoverRow !== null) {
       const clickedToolbar = path.some((n) => n instanceof Element && n.classList.contains('dd-section-toolbar'));
       if (!clickedToolbar) layoutPopoverRow = null;
+    }
+    if (bgPopoverCellKey !== null) {
+      const clickedBgControl = path.some(
+        (n) => n instanceof Element && n.classList.contains('dd-cell-bg-control'),
+      );
+      if (!clickedBgControl) bgPopoverCellKey = null;
     }
   }
 
@@ -650,6 +682,58 @@
                     <Icon name="grip" size={12} />
                   </button>
                 {/if}
+                <!-- Whole-cell background fill (memory.md D-065) — revealed
+                     on cell hover/focus, same reveal pattern as the split
+                     handle above. Batch-applies one bg to every stacked
+                     element in this cell (D-045), the same mechanism the
+                     reference templates already use to make a cell read as
+                     one solid block. -->
+                <div class="dd-cell-bg-control">
+                  <button
+                    type="button"
+                    class="dd-cell-bg-btn"
+                    aria-label={`Set background for section ${rowIndex + 1}'s cell`}
+                    title="Cell background"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      toggleBgPopover(rowIndex, groupCol);
+                    }}
+                  >
+                    <Icon name="box" size={12} />
+                  </button>
+                  {#if bgPopoverCellKey === `${rowIndex}:${groupCol}`}
+                    <div class="dd-cell-bg-popover" role="menu" aria-label="Choose a cell background">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        class="dd-cell-bg-swatch dd-cell-bg-swatch--none"
+                        aria-label="No fill"
+                        title="No fill"
+                        onclick={() => chooseCellBackground(group, undefined)}
+                      ></button>
+                      {#each CELL_BG_PRESETS as bg (bg)}
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="dd-cell-bg-swatch"
+                          style="background:{bg}"
+                          aria-label={`Fill with ${bg}`}
+                          title={bg}
+                          onclick={() => chooseCellBackground(group, bg)}
+                        ></button>
+                      {/each}
+                      <label class="dd-cell-bg-swatch dd-cell-bg-swatch--custom" title="Custom fill color">
+                        <Icon name="plus" size={11} />
+                        <input
+                          type="color"
+                          aria-label="Custom cell background color"
+                          value="#ffffff"
+                          oninput={(e) => chooseCellBackground(group, (e.currentTarget as HTMLInputElement).value)}
+                        />
+                      </label>
+                    </div>
+                  {/if}
+                </div>
               </div>
             {:else}
               {@const emptyRow = cell.kind === 'empty' ? cell.row : rowIndex}
@@ -1026,6 +1110,17 @@
     border-radius: 2px;
   }
 
+  /* Design-canvas-only visual aid, always on regardless of the template's
+     own gridBorder (the REAL printed border, D-034/--bordered above) — a
+     user reported not being able to see a section's full extent at all
+     when gridBorder is unset (the common case), only the individual
+     elements stacked inside it. Purely decorative, never serialized into
+     the template. */
+  .dd-grid-cell--filled:not(.dd-grid-cell--bordered) {
+    border: 1px dashed var(--dd-border);
+    border-radius: 2px;
+  }
+
   /* A filled cell is a passive container — each stacked element inside it
      (.dd-grid-subitem) is its own independently selectable/hoverable item
      (memory.md D-045). */
@@ -1060,6 +1155,94 @@
   .dd-grid-cell--filled:hover .dd-split-handle,
   .dd-grid-cell--filled:focus-within .dd-split-handle {
     display: flex;
+  }
+
+  .dd-cell-bg-control {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 4;
+  }
+
+  .dd-cell-bg-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--dd-border);
+    border-radius: 50%;
+    background: var(--dd-panel);
+    color: var(--dd-muted);
+    box-shadow: var(--dd-shadow);
+    cursor: pointer;
+  }
+
+  .dd-grid-cell--filled:hover .dd-cell-bg-btn,
+  .dd-grid-cell--filled:focus-within .dd-cell-bg-btn,
+  .dd-cell-bg-control:has(.dd-cell-bg-popover) .dd-cell-bg-btn {
+    display: flex;
+  }
+
+  .dd-cell-bg-btn:hover {
+    color: var(--dd-accent-strong);
+    border-color: var(--dd-accent);
+  }
+
+  .dd-cell-bg-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    display: flex;
+    gap: 6px;
+    background: var(--dd-panel);
+    border: 1px solid var(--dd-border);
+    border-radius: var(--dd-radius);
+    box-shadow: var(--dd-shadow);
+    padding: 6px;
+    z-index: 6;
+  }
+
+  .dd-cell-bg-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid var(--dd-panel);
+    box-shadow: 0 0 0 1px var(--dd-border);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .dd-cell-bg-swatch:hover {
+    box-shadow: 0 0 0 1px var(--dd-accent);
+  }
+
+  .dd-cell-bg-swatch--none {
+    background: var(--dd-panel);
+    background-image: linear-gradient(
+      to top right,
+      transparent calc(50% - 1px),
+      var(--dd-danger),
+      transparent calc(50% + 1px)
+    );
+  }
+
+  .dd-cell-bg-swatch--custom {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dd-panel-alt);
+    color: var(--dd-muted);
+    border: 1.5px dashed var(--dd-border);
+    box-shadow: none;
+  }
+
+  .dd-cell-bg-swatch--custom input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
   }
 
   .dd-grid-subitem {

@@ -487,4 +487,47 @@ describe('GridBand', () => {
       expect(document.querySelectorAll('.dd-split-handle')).toHaveLength(1); // only "Seller"
     });
   });
+
+  describe('whole-cell background fill (memory.md D-065)', () => {
+    it('batch-applies the chosen color to every element stacked in that cell', async () => {
+      const cb = callbacks();
+      render(GridBand, { props: { band: filledBand(), ...cb } });
+
+      const fillBtn = document.querySelector<HTMLButtonElement>(
+        "[aria-label=\"Set background for section 1's cell\"]",
+      );
+      expect(fillBtn).toBeTruthy();
+      await fireEvent.click(fillBtn!);
+
+      const swatch = document.querySelector<HTMLButtonElement>('[aria-label="Fill with #2563eb"]');
+      expect(swatch).toBeTruthy();
+      await fireEvent.click(swatch!);
+
+      expect(cb.onUpdateElements).toHaveBeenCalledTimes(1);
+      const [elements] = cb.onUpdateElements.mock.calls[0] as [FreeElement[]];
+      const seller = elements.find((e) => e.id === 'a');
+      expect(seller?.style?.bg).toBe('#2563eb');
+      // Only "Seller" (row 0) was in this cell's group — row 1's elements
+      // must be untouched.
+      const invoiceNo = elements.find((e) => e.id === 'b');
+      expect(invoiceNo?.style?.bg).toBeUndefined();
+    });
+
+    it('"No fill" clears bg back to undefined', async () => {
+      const cb = callbacks();
+      const band = filledBand();
+      band.elements[0] = { ...band.elements[0]!, style: { bg: '#b3261e' } };
+      render(GridBand, { props: { band, ...cb } });
+
+      const fillBtn = document.querySelector<HTMLButtonElement>(
+        "[aria-label=\"Set background for section 1's cell\"]",
+      );
+      await fireEvent.click(fillBtn!);
+      const noneSwatch = document.querySelector<HTMLButtonElement>('[aria-label="No fill"]');
+      await fireEvent.click(noneSwatch!);
+
+      const [elements] = cb.onUpdateElements.mock.calls[0] as [FreeElement[]];
+      expect(elements.find((e) => e.id === 'a')?.style?.bg).toBeUndefined();
+    });
+  });
 });

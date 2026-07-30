@@ -81,8 +81,21 @@
   reference templates themselves already relying on text-element
   backgrounds extensively) and an optional alternating (zebra) row
   shading toggle for the detail table (`DetailBand.stripeRows`, off by
-  default). The rest of this section (below) is historical Phase 0–3
-  journal, kept for reference.
+  default).
+  Pass 8, same session (D-065): direct screenshot report — a grid
+  section with two stacked text elements had no visible boundary at all
+  and no way to select "the whole section" to give it one background.
+  Added an always-visible dashed boundary (Design-canvas-only) for
+  sections without a real printed border, and a per-cell "Fill" button
+  that batch-applies one background to every element stacked in that
+  cell at once. Still open, asked back to the user rather than guessed:
+  whether grid sections should get an explicit, adjustable height (today
+  height is fully automatic) with children resizing proportionally, and
+  whether free-form bands (totals/pageHeader/pageFooter) should drop
+  their fixed-height box model in favor of auto-growing, unbounded-by-a-
+  single-page authoring — both are real architecture questions, not
+  small implementation details. The rest of this section (below) is
+  historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -857,6 +870,24 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Grid sections get an always-visible boundary and a
+  whole-cell background fill (D-065).** Direct report with a screenshot:
+  two stacked text elements in a grid section had no visible boundary at
+  all (only individually-selectable elements, no sense of the section's
+  own extent), and no way to select the section as a whole to give it
+  one background. Added a light dashed boundary to any section without a
+  real printed `gridBorder` (Design-canvas-only, purely decorative), and
+  a "Fill" button (revealed on cell hover, same reveal pattern as the
+  D-050 split handle) that opens a small swatch popover and batch-applies
+  one background to every element currently stacked in that cell, reusing
+  D-063's per-element `bg` and the existing `onUpdateElements` batch
+  callback — no new data model needed, since this is exactly the
+  mechanism the reference templates already use to make a cell read as
+  one solid block. Two new `GridBand.test.ts` cases (batch-apply leaves
+  other rows untouched; "No fill" clears `bg`). 197 designer tests (was
+  195), `pnpm -r typecheck` and designer `pnpm lint` green. Live
+  Puppeteer check confirmed the fill button/popover render and correctly
+  batch-recolor every stacked element in the targeted cell together.
 - **2026-07-30 — Fixed a real color-rendering bug; added background
   color for text/field elements; added optional zebra-striped detail
   rows (D-062, D-063, D-064).** While answering a user question about
