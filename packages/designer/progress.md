@@ -107,8 +107,17 @@
   only, extended to text/field. Immediate follow-up ("does not look
   nice") → Padding had NO editor control at all for any kind; added one,
   and fixed the Purchase Order templates' own `barStyle` to include
-  padding (it never had any). The rest of this section (below) is
-  historical Phase 0–3 journal, kept for reference.
+  padding (it never had any).
+  Pass 11, same session (D-068): direct screenshot report — pageHeader
+  (LOGO/"PURCHASE ORDER") lined up with reportHeader in the Design canvas
+  but not in Preview. Found and fixed a REAL regression, self-inflicted
+  by this session's own D-053/D-054: `.page` got an explicit, centered
+  width, but `.running` (pageHeader/pageFooter) still spanned the full
+  iframe edge-to-edge — two different coordinate origins for one page,
+  invisible before D-053/D-054 since both used to span their container by
+  default. `.running` now gets the same width + auto-centering `.page`
+  has. The rest of this section (below) is historical Phase 0–3 journal,
+  kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -883,6 +892,28 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Fixed a real Preview regression: pageHeader/pageFooter
+  didn't line up with the rest of the page (D-068).** Direct screenshot
+  report: LOGO/"PURCHASE ORDER" (pageHeader) lined up with VENDOR/SHIP TO
+  (reportHeader) in the Design canvas but were visibly shifted in
+  Preview. Measured directly in a real Preview iframe to confirm rather
+  than guess: `.page` (D-053/D-054, earlier this session) is 673px wide
+  and centered, starting at iframe-x≈347.5 — but `.running`
+  (pageHeader/pageFooter, `position:fixed;left:0;right:0`) had no width
+  of its own and spanned the FULL iframe edge-to-edge, a different,
+  wider coordinate origin than `.page`'s. An element at x:260 inside
+  pageHeader landed at absolute iframe-x 260; the same x:260 inside
+  reportHeader (inside `.page`) landed at 607.5 — two origins for one
+  page. Invisible before D-053/D-054 gave `.page` an explicit width,
+  since previously both spanned their container edge-to-edge by default
+  and matched by coincidence — a genuine, confirmed side effect of this
+  session's own earlier fix, not a user template issue. Fixed: `.running`
+  now gets the same computed width + `margin:0 auto` centering `.page`
+  uses. New `render.test.ts` case (67 core tests, was 66) asserts the two
+  widths match exactly in the generated CSS. Measured live: "PURCHASE
+  ORDER"'s right edge now exactly matches `.page`'s right edge
+  (previously it didn't). 198 designer tests unaffected, `pnpm -r
+  typecheck` and designer `pnpm lint` green.
 - **2026-07-30 — Corner radius and padding now settable for text/field
   elements (D-067).** Same "one gap surfaces the next" pattern as D-063:
   user asked to round the corners of the Purchase Order VENDOR/SHIP TO

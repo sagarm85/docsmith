@@ -624,6 +624,26 @@ describe('renderToHtml — DetailColumn.format:"image" (memory.md D-039)', () =>
   });
 });
 
+describe('renderToHtml — .running (pageHeader/pageFooter) is centered at the same width as .page (memory.md D-068)', () => {
+  it('gives .running an explicit width and auto margin matching .page\'s own width', () => {
+    const t = invoiceTemplate();
+    t.bands.unshift({
+      id: 'pageHeader',
+      type: 'pageHeader',
+      height: 30,
+      enabled: true,
+      elements: [{ id: 'ph1', kind: 'text', x: 0, y: 4, w: 100, h: 20, text: 'Logo' }],
+    });
+    const out = renderToHtml(t, fatDocument(1));
+    const pageWidthMatch = out.css.match(/\.page \{ width: (\d+)px; \}/);
+    expect(pageWidthMatch).toBeTruthy();
+    const pageWidth = pageWidthMatch![1];
+    expect(out.css).toContain(
+      `.running { position: fixed; left: 0; right: 0; width: ${pageWidth}px; margin: 0 auto; }`,
+    );
+  });
+});
+
 describe('renderToHtml — free-arrangement band height is a minimum, not a ceiling (memory.md D-066)', () => {
   it('renders the band at its stored height when content fits within it', () => {
     const out = renderToHtml(invoiceTemplate(), fatDocument(1));

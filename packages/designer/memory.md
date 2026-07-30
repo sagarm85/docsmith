@@ -2196,6 +2196,40 @@ between text and box edge in both.
 
 ---
 
+### D-068 — Fixed a real regression: pageHeader/pageFooter didn't line up with the rest of the page in Preview (self-inflicted by D-053/D-054)
+**Decision:** Direct screenshot report: Design canvas showed LOGO/
+"PURCHASE ORDER" (pageHeader) level with VENDOR/SHIP TO (reportHeader),
+but Preview showed pageHeader shifted left, not lining up with anything
+below it. Reproduced and measured directly in a real Preview iframe:
+`.page` (D-053/D-054) is 673px wide, centered (`margin:12px auto`) —
+starting at iframe-x≈347.5, not 0. But `.running` (pageHeader/pageFooter,
+`position:fixed;left:0;right:0`) had no width of its own, so it spanned
+the FULL iframe edge-to-edge — a DIFFERENT, wider coordinate origin than
+`.page`'s. An element at `x:260` inside pageHeader landed at absolute
+iframe-x 260; the same `x:260` inside reportHeader (inside `.page`)
+landed at 347.5+260=607.5 — two different origins for what's supposed to
+be one shared page. This was invisible before D-053/D-054 gave `.page`
+an explicit width: previously BOTH spanned their container edge-to-edge
+by default, so they matched by accident. Fixed: `.running` now also gets
+`width: ${pageWidth}px; margin: 0 auto` (the same computed `pageWidthPx`
+`.page` uses), which correctly centers a `position:fixed` element at a
+fixed width (the well-known `left:0;right:0` + explicit `width` +
+`margin:auto` combination).
+**Why:** A real, confirmed layout bug — not the user's template, not a
+misunderstanding — and specifically a side effect of this SESSION'S OWN
+D-053/D-054 fixes, caught because the user kept testing methodically
+against the shared reference templates exactly as asked.
+**Verified:** new `render.test.ts` case asserts `.running`'s CSS rule
+contains the exact same width as `.page`'s own computed width (67 core
+tests, was 66). Measured directly in a real Preview iframe:
+`PURCHASE ORDER`'s right edge (1020.5px) now exactly matches `.page`'s
+own right edge (1020.5px) — previously it did not. 198 designer tests
+unaffected, `pnpm -r typecheck` (all packages) and designer `pnpm lint`
+green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

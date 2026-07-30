@@ -583,7 +583,23 @@ table.detail thead { display: table-header-group; }
 table.detail tfoot { display: table-footer-group; }
 table.detail tr { break-inside: avoid; }
 .band-totals { break-inside: avoid; }
-.running { position: fixed; left: 0; right: 0; }
+/* width + margin:auto (with left:0;right:0 already set) centers a
+   position:fixed element exactly like a normal centered block — matching
+   .page's own width/centering above (memory.md D-068). Without this,
+   pageHeader/pageFooter spanned the FULL viewport/iframe edge-to-edge
+   while .page (and everything inside it — reportHeader/detail/totals) is
+   the narrower, centered printable width: an element at x:260 in a
+   pageHeader read as x:260 from the viewport's left edge, while the SAME
+   x:260 inside reportHeader read as x:260 from .page's own (inset, further
+   right) left edge — two different coordinate origins for what's supposed
+   to be one shared page. Reported directly: a Purchase Order's LOGO/
+   "PURCHASE ORDER" (pageHeader) visibly didn't line up with VENDOR/SHIP TO
+   (reportHeader) in Preview despite lining up in the Design canvas (which
+   has no such split — everything renders inside one bounded page box).
+   This was invisible before D-054/D-053 gave .page an explicit width —
+   previously BOTH spanned the full container by default, so they matched
+   by coincidence. */
+.running { position: fixed; left: 0; right: 0; width: ${pageWidth}px; margin: 0 auto; }
 .running-top { top: 0; }
 .running-bottom { bottom: 0; }
 @media screen {
