@@ -1910,6 +1910,39 @@ covers canvas background rendering).
 
 ---
 
+### D-059 — Alignment guide (D-038) tolerance widened 4px → 8px; grid overlay (D-058) pinned to a low z-index so it can never sit above it
+**Decision:** User reported dragging an element near siblings in
+REPORT HEADER showed no alignment guide line at all. Reproduced via
+Puppeteer: a smooth, simulated drag DOES correctly fire the guide (the
+mechanism itself is not broken), but `ALIGN_TOLERANCE` (4px / 0.6% —
+D-038's original value) requires landing within 4px of a sibling's edge,
+which a real, un-assisted mouse drag rarely does by chance while passing
+through. Confirmed directly: a drag landing 6px off a sibling's edge
+(inside the old 4px miss zone) showed no guide before this change, and
+does after. Widened to 8px / 1.2% — still tight enough to feel deliberate,
+loose enough to actually trigger by hand. Separately, and defensively:
+D-058's new `.dd-grid-overlay` is the LAST DOM child of `.dd-page`,
+`position:absolute` with no z-index of its own — an unstacked
+later sibling renders above an earlier one by CSS stacking rules
+REGARDLESS of that earlier element's own NESTED z-index (the align
+guide's `z-index:8` lives inside `.dd-band-body`'s own local stacking
+context, a different comparison than "z-index 1 vs 8" might suggest).
+Investigated whether this was actually hiding the guide (unlikely to be
+the FULL explanation, since `mix-blend-mode:multiply` darkens rather than
+occludes, and the guide was confirmed present in the DOM either way) but
+pinned `.dd-grid-overlay` to an explicit low `z-index:1` regardless, so
+the relationship is unambiguous and doesn't rely on DOM-order stacking
+subtleties holding up under future changes.
+**Verified:** 192 designer tests pass unmodified (both existing alignment-
+guide tests use either an exact 0px delta or a sibling positioned far
+enough away that neither is sensitive to the exact tolerance value).
+`pnpm -r typecheck` and designer `pnpm lint` green. Live Puppeteer
+verification: a controlled 6px-offset drag (inside the old miss zone)
+now shows the guide.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

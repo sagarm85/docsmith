@@ -44,8 +44,17 @@
   detail column into a footer row" already exists and works end-to-end
   (each column's Properties panel → "Aggregate (footer)" → Sum/Count/
   Average) — not a new feature, just confirmed and pointed out, since the
-  user asked for it not realizing it was already there. The rest of this
-  section (below) is historical Phase 0–3 journal, kept for reference.
+  user asked for it not realizing it was already there.
+  Pass 4, same session (D-059): user reported the D-038 alignment-guide
+  line wasn't appearing while dragging near siblings. Reproduced via
+  Puppeteer — the mechanism itself fires correctly under a smooth
+  simulated drag, but the 4px tolerance is too tight for a real, by-hand
+  mouse drag to land within reliably; widened to 8px, and confirmed a 6px-
+  off drag (inside the old miss zone) now shows the guide. Also pinned
+  D-058's new grid overlay to an explicit low z-index defensively, so it
+  can never end up stacked above real drag UI regardless of future DOM
+  reordering. The rest of this section (below) is historical Phase 0–3
+  journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -820,6 +829,24 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Alignment-guide tolerance widened; grid overlay pinned
+  to a low z-index (D-059).** Same live-editing session, continued: user
+  reported the alignment-guide line from D-038 wasn't appearing while
+  dragging. Reproduced with Puppeteer — a smooth, simulated drag DOES
+  fire the guide correctly, so the mechanism isn't broken; the real
+  problem is `ALIGN_TOLERANCE` (4px) requiring near-pixel-perfect
+  by-hand mouse positioning to ever land within range. Widened to 8px and
+  confirmed live: a drag landing 6px off a sibling's edge (inside the old
+  miss zone) now shows the guide, where it didn't before. Also pinned the
+  previous entry's new `.dd-grid-overlay` to an explicit `z-index:1` —
+  investigated whether it could be sitting above the guide line (DOM-order
+  stacking rules mean a later unstacked sibling CAN render over an
+  earlier one regardless of that element's own nested z-index) and, while
+  not confirmed as the actual cause here, pinned it defensively so the
+  relationship is unambiguous going forward. 192 designer tests pass
+  unmodified (both existing guide tests use either an exact 0px delta or
+  a far-away sibling, neither sensitive to the exact tolerance value),
+  `pnpm -r typecheck` and designer `pnpm lint` green.
 - **2026-07-30 — Free-form drag/resize right-edge clamp + Design canvas
   reference grid (D-057, D-058).** Same live-editing session as the entry
   below, continued: user reported dragging a totals field pushed it

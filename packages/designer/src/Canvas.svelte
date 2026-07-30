@@ -438,6 +438,13 @@
   .dd-grid-overlay {
     position: absolute;
     inset: 0;
+    /* Explicit low z-index (not just relying on DOM order): this is the
+       LAST child of .dd-page, and an unstacked absolutely-positioned later
+       sibling would otherwise render above an EARLIER one regardless of
+       that earlier element's own nested z-index — real UI drawn inside a
+       band (the alignment guide line, z-index:8 in Band.svelte, e.g.) must
+       stay unambiguously above this purely decorative layer. */
+    z-index: 1;
     pointer-events: none;
     mix-blend-mode: multiply;
     background-image:

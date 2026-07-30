@@ -111,7 +111,12 @@
   // (same idea as snapX/snapY's own px-vs-% split above) since edges in the
   // same band already share one basis (contentWidthPx for x, bandHeightPx
   // for y), so comparing raw stored values works with no conversion.
-  const ALIGN_TOLERANCE = $derived(unit === '%' ? 0.6 : 4);
+  // 4px (memory.md D-038's original value) needs near-pixel-perfect mouse
+  // positioning to ever trigger by hand — confirmed the guide mechanism
+  // itself fires correctly under a smooth simulated drag, but a real mouse
+  // gesture rarely lands within 4px of a sibling edge on the way past it
+  // (memory.md D-059). Widened to a still-tight-feeling but achievable 8px.
+  const ALIGN_TOLERANCE = $derived(unit === '%' ? 1.2 : 8);
 
   function computeAlignSnap(
     x: number,
