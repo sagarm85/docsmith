@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocSmith Designer Guide</title>
+<style>
+  :root {
+    --bg: #f2f4f8;
+    --panel: #ffffff;
+    --panel-alt: #eef1f5;
+    --border: #d7dce3;
+    --text: #14161b;
+    --muted: #5b6472;
+    --accent: #2563eb;
+    --accent-strong: #1d4ed8;
+    --accent-weak: #dde9ff;
+    --danger: #b3261e;
+    --warn: #9a6700;
+    --ok: #1a7f37;
+    --shadow: 0 1px 3px rgba(20, 22, 27, 0.08), 0 1px 2px rgba(20, 22, 27, 0.06);
+    --radius: 10px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --panel: #1a1d24;
+      --panel-alt: #20242c;
+      --border: #2c3038;
+      --text: #f2f4f8;
+      --muted: #9aa1ad;
+      --accent: #6d9bff;
+      --accent-strong: #8fb3ff;
+      --accent-weak: rgba(109, 155, 255, 0.16);
+      --danger: #ff7a72;
+      --warn: #e3ac4c;
+      --ok: #4ade80;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --panel-alt: #20242c;
+    --border: #2c3038;
+    --text: #f2f4f8;
+    --muted: #9aa1ad;
+    --accent: #6d9bff;
+    --accent-strong: #8fb3ff;
+    --accent-weak: rgba(109, 155, 255, 0.16);
+    --danger: #ff7a72;
+    --warn: #e3ac4c;
+    --ok: #4ade80;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+  :root[data-theme="light"] {
+    --bg: #f2f4f8;
+    --panel: #ffffff;
+    --panel-alt: #eef1f5;
+    --border: #d7dce3;
+    --text: #14161b;
+    --muted: #5b6472;
+    --accent: #2563eb;
+    --accent-strong: #1d4ed8;
+    --accent-weak: #dde9ff;
+    --danger: #b3261e;
+    --warn: #9a6700;
+    --ok: #1a7f37;
+    --shadow: 0 1px 3px rgba(20, 22, 27, 0.08), 0 1px 2px rgba(20, 22, 27, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  ::selection { background: var(--accent-weak); }
+
+  a { color: var(--accent); }
+
+  code, .kbd {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  /* ---- Sidebar ---- */
+  nav.toc {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 28px 20px 40px;
+    border-right: 1px solid var(--border);
+  }
+  .toc-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .toc-brand .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex: none;
+  }
+  .toc-sub { color: var(--muted); font-size: 12.5px; margin: 0 0 22px; }
+  .toc-group { margin-bottom: 18px; }
+  .toc-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .toc a {
+    display: block;
+    padding: 5px 8px;
+    margin: 0 -8px;
+    border-radius: 6px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13.5px;
+  }
+  .toc a:hover { background: var(--panel-alt); }
+
+  /* ---- Main content ---- */
+  main { padding: 48px clamp(20px, 5vw, 64px) 120px; min-width: 0; }
+
+  .hero { margin-bottom: 56px; }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    background: var(--accent-weak);
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 38px);
+    line-height: 1.15;
+    margin: 0 0 14px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .hero p.lede {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 640px;
+    margin: 0 0 28px;
+  }
+
+  section.chapter { margin: 72px 0; scroll-margin-top: 24px; }
+  section.chapter:first-of-type { margin-top: 0; }
+  .chapter-kicker {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    margin: 0 0 8px;
+  }
+  h2 {
+    font-size: 25px;
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 16px;
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 14px; color: var(--text); }
+  p.dim { color: var(--muted); }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .card h4 {
+    margin: 0 0 6px;
+    font-size: 14.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .card .tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--panel-alt);
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .tag.free { color: var(--accent-strong); background: var(--accent-weak); }
+  .tag.grid { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+  .tag.stack { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+
+  figure {
+    margin: 22px 0 28px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    box-shadow: var(--shadow);
+  }
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  figcaption {
+    font-size: 12.5px;
+    color: var(--muted);
+    padding: 10px 6px 2px;
+  }
+  .shot-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+  }
+  .shot-row figure { margin: 0; }
+
+  table.ref {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 4px;
+    font-size: 13.5px;
+    overflow-x: auto;
+    display: block;
+  }
+  table.ref thead tr { border-bottom: 1.5px solid var(--border); }
+  table.ref th {
+    text-align: left;
+    padding: 8px 12px 8px 0;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11.5px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  table.ref td {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.ref tr:last-child td { border-bottom: none; }
+
+  .steps {
+    list-style: none;
+    margin: 16px 0;
+    padding: 0;
+    counter-reset: step;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 2px 0 14px 34px;
+    font-size: 14.5px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-weak);
+    color: var(--accent-strong);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .callout {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--panel);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 14px 18px;
+    margin: 20px 0;
+    font-size: 13.5px;
+  }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout strong { display: block; margin-bottom: 3px; font-size: 13px; }
+
+  .divider { height: 1px; background: var(--border); margin: 56px 0 0; }
+
+  .band-order {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 18px 0 24px;
+  }
+  .band-order .b {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    font-size: 13.5px;
+  }
+  .band-order .b .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .band-order .b .name { font-weight: 600; min-width: 150px; }
+  .band-order .b .desc { color: var(--muted); }
+  .band-order .b.dashed { border-style: dashed; opacity: 0.85; }
+
+  footer.page-footer {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 clamp(20px, 5vw, 64px) 60px 300px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    footer.page-footer { padding-left: clamp(20px, 5vw, 64px); }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-brand"><span class="dot"></span> DocSmith Guide</div>
+    <p class="toc-sub">Every screen in this guide is a real screenshot of the app — nothing here is mocked up.</p>
+
+    <div class="toc-group">
+      <p class="toc-group-label">Basics</p>
+      <a href="#anatomy">Document anatomy</a>
+      <a href="#arrangements">Layout arrangements</a>
+      <a href="#elements">Element types</a>
+    </div>
+    <div class="toc-group">
+      <p class="toc-group-label">Styling an element</p>
+      <a href="#position">Position &amp; size</a>
+      <a href="#text-style">Alignment &amp; text style</a>
+      <a href="#color-bg">Color &amp; background</a>
+      <a href="#radius-padding">Corner radius &amp; padding</a>
+      <a href="#layering">Layer order</a>
+    </div>
+    <div class="toc-group">
+      <p class="toc-group-label">Grid sections</p>
+      <a href="#sections">Rows &amp; column layouts</a>
+      <a href="#cell-fill">Whole-cell background</a>
+    </div>
+    <div class="toc-group">
+      <p class="toc-group-label">Line items</p>
+      <a href="#columns">Columns &amp; formatting</a>
+      <a href="#aggregates">Totals &amp; carry-forward</a>
+      <a href="#table-look">Borders &amp; striping</a>
+    </div>
+    <div class="toc-group">
+      <p class="toc-group-label">Page-level</p>
+      <a href="#band-settings">Band settings &amp; height</a>
+      <a href="#page-setup">Page setup &amp; margins</a>
+      <a href="#preview-export">Preview &amp; export</a>
+    </div>
+    <div class="toc-group">
+      <p class="toc-group-label">Reference</p>
+      <a href="#quick-ref">Property quick reference</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="hero">
+      <span class="hero-eyebrow">Designer guide</span>
+      <h1>Everything you can build with DocSmith, in one place</h1>
+      <p class="lede">A tour of every band, element, and property in the designer — position and size, alignment, color and background, grid sections, line-item columns, page setup, and more — each shown against a real template, not a mockup.</p>
+    </div>
+
+    <figure>
+      <img src="images/01-overview.png" alt="Full Design view of the Invoice (Orange) reference template, showing Report Header, Detail line items, and Totals bands" />
+      <figcaption>The Design view of the "Invoice (Orange)" reference template — the same one every screenshot in this guide is taken from.</figcaption>
+    </figure>
+
+    <section class="chapter" id="anatomy">
+      <p class="chapter-kicker">Basics</p>
+      <h2>Document anatomy: bands</h2>
+      <p>A template is built from a fixed stack of <strong>bands</strong>, always in this order. Page Header and Page Footer are optional and repeat on every printed page; the rest flow once per document.</p>
+
+      <div class="band-order">
+        <div class="b dashed">
+          <span class="swatch" style="background:var(--muted)"></span>
+          <span class="name">Page Header</span>
+          <span class="desc">Optional. Repeats at the top of every printed page — logos, running titles.</span>
+        </div>
+        <div class="b">
+          <span class="swatch" style="background:#7c6fd6"></span>
+          <span class="name">Report Header</span>
+          <span class="desc">Prints once, at the top — company/customer details, invoice metadata.</span>
+        </div>
+        <div class="b">
+          <span class="swatch" style="background:var(--accent)"></span>
+          <span class="name">Detail (line items)</span>
+          <span class="desc">The repeating table bound to your dataset — one row per record. Its column header repeats on every printed page automatically.</span>
+        </div>
+        <div class="b">
+          <span class="swatch" style="background:var(--ok)"></span>
+          <span class="name">Totals</span>
+          <span class="desc">Prints once, after the last row — subtotal/tax/grand total, terms, signatures.</span>
+        </div>
+        <div class="b dashed">
+          <span class="swatch" style="background:var(--muted)"></span>
+          <span class="name">Page Footer</span>
+          <span class="desc">Optional. Repeats at the bottom of every printed page — contact info, page numbers.</span>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Preview vs. print</strong>
+        Preview and the exported PDF are rendered by the exact same engine — what you see in Preview is what prints. There's no separate "print mode" to second-guess.
+      </div>
+    </section>
+
+    <section class="chapter" id="arrangements">
+      <p class="chapter-kicker">Basics</p>
+      <h2>Layout arrangements</h2>
+      <p>Report Header and Totals can each be laid out one of three ways. Detail is always a table; Page Header/Footer are always free-form.</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <span class="tag free">Free-form</span>
+          <h4>Place anything, anywhere</h4>
+          <p>Drag elements to an exact X/Y position and size. Full control, but you position everything by hand — this is what Totals, Page Header, and Page Footer use.</p>
+        </div>
+        <div class="card">
+          <span class="tag grid">Grid</span>
+          <h4>Bordered rows &amp; columns</h4>
+          <p>Rows of 1, 2, or more side-by-side cells, each independently sized. Best for forms — a "Seller" cell spanning a full row above two narrower "Invoice #" / "Date" cells. Used by Report Header in this example.</p>
+        </div>
+        <div class="card">
+          <span class="tag stack">Stacked</span>
+          <h4>Flows top-to-bottom</h4>
+          <p>Elements auto-flow like a simple document — no X/Y to manage, width is a percentage of the row. Height is always automatic.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="elements">
+      <p class="chapter-kicker">Basics</p>
+      <h2>Element types</h2>
+      <table class="ref">
+        <thead><tr><th>Kind</th><th>What it's for</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Text</strong></td><td>A static label you type yourself — "SUB TOTAL:", "Term &amp; Condition".</td></tr>
+          <tr><td><strong>Field</strong></td><td>A value bound to your data — a header field (Invoice #, Customer Name) or a line-item column. Never fabricated: an unconnected field shows honestly empty, never a fake sample value.</td></tr>
+          <tr><td><strong>Image</strong></td><td>A logo or photo, from a URL — or a per-row bound image in a Detail column.</td></tr>
+          <tr><td><strong>Line</strong></td><td>A plain horizontal rule — the simplest way to visually separate two sections.</td></tr>
+          <tr><td><strong>Box</strong></td><td>A plain rectangle — background fill and corner radius, no text.</td></tr>
+        </tbody>
+      </table>
+      <p class="dim">Add any of these from the <strong>Blocks</strong> panel on the left, or drag a field directly from <strong>Header fields</strong> / a line-item column onto the canvas.</p>
+      <figure style="max-width: 280px;">
+        <img src="images/08-palette.png" alt="The left Blocks/Sections/Header fields palette" />
+        <figcaption>The left palette: Blocks (Text/Image/Line/Box), Sections (row layout presets), and your entity's Header fields — click "+" or drag onto the canvas.</figcaption>
+      </figure>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="chapter" id="position">
+      <p class="chapter-kicker">Styling an element</p>
+      <h2>The Properties panel</h2>
+      <p>Select any element on the canvas and its full set of controls appears on the right. This is the same panel for a free-form Text/Field element — everything below is explained against this one screenshot.</p>
+
+      <figure style="max-width: 380px;">
+        <img src="images/02-element-properties.png" alt="The full Properties panel for a selected text element, showing Position, Alignment, Text style, Color, Background, Corner radius, Padding, Text, Layer order, Duplicate and Delete" />
+        <figcaption>Every control below refers to this panel, top to bottom.</figcaption>
+      </figure>
+
+      <h3>Position &amp; size</h3>
+      <p>X/Y position and Width/Height in pixels (or percent, if the template uses percentage units). This is the element's own bounding box — everything else (alignment, background, padding) is relative to it.</p>
+    </section>
+
+    <section class="chapter" id="text-style">
+      <p class="chapter-kicker">Styling an element</p>
+      <h3 style="margin-top:0">Alignment</h3>
+      <p>Left / Center / Right — where the text sits <em>within</em> its own box. A right-aligned field in a wide box will hug the box's right edge, not its left.</p>
+
+      <h3>Text style</h3>
+      <p>Font size (with quick −/+ steppers), Bold, and Italic.</p>
+    </section>
+
+    <section class="chapter" id="color-bg">
+      <p class="chapter-kicker">Styling an element</p>
+      <h3 style="margin-top:0">Color &amp; Background</h3>
+      <p>Both are swatch rows: five presets plus a custom picker (the "+" swatch opens a full color picker for any hex value). <strong>Background</strong> also has a "No fill" option (the diagonal-line swatch) — the standard way to clear it back to transparent.</p>
+      <div class="callout">
+        <strong>Why background matters most on labels</strong>
+        A colored background is what turns a plain text label into a "badge" or "bar" look — like the orange <code>SUB TOTAL:</code> row in the overview screenshot above. Pair it with Padding (next) so the text doesn't sit flush against the edge.
+      </div>
+    </section>
+
+    <section class="chapter" id="radius-padding">
+      <p class="chapter-kicker">Styling an element</p>
+      <h3 style="margin-top:0">Corner radius &amp; Padding</h3>
+      <p><strong>Corner radius</strong> rounds the element's box corners — 0 is a sharp rectangle, higher values round it, a large enough value makes a pill shape.</p>
+      <p><strong>Padding</strong> is the space between the text and its own box edges. It has no visible effect until a background color is set — that's exactly when it matters most, so the text has breathing room instead of touching the color's edge.</p>
+    </section>
+
+    <section class="chapter" id="layering">
+      <p class="chapter-kicker">Styling an element</p>
+      <h3 style="margin-top:0">Layer order</h3>
+      <p>Only matters when two elements visually overlap — e.g. a plain Box used as a colored background sitting behind a Text label. <strong>Bring forward</strong> / <strong>Send backward</strong> swap which one paints on top. If nothing in your layout overlaps, these buttons won't visibly do anything — that's expected, not a bug.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="chapter" id="sections">
+      <p class="chapter-kicker">Grid sections</p>
+      <h2>Rows &amp; column layouts</h2>
+      <p>When a band is set to <strong>Grid</strong> arrangement, it's organized into rows — each row is a "section," and each section can have its own column split. Hover any section to reveal its toolbar.</p>
+
+      <figure>
+        <img src="images/03-section-toolbar.png" alt="A grid section's hover toolbar open, showing the layout popover with 1 column, 2 columns, and Large + small options" />
+        <figcaption>Hovering a section reveals Layer order / Duplicate / Delete for that whole row, plus a "Change layout" popover to switch its column split.</figcaption>
+      </figure>
+
+      <ul class="steps">
+        <li><strong>Add a row</strong> — the "+ Add row" button at the bottom of the band creates a new, empty section with the default column layout.</li>
+        <li><strong>Fill a cell</strong> — click an empty cell to search for a field or type your own text, or drag a field/block onto it directly.</li>
+        <li><strong>Change a section's layout</strong> — hover the row, click the layers icon, pick 1 column / 2 columns / Large + small.</li>
+        <li><strong>Split a wide cell</strong> — a cell spanning more than one column shows a small grip handle at its center; click it to divide the cell in two.</li>
+        <li><strong>Duplicate or delete</strong> a whole section from the same hover toolbar.</li>
+      </ul>
+
+      <p class="dim">Every section shows a light dashed outline in the Design canvas even without a printed border, purely so you can see its extent while editing — it never appears in Preview or the PDF.</p>
+    </section>
+
+    <section class="chapter" id="cell-fill">
+      <p class="chapter-kicker">Grid sections</p>
+      <h2>Whole-cell background</h2>
+      <p>Hover any filled cell and a small circular "Fill" button appears at its top-right corner. It opens the same color palette as an element's Background swatch, and applies that color to <em>every</em> element stacked in that cell at once — the fastest way to make a cell read as one solid block, like the BRANDNAME cell in the overview screenshot.</p>
+
+      <figure>
+        <img src="images/04-cell-fill.png" alt="A grid cell's Fill button open, showing a popover with No fill, five color presets, and a custom color picker" />
+        <figcaption>The Fill popover: No fill, five presets, and a custom picker — applied to every element in the cell together.</figcaption>
+      </figure>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="chapter" id="columns">
+      <p class="chapter-kicker">Line items</p>
+      <h2>Columns &amp; formatting</h2>
+      <p>Click a column's header text (not the format/align controls beside it) to select the column itself and open its full Properties.</p>
+
+      <figure style="max-width: 380px;">
+        <img src="images/05-column-properties.png" alt="Column properties panel for the Total column, showing Header text, Width, Align, Format, Aggregate, Carry forward, and Conditional formatting" />
+        <figcaption>A currency column's full Properties — Header text, Width, Align, Format, plus Aggregate/Carry-forward (only shown for Number/Currency columns).</figcaption>
+      </figure>
+
+      <table class="ref">
+        <thead><tr><th>Field</th><th>Controls</th></tr></thead>
+        <tbody>
+          <tr><td>Header text</td><td>The column title shown in the table.</td></tr>
+          <tr><td>Width</td><td>Pixel width of the column.</td></tr>
+          <tr><td>Align</td><td>Left / Center / Right for every row's value in this column.</td></tr>
+          <tr><td>Format</td><td>Text, Number, Currency, Date, Words (spells out a number), Image.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="chapter" id="aggregates">
+      <p class="chapter-kicker">Line items</p>
+      <h2>Totals &amp; carry-forward</h2>
+      <p><strong>Aggregate (footer)</strong> — Sum, Count, or Average — adds a computed row directly under the line items, right in the same table. Only shown for Number/Currency columns, since summing text or dates doesn't mean anything. Defaults to <strong>None</strong>: nothing shows until you deliberately turn it on for a specific column.</p>
+      <p><strong>Carry forward (page breaks)</strong> — for a document long enough to span multiple pages, this adds "Carried forward" / "Brought forward" subtotal rows at each page break in the exported PDF. It's PDF-export-only — Preview never shows carry-forward rows, since it has no concept of page breaks.</p>
+    </section>
+
+    <section class="chapter" id="table-look">
+      <p class="chapter-kicker">Line items</p>
+      <h2>Borders &amp; striping</h2>
+      <p>Select the <strong>Detail (line items)</strong> band itself (not a column) for two table-wide toggles.</p>
+
+      <figure style="max-width: 380px;">
+        <img src="images/07-detail-band-properties.png" alt="Detail band properties showing Row borders and Alternating row shading checkboxes" />
+        <figcaption>Detail band properties: dataset info, Row borders, and Alternating row shading — both off/on toggles, no color picker to manage.</figcaption>
+      </figure>
+
+      <ul class="steps">
+        <li><strong>Row borders</strong> — on by default; a thin line under every row. Turn off for a fully borderless table (like the Invoice (Orange) template's line items).</li>
+        <li><strong>Alternating row shading</strong> — a light gray tint on every other row, off by default so it never silently changes an existing template's look. A fixed tint, not a color picker, to keep it a one-click decision.</li>
+      </ul>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="chapter" id="band-settings">
+      <p class="chapter-kicker">Page-level</p>
+      <h2>Band settings &amp; height</h2>
+      <p>Select any free-form band (Totals, Page Header, Page Footer) directly — click its label bar on the canvas — for its own settings.</p>
+
+      <figure style="max-width: 380px;">
+        <img src="images/06-band-properties.png" alt="Totals band properties showing Arrangement dropdown, Minimum height field with hint text, and Background swatch" />
+        <figcaption>The Totals band's own properties: Arrangement, Minimum height, and Background.</figcaption>
+      </figure>
+
+      <div class="callout">
+        <strong>"Minimum height," not a hard limit</strong>
+        Place content lower than this number and the band grows automatically to fit it — it never gets clipped or restricted. The number is just a floor: useful for reserving visual space even when content is short, but never a ceiling that blocks you from adding more.
+      </div>
+    </section>
+
+    <section class="chapter" id="page-setup">
+      <p class="chapter-kicker">Page-level</p>
+      <h2>Page setup &amp; margins</h2>
+      <p>The <strong>Page</strong> tab (next to Selection, top-right) covers everything about the physical page itself, independent of any one band.</p>
+
+      <figure style="max-width: 380px;">
+        <img src="images/10-page-setup.png" alt="Page setup panel showing Page size, Orientation, Margins in mm, Formatting locale and currency, Element position unit, and Print behaviour checkboxes" />
+        <figcaption>Page size, orientation, margins (mm), locale/currency for number formatting, the element position unit, and print-only behavior toggles.</figcaption>
+      </figure>
+
+      <table class="ref">
+        <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Page size / Orientation</td><td>A4, Letter, A5, Legal — portrait or landscape.</td></tr>
+          <tr><td>Margins (mm)</td><td>The real, physical print margin on all four sides — honored by both the Preview and the exported PDF.</td></tr>
+          <tr><td>Locale / Currency</td><td>Drives number, date, and currency formatting for every Field on the page.</td></tr>
+          <tr><td>Element position/size unit</td><td>Fixed (px) keeps elements at an exact pixel spot regardless of page size; percentage scales them proportionally instead.</td></tr>
+          <tr><td>Repeat page header/footer</td><td>Independent of whether the bands exist — this toggles whether they actually repeat on every printed page.</td></tr>
+          <tr><td>Keep line rows together</td><td>Prevents a single line-item row from being split across a page break.</td></tr>
+          <tr><td>Fill page height</td><td>Stretches content to a full page and pins Totals to the bottom, instead of leaving it wherever the last row ends.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="chapter" id="preview-export">
+      <p class="chapter-kicker">Page-level</p>
+      <h2>Preview &amp; export</h2>
+      <p>Toggle <strong>Design / Preview</strong> at the top at any time — Preview renders your actual data through the exact same engine used for the exported PDF, so there's nothing to double-check between the two.</p>
+
+      <figure>
+        <img src="images/09-preview.png" alt="Preview mode showing the fully rendered Invoice (Orange) template with real styling" />
+        <figcaption>Preview: the same template from the top of this guide, fully rendered.</figcaption>
+      </figure>
+
+      <p><strong>Print</strong> (in Preview) opens your browser's native print dialog against the real rendered page. <strong>Export PDF</strong> (top-right, always available) generates the archival PDF via the render service — the same source, guaranteed page breaks and repeating headers included.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="chapter" id="quick-ref">
+      <p class="chapter-kicker">Reference</p>
+      <h2>Property quick reference</h2>
+      <table class="ref">
+        <thead><tr><th>Want to&hellip;</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>Move or resize something</td><td>Select it → Position &amp; size (Properties panel)</td></tr>
+          <tr><td>Change text color</td><td>Select a Text/Field element → Color swatches</td></tr>
+          <tr><td>Add a background color to a label</td><td>Select it → Background swatches (then add Padding so it isn't cramped)</td></tr>
+          <tr><td>Round a box's corners</td><td>Select it → Corner radius</td></tr>
+          <tr><td>Color a whole section at once</td><td>Hover the cell on the canvas → Fill button</td></tr>
+          <tr><td>Add/remove a row in a form-style header</td><td>"+ Add row" at the band's bottom, or the section's own hover toolbar to duplicate/delete</td></tr>
+          <tr><td>Sum a line-item column</td><td>Click the column header → Aggregate (footer) → Sum (Number/Currency columns only)</td></tr>
+          <tr><td>Stripe the line-item table</td><td>Select the Detail band → Alternating row shading</td></tr>
+          <tr><td>Let a section grow with its content</td><td>Nothing to do — it already does; Minimum height is a floor, not a ceiling</td></tr>
+          <tr><td>Change the physical print margin</td><td>Page tab → Margins (mm)</td></tr>
+          <tr><td>Repeat a logo on every page</td><td>Enable Page Header, then Page tab → "Repeat page header"</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<footer class="page-footer">
+  Built directly from the running designer — every screenshot above is a real capture, not a mockup.
+</footer>
+</body>
+</html>
