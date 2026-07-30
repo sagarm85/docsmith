@@ -153,7 +153,21 @@
   fixture (60 rows, 3 pages) — reportHeader once, column header + tfoot
   aggregate + pageFooter all correctly repeat on every page, Grand
   Total/totals print once on the last page. 70 core tests pass (was 67);
-  198 designer tests unaffected; `pnpm -r typecheck`/lint green. The rest
+  198 designer tests unaffected; `pnpm -r typecheck`/lint green.
+  Pass 14, same session (D-071): "Line Items - I am not able to add
+  field." Reproduced directly — every reference/demo template already maps
+  100% of its dataset fields to detail columns, so clicking "+" on ANY
+  Line Items field threw Svelte's `each_key_duplicate` and broke the
+  table: a `DetailColumn`'s only identity is its bound field name, and
+  `DetailTable.svelte` keys three `{#each}` blocks on exactly that,
+  guaranteed to collide on a duplicate. Fixed at the root
+  (`DocDesigner.handleAddColumn` now no-ops on a duplicate field name,
+  covering both the palette "+" and drag-drop-onto-table paths at once)
+  and in the UX (an already-added dataset field now shows a check instead
+  of "+", disabled, labeled "already added," in the palette — so it reads
+  as done, not broken; header fields are unaffected, they have no such
+  limit). New `check` icon added to the existing hand-authored icon set.
+  201 designer tests pass (was 198); lint/typecheck/build green. The rest
   of this section (below) is historical Phase 0–3 journal, kept for
   reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,

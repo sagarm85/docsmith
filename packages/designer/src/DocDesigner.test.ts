@@ -677,6 +677,43 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('clicking Add on a dataset field already used as a detail column is a no-op, not a crash ("Line Items - not able to add field")', async () => {
+    const el = await mountWithEntityAndDataset();
+
+    // First add is real: one "Description" column.
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Add Description column"]')!.click();
+    await nextTick();
+    let detail = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      columns: Array<{ column: string }>;
+    };
+    expect(detail.columns).toHaveLength(1);
+
+    // DetailTable.svelte keys its column {#each} blocks by `col.column` (the
+    // field name — a DetailColumn has no other identity). Before the fix,
+    // clicking Add again on the SAME already-added field threw Svelte's
+    // each_key_duplicate and broke the table's rendering — reported directly
+    // as "Line Items - not able to add field" for a template (like every
+    // reference template) where every dataset field is already a column.
+    // The chip itself now shows "added" and its button is disabled, but
+    // assert the underlying guard directly rather than relying only on the
+    // chip being unclickable.
+    const addedBtn = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '[aria-label="Description already added"]',
+    );
+    expect(addedBtn).toBeTruthy();
+    expect(addedBtn!.disabled).toBe(true);
+
+    detail = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      columns: Array<{ column: string }>;
+    };
+    expect(detail.columns).toHaveLength(1);
+    expect(detail.columns[0]?.column).toBe('description');
+    // The table still renders correctly — no crash, no duplicate-keyed rows.
+    expect(el.shadowRoot?.textContent).toContain('Description');
+
+    el.remove();
+  });
+
   it('adding a conditional-formatting rule to a field element writes FreeElement.conditionalFormat (memory.md D-031)', async () => {
     const el = await mountWithEntitySelected();
 

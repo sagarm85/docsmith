@@ -18,6 +18,7 @@
     pickedUp = null,
     onPickUpField,
     onPickUpBlock,
+    addedDatasetColumns,
   }: {
     adapter: DataSourceAdapter;
     dataSource: DataSource;
@@ -38,6 +39,12 @@
     pickedUp?: PickedUp;
     onPickUpField?: (field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) => void;
     onPickUpBlock?: (kind: BlockKind) => void;
+    /** Field names already present as a detail column — shown as "added"
+     * in the dataset FieldGroups rather than a "+" that silently no-ops
+     * (DocDesigner's handleAddColumn duplicate guard: a DetailColumn's only
+     * identity is its field name, so a second one crashes the table's keyed
+     * `{#each}`). Never applies to header fields, which have no such limit. */
+    addedDatasetColumns?: Set<string>;
   } = $props();
 
   let search = $state('');
@@ -172,6 +179,7 @@
         onAddField={onAddField && ((field) => onAddField(field, 'dataset', ds.id))}
         {pickedUp}
         onPickUp={onPickUpField && ((field) => onPickUpField(field, 'dataset', ds.id))}
+        {addedDatasetColumns}
       />
     {/each}
   {/if}

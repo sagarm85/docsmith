@@ -151,4 +151,61 @@ describe('FieldGroup', () => {
       expect(screen.getByRole('group', { name: 'Invoice # field (picked up)' })).toBeTruthy(),
     );
   });
+
+  it('shows a dataset field already used as a detail column as "added" — no Add/pick-up, a check instead of a +', async () => {
+    const adapter = makeAdapter([
+      { name: 'description', label: 'Description', type: 'text', kind: 'system' },
+      { name: 'qty', label: 'Qty', type: 'int', kind: 'system' },
+    ]);
+    const onAddField = vi.fn();
+    const onPickUp = vi.fn();
+    render(FieldGroup, {
+      props: {
+        title: 'Line items',
+        cls: 'dataset',
+        adapter,
+        entity: 'invoice',
+        datasetId: 'invoice_items',
+        onAddField,
+        onPickUp,
+        addedDatasetColumns: new Set(['description']),
+      },
+    });
+
+    await waitFor(() => expect(screen.getByText('Qty')).toBeTruthy());
+
+    // Already-added field: disabled, labeled distinctly, not pickable.
+    const addedBtn = screen.getByRole('button', { name: 'Description already added' });
+    expect((addedBtn as HTMLButtonElement).disabled).toBe(true);
+    await fireEvent.keyDown(screen.getByRole('group', { name: 'Description field (already added)' }), {
+      key: 'Enter',
+    });
+    expect(onPickUp).not.toHaveBeenCalled();
+
+    // Still-addable field: unaffected.
+    const addBtn = screen.getByRole('button', { name: 'Add Qty column' });
+    expect((addBtn as HTMLButtonElement).disabled).toBe(false);
+    await fireEvent.click(addBtn);
+    expect(onAddField).toHaveBeenCalledWith({ name: 'qty', label: 'Qty', type: 'int', kind: 'system' });
+  });
+
+  it('never treats header fields as "added", even if addedDatasetColumns happens to contain the name', async () => {
+    const adapter = makeAdapter([
+      { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
+    ]);
+    render(FieldGroup, {
+      props: {
+        title: 'Header fields',
+        cls: 'header',
+        adapter,
+        entity: 'invoice',
+        onAddField: vi.fn(),
+        addedDatasetColumns: new Set(['invoice_number']),
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add Invoice # to report header' })).toBeTruthy(),
+    );
+  });
 });

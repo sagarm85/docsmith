@@ -2330,6 +2330,56 @@ references the old `.running` class).
 
 ---
 
+### D-071 — Fixed a real crash: adding a Line Items field that's already a detail column threw `each_key_duplicate` and broke the table ("Line Items - I am not able to add field")
+**Decision:** Reported directly. Reproduced live against the dev harness:
+opening the Standard Invoice demo template (every one of its 4 dataset
+fields already mapped to a detail column — true of every reference
+template too, since they're all fully built out) and clicking "+" on ANY
+Line Items field threw `Svelte error: each_key_duplicate — Keyed each
+block has duplicate key 'description'`. Root cause: `DetailColumn` has no
+identity beyond its bound field name (`createDetailColumn` in
+`template-edits.ts` sets `column: field.name` and nothing else), and
+`DetailTable.svelte` keys THREE separate `{#each band.columns as col
+(col.column)}` blocks on that same field name — adding a second column
+for an already-used field is guaranteed to collide and crash Svelte's
+keyed reconciliation, breaking the whole table's rendering. Confirmed the
+mechanism itself is otherwise sound: removing a column first, then
+re-adding that exact field fresh (no duplicate), worked with zero errors —
+isolating the bug precisely to the duplicate case, not the add path in
+general. Both entry points shared this risk: the palette's "+" click AND
+dragging a field chip straight onto the table both funnel through
+`DocDesigner.handleAddColumn`.
+**Fix:** two parts. (1) Root-cause guard: `handleAddColumn` now no-ops if
+the target detail band already has a column with that field name — covers
+both the click and the drag-drop path from one place, so no duplicate can
+ever reach `DetailTable.svelte` regardless of how it's requested. (2) UX
+clarity, since a silent no-op alone would still look broken ("I click +
+and nothing happens"): `DocDesigner` now derives the current detail
+band's column names (`detailColumnNames`) and threads it down (`Palette`
+→ dataset `FieldGroup`s only, never header ones, which have no such
+limit → `FieldChip`) as `addedDatasetColumns`. An already-added field's
+chip shows a check icon instead of "+", a disabled button labeled "{field}
+already added", `aria-label` reflects it, and its keyboard pick-up
+(design.md §12) is disabled too — same honest-UI pattern as the existing
+`picked` state. Added a new hand-authored `check` icon to `icons.ts`
+(house style, no library) since none existed.
+**Why:** every reference template maps 100% of its dataset's fields to
+detail columns by design (they're finished, fully-built demos) — meaning
+literally the FIRST click on ANY Line Items field in ANY of them hit this
+crash. Not an edge case; the most likely thing a real user does first.
+**Verified:** (1) real Puppeteer reproduction against the dev harness
+confirmed the exact crash and message before the fix. (2) After the fix,
+the same click sequence produces zero console errors, the chip shows
+"Description already added" (disabled), and the detail table keeps
+rendering correctly — confirmed via screenshot. (3) `pnpm --filter
+@docsmith/designer lint/typecheck/test`: 201 tests pass (was 198; 3 new:
+2 in `FieldGroup.test.ts` covering the added-state and that header fields
+are never affected, 1 in `DocDesigner.test.ts` reproducing the exact
+bug-report scenario end-to-end and asserting no duplicate/no crash).
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

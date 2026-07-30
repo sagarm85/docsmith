@@ -9,6 +9,7 @@
     onAdd,
     picked = false,
     onPickUp,
+    added = false,
   }: {
     field: FieldMeta;
     cls: 'header' | 'dataset';
@@ -18,10 +19,19 @@
      * drag-alternative (design.md §12). */
     picked?: boolean;
     onPickUp?: () => void;
+    /** True when this dataset field is already a detail column — shown as
+     * "added" (a check, not a "+") instead of a control that would silently
+     * no-op or, worse, crash the table's keyed rendering on a duplicate
+     * (DocDesigner's handleAddColumn guard; see FieldGroup.svelte). */
+    added?: boolean;
   } = $props();
 
   const addLabel = $derived(
-    cls === 'header' ? `Add ${field.label} to report header` : `Add ${field.label} column`,
+    added
+      ? `${field.label} already added`
+      : cls === 'header'
+        ? `Add ${field.label} to report header`
+        : `Add ${field.label} column`,
   );
 
   // Native HTML5 DnD payload (design.md §5). The drop side (Canvas/Band/DetailTable)
@@ -57,8 +67,9 @@
 <div
   class="dd-chip"
   class:dd-chip--picked={picked}
+  class:dd-chip--added={added}
   role="group"
-  aria-label={`${field.label} field${picked ? ' (picked up)' : ''}`}
+  aria-label={`${field.label} field${picked ? ' (picked up)' : added ? ' (already added)' : ''}`}
   tabindex={onPickUp ? 0 : -1}
   draggable="true"
   ondragstart={handleDragStart}
@@ -69,11 +80,12 @@
   <button
     type="button"
     class="dd-chip-add"
+    class:dd-chip-add--added={added}
     aria-label={addLabel}
     disabled={!onAdd}
     onclick={onAdd}
   >
-    <Icon name="plus" size={12} />
+    <Icon name={added ? 'check' : 'plus'} size={12} />
   </button>
 </div>
 
@@ -100,6 +112,19 @@
     outline: 2px solid var(--dd-accent);
     outline-offset: -2px;
     background: var(--dd-accent-weak);
+  }
+
+  /* Quiet, not dimmed like a normal disabled control — this chip isn't
+     unavailable, it's already done (memory.md: DetailColumn's only identity
+     is its field name, so a second one would crash the table's keyed
+     rendering; this is the honest "nothing to add" state, not a broken +). */
+  .dd-chip--added {
+    opacity: 0.75;
+  }
+
+  .dd-chip-add--added:disabled {
+    opacity: 1;
+    color: var(--dd-accent-strong);
   }
 
   .dd-chip:active {

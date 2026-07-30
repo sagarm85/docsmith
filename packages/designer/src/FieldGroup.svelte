@@ -16,6 +16,7 @@
     onAddField,
     pickedUp = null,
     onPickUp,
+    addedDatasetColumns,
   }: {
     title: string;
     cls: 'header' | 'dataset';
@@ -29,6 +30,9 @@
     /** Keyboard drag-alternative (design.md §12) state, lifted to DocDesigner. */
     pickedUp?: PickedUp;
     onPickUp?: (field: FieldMeta) => void;
+    /** Field names already present as a detail column (cls === 'dataset' only —
+     * see Palette.svelte's doc comment for why). */
+    addedDatasetColumns?: Set<string>;
   } = $props();
 
   function isPicked(field: FieldMeta): boolean {
@@ -37,6 +41,10 @@
       pickedUp.column === field.name &&
       pickedUp.datasetId === (datasetId ?? null)
     );
+  }
+
+  function isAdded(field: FieldMeta): boolean {
+    return cls === 'dataset' && (addedDatasetColumns?.has(field.name) ?? false);
   }
 
   type AsyncState<T> =
@@ -109,7 +117,15 @@
     {:else}
       <div class="dd-subgroup">
         {#each ordered as field (field.name)}
-          <FieldChip {field} {cls} {datasetId} onAdd={onAddField && (() => onAddField(field))} picked={isPicked(field)} onPickUp={onPickUp && (() => onPickUp(field))} />
+          <FieldChip
+            {field}
+            {cls}
+            {datasetId}
+            onAdd={onAddField && !isAdded(field) ? () => onAddField(field) : undefined}
+            picked={isPicked(field)}
+            onPickUp={onPickUp && !isAdded(field) ? () => onPickUp(field) : undefined}
+            added={isAdded(field)}
+          />
         {/each}
       </div>
     {/if}

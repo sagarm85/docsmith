@@ -70,6 +70,14 @@
   const undoAvailable = $derived(canUndo(history));
   const redoAvailable = $derived(canRedo(history));
 
+  // Surfaced in the palette so an already-added dataset field shows as such
+  // instead of a "+" that silently no-ops (handleAddColumn's duplicate
+  // guard below) — the field IS already on the line-item table, so there's
+  // nothing to add, and the UI should say that rather than look broken.
+  const detailColumnNames = $derived(
+    new Set(template.bands.filter(isDetailBand).flatMap((b) => b.columns.map((c) => c.column))),
+  );
+
   let selection = $state<Selection>(null);
   let mode = $state<'design' | 'preview'>('design');
   let saving = $state(false);
@@ -188,7 +196,20 @@
     commitTemplate(updateBandElements(bandId, () => elements));
   }
 
+  // Guards against a real crash: DetailTable.svelte keys its column `{#each}`
+  // blocks by `col.column` (the bound field name — DetailColumn has no other
+  // identity), so adding a second column for a field that's already present
+  // throws Svelte's `each_key_duplicate` and breaks the whole table's
+  // rendering. Reported directly as "not able to add field" — every
+  // dataset field in the reference templates is already mapped to a column,
+  // so the very first "+" click (or drag) on any of them hit this. A no-op
+  // on an exact duplicate is the correct behavior here, not a silent crash:
+  // there's nothing meaningful to add when the field is already a column.
   function handleAddColumn(column: DetailColumn) {
+    const alreadyPresent = template.bands.some(
+      (b) => isDetailBand(b) && b.columns.some((c) => c.column === column.column),
+    );
+    if (alreadyPresent) return;
     commitTemplate({
       ...template,
       bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, columns: [...b.columns, column] } : b)),
@@ -864,6 +885,7 @@
             {pickedUp}
             onPickUpField={handlePickUpField}
             onPickUpBlock={handlePickUpBlock}
+            addedDatasetColumns={detailColumnNames}
           />
           <Canvas
             {template}
