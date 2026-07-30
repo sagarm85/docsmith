@@ -2380,6 +2380,52 @@ bug-report scenario end-to-end and asserting no duplicate/no crash).
 
 ---
 
+### D-072 — Fixed a real 12px vertical misalignment: Preview's repeating pageHeader/pageFooter didn't line up with `.page`'s own top/bottom edge
+**Decision:** Reported directly with two screenshots (Design canvas vs.
+Preview) of the Purchase Order (Blue) template's LOGO/PURCHASE ORDER
+pageHeader: "header top position at 0 position but preview is showing not
+in the top." Measured directly (`getBoundingClientRect()` inside the real
+Preview iframe, not guessed): `.page` has `margin: 12px auto` under
+`@media screen` (D-070's "floating sheet on a grey background" look,
+pre-existing, unrelated to D-070 itself) — but `.band-pageHeader`/
+`.band-pageFooter`'s screen-only `position:fixed` used `top:0`/`bottom:0`,
+fixed to the iframe **viewport's** literal edge, completely ignoring that
+`.page` itself sits 12px in from that edge. Net effect: the pageHeader bar
+visually started 12px ABOVE where `.page`'s white background even began
+(partly painted on the grey body background instead of the page), and
+`.doc-flow`'s reserved padding (which starts flush with `.page`'s OWN
+12px-shifted top) left a 12px BLANK gap between the bottom of the visible
+header bar and the start of reportHeader's actual content. Two independent
+symptoms, one root cause: `.page`'s margin and the header/footer's fixed
+offset were two unrelated hardcoded values (12 vs. 0) with nothing keeping
+them in sync. This is NOT a new regression from D-070 — D-070 only
+replaced PRINT's mechanism (position:fixed → real thead/tfoot); the
+SCREEN-mode position:fixed path was carried over unchanged from the
+original D-052/D-068-era code, so this exact mismatch already existed in
+Preview before D-070 too, just not yet reported.
+**Fix:** extracted one shared `screenPageMargin` value in `baseCss`, used
+by both `.page`'s `margin` AND `.band-pageHeader { top: }`/
+`.band-pageFooter { bottom: }` — they literally cannot drift apart again
+since there's only one number now, not two.
+**Why:** confirmed via precise DOM measurement inside the real Preview
+iframe (not assumed from reading the CSS) — `.page` top=12,
+`.band-pageHeader` top=0 (before), leaving reportHeader (`.doc-flow`'s
+content) starting at 12+46=58 while the visible header bar only spanned
+0–46, a genuine 12px mismatch on both ends.
+**Verified:** re-measured the same three rects after the fix —
+`.band-pageHeader`'s top (12) now exactly equals `.page`'s own top (12),
+and its bottom (12+46=58) exactly equals reportHeader's top (58), zero
+gap. Confirmed visually via Puppeteer screenshot: LOGO/PURCHASE ORDER now
+sits flush with the page's white background, matching the Design canvas
+exactly. New `render.test.ts` case (memory.md D-072) asserts
+`.band-pageHeader`'s `top` and `.page`'s `margin-top` are literally the
+same extracted value, so this can't silently regress again. 71 core tests
+pass (was 70); 201 designer tests unaffected (screen-only print CSS
+change, no designer source touched); lint/typecheck green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

@@ -644,6 +644,40 @@ describe('renderToHtml — screen-only pageHeader/pageFooter fixed positioning m
   });
 });
 
+describe('renderToHtml — screen-only pageHeader/pageFooter top/bottom offset matches .page\'s own margin (memory.md D-072)', () => {
+  it('band-pageHeader\'s top and .page\'s margin-top are the same value — a repeating header must not float above/below the page it runs across', () => {
+    const t = invoiceTemplate();
+    t.bands.unshift({
+      id: 'pageHeader',
+      type: 'pageHeader',
+      height: 30,
+      enabled: true,
+      elements: [{ id: 'ph1', kind: 'text', x: 0, y: 4, w: 100, h: 20, text: 'Logo' }],
+    });
+    t.bands.push({
+      id: 'pageFooter',
+      type: 'pageFooter',
+      height: 20,
+      enabled: true,
+      elements: [{ id: 'pf1', kind: 'text', x: 0, y: 2, w: 100, h: 16, text: 'Footer' }],
+    });
+    const out = renderToHtml(t, fatDocument(1));
+
+    const pageMarginMatch = out.css.match(/\.page \{ background: #fff; margin: (\d+)px auto;/);
+    expect(pageMarginMatch).toBeTruthy();
+    const margin = pageMarginMatch![1];
+
+    // Before the fix these were independently 0/0 — a plain 0 fixes the bar
+    // to the iframe viewport's literal edge, ignoring that .page itself
+    // sits `margin`px in from that edge, so a repeating pageHeader visibly
+    // overhung above .page's own white background instead of running flush
+    // across its top (reported directly: "header top position at 0 but
+    // preview is showing not in the top").
+    expect(out.css).toContain(`.band-pageHeader { top: ${margin}px; }`);
+    expect(out.css).toContain(`.band-pageFooter { bottom: ${margin}px; }`);
+  });
+});
+
 describe('renderToHtml — pageHeader/pageFooter repeat via a real <thead>/<tfoot>, not position:fixed, in print (memory.md D-070)', () => {
   function templateWithRunningBands() {
     const t = invoiceTemplate();

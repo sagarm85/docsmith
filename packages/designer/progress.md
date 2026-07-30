@@ -167,8 +167,27 @@
   of "+", disabled, labeled "already added," in the palette — so it reads
   as done, not broken; header fields are unaffected, they have no such
   limit). New `check` icon added to the existing hand-authored icon set.
-  201 designer tests pass (was 198); lint/typecheck/build green. The rest
-  of this section (below) is historical Phase 0–3 journal, kept for
+  201 designer tests pass (was 198); lint/typecheck/build green.
+  Pass 15, same session (D-072): two screenshots (Design canvas vs.
+  Preview) + "header top position at 0 position but preview is showing
+  not in the top." Measured directly inside the real Preview iframe:
+  `.page` has a screen-only `margin: 12px auto` (pre-existing, the
+  "floating sheet on grey" look), but `.band-pageHeader`/
+  `.band-pageFooter`'s screen-only `position:fixed` used `top:0`/
+  `bottom:0` — fixed to the iframe viewport's literal edge, ignoring that
+  `.page` itself sits 12px in from it. Result: the header bar visually
+  started 12px above `.page`'s own white background, and reportHeader
+  started an extra 12px below where the bar actually ended — a genuine
+  mismatch on both ends, not a new D-070 regression (D-070 only touched
+  PRINT's mechanism; this screen-only path was carried over unchanged from
+  the original D-052/D-068-era code). Fixed by extracting one shared
+  `screenPageMargin` value used by both `.page`'s margin and the
+  header/footer's fixed top/bottom offset, so they can't drift apart
+  again. Re-measured after the fix: header top now exactly equals `.page`
+  top, header bottom exactly equals reportHeader top, zero gap — also
+  confirmed visually via screenshot, matching the Design canvas exactly.
+  71 core tests pass (was 70); 201 designer tests unaffected. The rest of
+  this section (below) is historical Phase 0–3 journal, kept for
   reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired

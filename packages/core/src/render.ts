@@ -558,6 +558,12 @@ function baseCss(p: PrintSetup, runningTop: number, runningBottom: number, fillP
 .doc-flow > *:last-child { margin-top: auto; }`
       : '';
   const pageWidth = Math.round(pageWidthPx(p));
+  // Screen-only (@media screen below): the floating-sheet-on-grey-background
+  // look for .page. Shared with .band-pageHeader/.band-pageFooter's fixed
+  // top/bottom offset so the two can never drift apart again (memory.md
+  // D-072 — they used to be independent 12px/0px, which visually misaligned
+  // a repeating pageHeader by exactly this margin from .page's own top edge).
+  const screenPageMargin = 12;
   return `
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -602,19 +608,26 @@ table.detail tr { break-inside: avoid; }
 .band-totals { break-inside: avoid; }
 @media screen {
   body { background: #eceef1; }
-  .page { background: #fff; margin: 12px auto; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+  .page { background: #fff; margin: ${screenPageMargin}px auto; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
   /* Screen-only: pageHeader/pageFooter render fixed (sticky while scrolling
      Preview) instead of repeating per-page like they do in print (memory.md
      D-070 — there's no such thing as "page 2" on one continuous scrolling
      preview, so this recreates the old, still-desired on-screen feel).
      width + margin:auto (with left:0;right:0) centers a position:fixed
      element exactly like a normal centered block, matching .page's own
-     width/centering above. .doc-flow needs the matching padding here since
-     a position:fixed element reserves no flow space of its own — without
+     width/centering above. top/bottom match .page's OWN margin above
+     (memory.md D-072) — a plain 0/0 fixes the bar to the iframe viewport's
+     literal edge, ignoring that .page itself sits ${screenPageMargin}px
+     in from that edge, which visibly misaligned the header from the page
+     it's supposed to run across (reported directly: "header top position
+     at 0 but preview is showing not in the top" — the LOGO/PURCHASE ORDER
+     bar sat partly above .page's own white background instead of flush
+     with it). .doc-flow needs the matching padding here since a
+     position:fixed element reserves no flow space of its own — without
      it, in-flow content would render underneath the fixed bar on screen. */
   .band-pageHeader, .band-pageFooter { position: fixed; left: 0; right: 0; width: ${pageWidth}px; margin: 0 auto; }
-  .band-pageHeader { top: 0; }
-  .band-pageFooter { bottom: 0; }
+  .band-pageHeader { top: ${screenPageMargin}px; }
+  .band-pageFooter { bottom: ${screenPageMargin}px; }
   .doc-flow { padding-top: ${runningTop}px; padding-bottom: ${runningBottom}px; }
 }
 `.trim();
