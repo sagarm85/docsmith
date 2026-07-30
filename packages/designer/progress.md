@@ -101,8 +101,14 @@
   through the real renderer, the carry-forward pagination budget, and the
   Design canvas so all three agree. The grid-section explicit-height +
   proportional-child-resize half of the question remains open — not
-  addressed yet. The rest of this section (below) is historical Phase
-  0–3 journal, kept for reference.
+  addressed yet.
+  Pass 10, same session (D-067): "can I add rounded corners to this
+  label" (Purchase Order VENDOR/SHIP TO) → Corner radius was box-kind
+  only, extended to text/field. Immediate follow-up ("does not look
+  nice") → Padding had NO editor control at all for any kind; added one,
+  and fixed the Purchase Order templates' own `barStyle` to include
+  padding (it never had any). The rest of this section (below) is
+  historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -877,6 +883,20 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Corner radius and padding now settable for text/field
+  elements (D-067).** Same "one gap surfaces the next" pattern as D-063:
+  user asked to round the corners of the Purchase Order VENDOR/SHIP TO
+  label bars — `borderRadius` was already fully rendered for any element
+  kind, just never exposed in the editor except for `box`. Extended it
+  to text/field. Immediately reported the result "does not look nice" —
+  rounding a label with zero padding puts text right against the curve.
+  `padding` had no editor control at all for any kind; added one, and
+  fixed the actual Purchase Order (Blue/Peach) fixture's `barStyle`
+  (used for every colored label) to include `padding: 4`, since it never
+  had any. `pnpm -r typecheck` and designer `pnpm lint` green. Live
+  Puppeteer check against the real Purchase Order (Blue) template
+  confirms both controls work and the labels now have visible breathing
+  room in Preview and the Design canvas alike.
 - **2026-07-30 — Free-form band height is now a minimum, not a fixed
   ceiling (D-066).** Direct report: the totals band felt "restricted" —
   content placed below its stored height wasn't actually blocked (Y was

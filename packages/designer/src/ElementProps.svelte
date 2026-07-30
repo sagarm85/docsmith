@@ -266,6 +266,32 @@
         />
       </label>
     </div>
+
+    <Field label="Corner radius (px)" fieldId="dd-el-text-radius">
+      <NumberInput
+        id="dd-el-text-radius"
+        ariaLabel="Corner radius"
+        min={0}
+        max={999}
+        value={typeof element.style?.borderRadius === 'number' ? element.style.borderRadius : 0}
+        onchange={(v) => patchStyle({ borderRadius: v })}
+      />
+    </Field>
+
+    <Field
+      label="Padding (px)"
+      fieldId="dd-el-padding"
+      hint="Space between the text and its box edges — matters most once a background color is set."
+    >
+      <NumberInput
+        id="dd-el-padding"
+        ariaLabel="Padding"
+        min={0}
+        max={99}
+        value={element.style?.padding ?? 0}
+        onchange={(v) => patchStyle({ padding: v })}
+      />
+    </Field>
   {/if}
 
   {#if element.kind === 'text'}

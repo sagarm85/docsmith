@@ -2166,6 +2166,36 @@ no overlap.
 
 ---
 
+### D-067 — Corner radius and padding now settable for text/field elements (were box-only / missing entirely)
+**Decision:** Two follow-on gaps from the same live conversation, both
+matching the exact D-063 (background-color) pattern — a real,
+renderer-supported `ElementStyle` property with no editor exposure:
+1. User asked "can I add rounded corners to this label" (the Purchase
+   Order VENDOR/SHIP TO bars). `borderRadius` was already fully applied
+   by `styleToCss` for any element kind, but `ElementProps.svelte`'s
+   "Corner radius" `NumberInput` only ever rendered for `kind === 'box'`.
+   Extended it to `text`/`field`.
+2. Immediately after, user reported the result "does not look nice" —
+   rounding a label's corners with zero padding puts the text right up
+   against the curve. Checked: `ElementStyle.padding` is fully supported
+   by the renderer, but had NO editor control at all, for any element
+   kind. Added a "Padding (px)" `NumberInput` alongside Corner radius.
+   Also fixed the actual reference template the user was looking at —
+   the Purchase Order (Blue/Peach) `barStyle` (used for every colored
+   label: VENDOR, SHIP TO, DATE, PO #, etc.) never set `padding` at all;
+   added `padding: 4`, matching the polish level the Invoice (Orange)
+   template's own label boxes already have.
+**Verified:** `pnpm -r typecheck` and designer `pnpm lint` green (no
+dedicated `ElementProps` test file exists yet — same standing gap noted
+since D-051). Live Puppeteer check against the real Purchase Order
+(Blue) template: Corner radius control appears and applies (confirmed
+via a rounded "SHIP TO" bar); Padding fix confirmed in both Preview and
+the Design canvas — VENDOR/SHIP TO now have visible breathing room
+between text and box edge in both.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

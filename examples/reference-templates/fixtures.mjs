@@ -565,7 +565,10 @@ function purchaseOrderEntity(name, label) {
 }
 
 function purchaseOrderTemplate(id, name, entity, accent, accentText = '#ffffff') {
-  const barStyle = { bold: true, color: accentText, bg: accent, fontSize: 10 };
+  // padding matters as soon as a label has its own background — without it
+  // the text sits flush against the box edges, cramped against the color
+  // (and against any corner radius, once one's set).
+  const barStyle = { bold: true, color: accentText, bg: accent, fontSize: 10, padding: 4 };
   return {
     version: 1,
     id,
