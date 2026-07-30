@@ -624,8 +624,8 @@ describe('renderToHtml — DetailColumn.format:"image" (memory.md D-039)', () =>
   });
 });
 
-describe('renderToHtml — .running (pageHeader/pageFooter) is centered at the same width as .page (memory.md D-068)', () => {
-  it('gives .running an explicit width and auto margin matching .page\'s own width', () => {
+describe('renderToHtml — screen-only pageHeader/pageFooter fixed positioning matches .page\'s width (memory.md D-068/D-070)', () => {
+  it('gives the screen-only .band-pageHeader/.band-pageFooter rule an explicit width and auto margin matching .page\'s own width', () => {
     const t = invoiceTemplate();
     t.bands.unshift({
       id: 'pageHeader',
@@ -639,8 +639,52 @@ describe('renderToHtml — .running (pageHeader/pageFooter) is centered at the s
     expect(pageWidthMatch).toBeTruthy();
     const pageWidth = pageWidthMatch![1];
     expect(out.css).toContain(
-      `.running { position: fixed; left: 0; right: 0; width: ${pageWidth}px; margin: 0 auto; }`,
+      `.band-pageHeader, .band-pageFooter { position: fixed; left: 0; right: 0; width: ${pageWidth}px; margin: 0 auto; }`,
     );
+  });
+});
+
+describe('renderToHtml — pageHeader/pageFooter repeat via a real <thead>/<tfoot>, not position:fixed, in print (memory.md D-070)', () => {
+  function templateWithRunningBands() {
+    const t = invoiceTemplate();
+    t.bands.unshift({
+      id: 'pageHeader',
+      type: 'pageHeader',
+      height: 30,
+      enabled: true,
+      elements: [{ id: 'ph1', kind: 'text', x: 0, y: 4, w: 100, h: 20, text: 'Running header' }],
+    });
+    t.bands.push({
+      id: 'pageFooter',
+      type: 'pageFooter',
+      height: 20,
+      enabled: true,
+      elements: [{ id: 'pf1', kind: 'text', x: 0, y: 2, w: 100, h: 16, text: 'Running footer' }],
+    });
+    return t;
+  }
+
+  it('wraps the page in a table with pageHeader as <thead> and pageFooter as <tfoot>', () => {
+    const out = renderToHtml(templateWithRunningBands(), fatDocument(1));
+    expect(out.html).toContain('<table class="page-table">');
+    expect(out.html).toMatch(/<thead><tr><td>[^]*Running header[^]*<\/td><\/tr><\/thead>/);
+    expect(out.html).toMatch(/<tfoot><tr><td>[^]*Running footer[^]*<\/td><\/tr><\/tfoot>/);
+    // The in-flow content (reportHeader/detail/totals) is the <tbody>, not fixed-position.
+    expect(out.html).toMatch(/<tbody><tr><td><div class="doc-flow">/);
+  });
+
+  it('never emits position:fixed in the default (print) stylesheet — only inside @media screen', () => {
+    const out = renderToHtml(templateWithRunningBands(), fatDocument(1));
+    const screenBlockMatch = out.css.match(/@media screen \{[^]*\}\s*$/);
+    expect(screenBlockMatch).toBeTruthy();
+    const printOnlyCss = out.css.slice(0, screenBlockMatch!.index);
+    expect(printOnlyCss).not.toContain('position: fixed');
+  });
+
+  it('a template with neither pageHeader nor pageFooter keeps the plain .page > .doc-flow shape (no page-table)', () => {
+    const out = renderToHtml(invoiceTemplate(), fatDocument(1));
+    expect(out.html).not.toContain('page-table');
+    expect(out.html).toMatch(/<div class="page"><div class="doc-flow">/);
   });
 });
 

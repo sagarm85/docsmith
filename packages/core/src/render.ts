@@ -8,7 +8,17 @@
 //     every printed page automatically;
 //   • @page (injected from printSetup) sets page size / orientation / margins;
 //   • break-inside: avoid keeps line rows and the totals block from splitting;
-//   • pageHeader / pageFooter are position:fixed → painted on every printed sheet.
+//   • pageHeader / pageFooter repeat the SAME way (memory.md D-070): the whole
+//     page is wrapped in one outer <table>, with pageHeader as its <thead> and
+//     pageFooter as its <tfoot> — Chromium fragments the <tbody> content across
+//     pages while repeating thead/tfoot on each one, exactly like the detail
+//     table already does. `position:fixed` (this file's previous mechanism,
+//     memory.md D-052) only ever reserved space at the very top/bottom of the
+//     WHOLE document, not on every physical page, so it silently overlapped
+//     page 2+'s content — a real, verified bug, not a hypothetical. The old
+//     position:fixed behavior is kept, `@media screen`-only, purely for the
+//     on-screen Preview's "sticky while scrolling" feel; it plays no part in
+//     print/PDF output anymore.
 
 import type {
   Align,
@@ -401,14 +411,13 @@ function renderFreeBand(
   data: DocumentData,
   fmtOpts: FormatOptions,
   layoutUnit: 'px' | '%',
-  extraClass = '',
 ): string {
   if (band.enabled === false) return '';
   if (band.arrangement === 'stack' && band.type !== 'pageHeader' && band.type !== 'pageFooter') {
-    return renderStackBand(band, data, fmtOpts, extraClass);
+    return renderStackBand(band, data, fmtOpts);
   }
   if (band.arrangement === 'grid' && band.type !== 'pageHeader' && band.type !== 'pageFooter') {
-    return renderGridBand(band, data, fmtOpts, extraClass);
+    return renderGridBand(band, data, fmtOpts);
   }
   const els = band.elements.map((e) => renderFreeElement(e, data, fmtOpts, layoutUnit)).join('');
   const st = styleToCss(band.style);
@@ -418,19 +427,20 @@ function renderFreeBand(
   // rendered height is `band.height` treated as a MINIMUM, growing to fit
   // content that extends past it rather than clipping/restricting it.
   //
-  // `position` must NOT be forced to `relative` here for a running
-  // (pageHeader/pageFooter) band: an inline style always wins specificity
-  // over the `.running { position: fixed }` class rule below, so a bare
-  // `position:relative` inline silently defeated `position:fixed` — the
-  // element was still absolutely-positioned-child-anchoring-capable, but
-  // never actually fixed to the viewport. It instead rendered once, in
-  // normal document flow, whichever DOM position `runningHtml` placed it in
-  // (before `.page` — i.e. at the very top) — which is exactly why a
-  // pageFooter (bank on `bottom:0`) was appearing above the reportHeader
-  // instead of at the foot of the page.
-  const isRunning = extraClass.includes('running');
+  // `position` must NOT be forced to `relative` here for pageHeader/
+  // pageFooter: they get their `position` from CSS classes ONLY — `.band {
+  // position: relative }` in print (the containing block for their own `.el`
+  // absolute children, same as any other free band; this div sits INSIDE the
+  // outer <thead>/<tfoot>'s <td>, so it has no bearing on that outer
+  // element's own table-header-group/table-footer-group display), overridden
+  // to `position: fixed` under `@media screen` for the on-screen Preview's
+  // sticky-while-scrolling feel (memory.md D-070). An inline `position:`
+  // here would always beat that class rule regardless of specificity or
+  // media query, silently defeating it — memory.md D-052 hit exactly this
+  // trap once already (that time the class rule itself was never reached).
+  const isRunning = band.type === 'pageHeader' || band.type === 'pageFooter';
   const posCss = isRunning ? '' : 'position:relative;';
-  return `<div class="band band-${band.type} ${extraClass}" data-band="${band.type}" style="${posCss}height:${freeBandHeightPx(band)}px;${st}">${els}</div>`;
+  return `<div class="band band-${band.type}" data-band="${band.type}" style="${posCss}height:${freeBandHeightPx(band)}px;${st}">${els}</div>`;
 }
 
 // ── detail band (the flowing, paginating line-item table) ───────────────────────
@@ -556,7 +566,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helve
    applies on screen AND in print, so Preview shows exactly the same
    available width free-form elements are actually laid out against. */
 .page { width: ${pageWidth}px; }
-.doc-flow { padding-top: ${runningTop}px; padding-bottom: ${runningBottom}px; }
+/* memory.md D-070: wraps the whole page when pageHeader/pageFooter exist —
+   thead/tfoot are display:table-header-group/table-footer-group by default
+   (same browser behavior table.detail already relies on), so they repeat on
+   every printed page while this single <td> in <tbody> fragments across
+   pages. width:100% keeps every descendant's x/y math against the exact
+   same width as a plain .page > .doc-flow template (no page-table at all). */
+table.page-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.page-table td { padding: 0; border: 0; }
 ${fillPageCss}
 .band { position: relative; }
 .el { position: absolute; }
@@ -583,28 +600,22 @@ table.detail thead { display: table-header-group; }
 table.detail tfoot { display: table-footer-group; }
 table.detail tr { break-inside: avoid; }
 .band-totals { break-inside: avoid; }
-/* width + margin:auto (with left:0;right:0 already set) centers a
-   position:fixed element exactly like a normal centered block — matching
-   .page's own width/centering above (memory.md D-068). Without this,
-   pageHeader/pageFooter spanned the FULL viewport/iframe edge-to-edge
-   while .page (and everything inside it — reportHeader/detail/totals) is
-   the narrower, centered printable width: an element at x:260 in a
-   pageHeader read as x:260 from the viewport's left edge, while the SAME
-   x:260 inside reportHeader read as x:260 from .page's own (inset, further
-   right) left edge — two different coordinate origins for what's supposed
-   to be one shared page. Reported directly: a Purchase Order's LOGO/
-   "PURCHASE ORDER" (pageHeader) visibly didn't line up with VENDOR/SHIP TO
-   (reportHeader) in Preview despite lining up in the Design canvas (which
-   has no such split — everything renders inside one bounded page box).
-   This was invisible before D-054/D-053 gave .page an explicit width —
-   previously BOTH spanned the full container by default, so they matched
-   by coincidence. */
-.running { position: fixed; left: 0; right: 0; width: ${pageWidth}px; margin: 0 auto; }
-.running-top { top: 0; }
-.running-bottom { bottom: 0; }
 @media screen {
   body { background: #eceef1; }
   .page { background: #fff; margin: 12px auto; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+  /* Screen-only: pageHeader/pageFooter render fixed (sticky while scrolling
+     Preview) instead of repeating per-page like they do in print (memory.md
+     D-070 — there's no such thing as "page 2" on one continuous scrolling
+     preview, so this recreates the old, still-desired on-screen feel).
+     width + margin:auto (with left:0;right:0) centers a position:fixed
+     element exactly like a normal centered block, matching .page's own
+     width/centering above. .doc-flow needs the matching padding here since
+     a position:fixed element reserves no flow space of its own — without
+     it, in-flow content would render underneath the fixed bar on screen. */
+  .band-pageHeader, .band-pageFooter { position: fixed; left: 0; right: 0; width: ${pageWidth}px; margin: 0 auto; }
+  .band-pageHeader { top: 0; }
+  .band-pageFooter { bottom: 0; }
+  .doc-flow { padding-top: ${runningTop}px; padding-bottom: ${runningBottom}px; }
 }
 `.trim();
 }
@@ -629,25 +640,45 @@ export function renderToHtml(template: Template, data: DocumentData): RenderResu
     (b) => b.type === 'pageFooter' && (b as FreeBand).enabled !== false,
   ) as FreeBand | undefined;
 
+  // On screen only (the `@media screen` rule in baseCss), pageHeader/
+  // pageFooter render `position:fixed` for a sticky-while-scrolling Preview
+  // feel — `.doc-flow` needs a matching padding reservation there so
+  // in-flow content doesn't render underneath them. Print doesn't need this
+  // at all: the real <thead>/<tfoot> wrapper below (memory.md D-070)
+  // reserves and repeats the exact right amount of space natively, on
+  // EVERY page, not just page 1.
   const runningTop = pageHeader ? freeBandHeightPx(pageHeader) : 0;
   const runningBottom = pageFooter ? freeBandHeightPx(pageFooter) : 0;
 
-  // In-flow bands in print order: reportHeader, detail, totals (page h/f are fixed).
+  // In-flow bands in print order: reportHeader, detail, totals (page h/f repeat separately).
   const flowOrder: Band['type'][] = ['reportHeader', 'detail', 'totals'];
   const flowHtml = flowOrder
     .flatMap((type) => bands.filter((b) => b.type === type))
     .map((b) => renderBand(b, data, fmtOpts, layoutUnit))
     .join('\n');
+  const docFlowHtml = `<div class="doc-flow">${flowHtml}</div>`;
 
-  const runningHtml =
-    (pageHeader ? renderFreeBand(pageHeader, data, fmtOpts, layoutUnit, 'running running-top') : '') +
-    (pageFooter ? renderFreeBand(pageFooter, data, fmtOpts, layoutUnit, 'running running-bottom') : '');
+  // memory.md D-070: pageHeader/pageFooter repeat on every PRINTED page the
+  // same way the detail band's own column headers already do — as a real
+  // <thead>/<tfoot> (display:table-header-group/table-footer-group is the
+  // browser default for those elements, so no CSS is needed to force it),
+  // wrapping the whole page in one outer table. Chromium fragments the
+  // <tbody>'s content across pages while repeating thead/tfoot on each one
+  // (verified directly against a real generated PDF — see memory.md). Only
+  // built when pageHeader/pageFooter actually exist: a template using
+  // neither keeps the exact same `.page > .doc-flow` shape as before.
+  const pageHeaderHtml = pageHeader ? renderFreeBand(pageHeader, data, fmtOpts, layoutUnit) : '';
+  const pageFooterHtml = pageFooter ? renderFreeBand(pageFooter, data, fmtOpts, layoutUnit) : '';
+  const pageInner =
+    pageHeader || pageFooter
+      ? `<table class="page-table">${pageHeader ? `<thead><tr><td>${pageHeaderHtml}</td></tr></thead>` : ''}<tbody><tr><td>${docFlowHtml}</td></tr></tbody>${pageFooter ? `<tfoot><tr><td>${pageFooterHtml}</td></tr></tfoot>` : ''}</table>`
+      : docFlowHtml;
 
   const fillPageMinHeight = template.printSetup.fillPage
     ? printableContentHeightPx(template.printSetup)
     : undefined;
   const css = `${pageCss(template.printSetup)}\n${baseCss(template.printSetup, runningTop, runningBottom, fillPageMinHeight)}`;
-  const html = `${runningHtml}\n<div class="page"><div class="doc-flow">${flowHtml}</div></div>`;
+  const html = `<div class="page">${pageInner}</div>`;
 
   const document = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}</body></html>`;
 

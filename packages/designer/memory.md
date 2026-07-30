@@ -2261,6 +2261,75 @@ fixture-data-only change, no `core`/`designer` source touched.
 
 ---
 
+### D-070 — pageHeader/pageFooter now genuinely repeat on every printed page (fixes the D-052 known gap), via a real `<thead>`/`<tfoot>` instead of `position:fixed`
+**Decision:** D-052 flagged, and this session's own PO/Invoice work left
+open, a real gap: a repeating pageHeader visually **overlapped** page 2+'s
+content instead of pushing it down. Root cause: `position:fixed` only ever
+reserves flow space once, at the very top/bottom of the WHOLE document
+(`.doc-flow`'s manual `padding-top`/`padding-bottom`) — it has no way to
+repeat that reservation on every subsequent physical page, since fixed
+elements aren't part of the page-fragmentation model at all. Reproduced
+directly: built a throwaway template with a pageHeader/pageFooter and 60
+detail rows, rendered a real PDF via `@docsmith/render-service`, and
+confirmed the pageHeader bar was painted directly over the first
+continuing row on page 2.
+**Fix:** replaced `position:fixed` with the SAME native mechanism the
+detail band's own repeating column header already relies on (verified
+working by the original claude.md §8 pagination-gate evidence): `<thead>`/
+`<tfoot>` are `display:table-header-group`/`table-footer-group` by
+browser default, which Chromium repeats on every fragment of a `<table>`
+whose body content is taller than one page. `renderToHtml` now wraps the
+WHOLE page in one outer `<table class="page-table">` — `<thead>` holding
+pageHeader, `<tfoot>` holding pageFooter, one `<tbody><tr><td>` holding the
+existing `.doc-flow` — but ONLY when a pageHeader or pageFooter actually
+exists; a template using neither keeps the exact original `.page >
+.doc-flow` shape untouched. Before landing, prototyped the core assumption
+in complete isolation (throwaway HTML, nothing from this codebase) to
+confirm Chromium really does fragment a `<td>`'s content across pages
+while repeating its sibling thead/tfoot — confirmed, so the fix proceeded.
+`.band-pageHeader`/`.band-pageFooter` keep `position:fixed`, but now ONLY
+under `@media screen` — this preserves the on-screen Preview's existing
+"sticky while scrolling" feel (there's no literal "page 2" on one
+continuous scrollable preview, so print's new mechanism doesn't apply
+there), including `.doc-flow`'s matching padding-top/bottom, also moved
+into `@media screen` only (print no longer needs it at all — the real
+thead/tfoot reserves the exact right space natively). `renderFreeBand`
+keeps its narrow special case (no inline `position:` for pageHeader/
+pageFooter, CSS classes decide it) for the same reason D-052 already
+taught: an inline style would always beat a class rule regardless of
+media query, silently defeating the `@media screen` override.
+This also makes D-068's manual `.running` width/centering hack obsolete
+going forward: since pageHeader/pageFooter now live inside the SAME outer
+table as `.doc-flow` (same containing-block chain), they automatically get
+the identical width without any separate CSS sync — a structural
+guarantee instead of a coincidental style match.
+**Why:** Reported nowhere directly this session (it was self-discovered
+and explicitly deferred as "known, not-yet-fixed" in D-052's own entry) —
+fixed as a follow-up now that the rest of the pageHeader/pageFooter/
+pagination work this session had settled, since leaving a documented,
+user-visible rendering bug in the single shared renderer isn't something
+to leave open indefinitely once there's a verified, working fix.
+**Verified:** (1) isolated Chromium capability test (throwaway HTML, 80
+rows, no app code) confirmed thead/tfoot repeat with zero overlap across
+2 pages. (2) The original repro template (pageHeader+pageFooter+60 rows)
+re-rendered through the real `@docsmith/render-service` PDF pipeline after
+the fix — page 2 now shows the running header cleanly above the
+continuing rows, no overlap, confirmed via Puppeteer screenshot. (3) The
+full claude.md §8 pagination gate re-run against the real invoice-demo
+`pnpm demo` fixture (which has a pageFooter but no pageHeader, so it does
+exercise the new tfoot-only path): 3 pages, reportHeader once (page 1),
+column header + tfoot aggregate + pageFooter all correctly repeat on
+every page (2 and 3 included), Grand Total/totals text prints once on the
+final page — all via a real generated PDF, not a guess. (4) `pnpm
+--filter @docsmith/core test`: 70 tests pass (was 67 after D-069; 3 new
+cases added — page-table wrapping present/absent, print CSS never
+contains `position: fixed`); `pnpm --filter @docsmith/designer lint/
+typecheck/test`: 198 tests pass, unaffected (no designer source
+references the old `.running` class).
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

@@ -30,11 +30,7 @@
   ALL, only position/size, so nothing looked styled until switching to
   Preview — fixed by exporting core's `styleToCss` and wiring it into
   `FreeElement`/`GridBand`/`StackBand`. Also gave the `examples/
-  invoice-demo` pageFooter a visual top-rule separator. Next: none queued
-  — still offered, not yet confirmed: right-align the Purchase Order
-  (Blue/Peach) totals to match the invoice. Known, not-yet-fixed follow-up
-  (D-052): a repeating pageHeader overlaps page 2+'s content (outside the
-  official pagination gate's scope — see D-052 for why).
+  invoice-demo` pageFooter a visual top-rule separator.
   Pass 3, same live-editing session (D-057, D-058): dragging/resizing a
   free-form element had no right-edge clamp at all (only left/top ever
   clamped to 0) — fixed, and covered by a new test. Added a light 20px
@@ -130,8 +126,36 @@
   share one `purchaseOrderTemplate()` factory, so one fixture edit covers
   both. Verified with real Preview-iframe measurements (Puppeteer): totals
   labels/values now line up with the detail table's Qty+Unit Price/Total
-  columns to within ~1px, matching the Invoice's own treatment. The rest of
-  this section (below) is historical Phase 0–3 journal, kept for reference.
+  columns to within ~1px, matching the Invoice's own treatment.
+  Pass 13, same session (D-070): closed the last known gap from D-052 — a
+  repeating pageHeader/pageFooter used `position:fixed`, which only
+  reserves space once (top/bottom of the whole document), so it silently
+  overlapped page 2+'s content on a real multi-page print instead of
+  pushing it down. Reproduced directly with a throwaway 60-row template +
+  a real PDF via `@docsmith/render-service`. Fixed by replacing
+  `position:fixed` with the SAME native repeat mechanism the detail band's
+  own column header already uses: `renderToHtml` now wraps the whole page
+  in one outer `<table>` (pageHeader as `<thead>`, pageFooter as `<tfoot>`,
+  `.doc-flow` as the single `<tbody>` cell) whenever pageHeader/pageFooter
+  exist — Chromium fragments that cell across pages while repeating
+  thead/tfoot on each one, exactly like `table.detail` already does.
+  `position:fixed` is kept, `@media screen`-only, purely so the on-screen
+  Preview keeps its existing sticky-while-scrolling feel; print no longer
+  uses it at all. Also makes D-068's manual `.running` width-sync hack
+  obsolete going forward — pageHeader/pageFooter now share the exact same
+  containing-block chain as `.doc-flow`, so matching width is structural,
+  not a coincidence to maintain. Verified in three steps before landing:
+  (1) an isolated Chromium capability test (no app code) confirmed
+  thead/tfoot really do repeat with zero overlap across pages; (2) the
+  original repro re-rendered through the real render-service pipeline
+  after the fix, confirmed clean via Puppeteer screenshot; (3) the full
+  claude.md §8 pagination gate re-run against the real `pnpm demo`
+  fixture (60 rows, 3 pages) — reportHeader once, column header + tfoot
+  aggregate + pageFooter all correctly repeat on every page, Grand
+  Total/totals print once on the last page. 70 core tests pass (was 67);
+  198 designer tests unaffected; `pnpm -r typecheck`/lint green. The rest
+  of this section (below) is historical Phase 0–3 journal, kept for
+  reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
