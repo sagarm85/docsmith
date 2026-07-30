@@ -381,6 +381,7 @@
           />
         </div>
       {/if}
+      <div class="dd-grid-overlay" aria-hidden="true"></div>
     </div>
   </div>
 </div>
@@ -416,8 +417,33 @@
   .dd-page {
     position: relative;
     margin: 0 auto;
+    /* The page is a literal sheet of paper — always white, independent of
+       the app's light/dark theme (matching the existing #c6cbd2 margin-guide
+       dashes below, the same established exception). */
     background: #fff;
     box-shadow: var(--dd-shadow);
+  }
+
+  /* Reference grid for judging horizontal/vertical placement — a plain
+     background-image on .dd-page would sit BEHIND band content, and every
+     band type paints its own translucent-but-opaque tint over its full
+     area (.dd-band-body's --dd-hero-weak/--dd-run-weak/--dd-totals-weak
+     etc., Band.svelte), hiding it almost everywhere it'd actually be
+     useful. This is a full-page overlay instead, painted on top (last
+     child, `pointer-events: none` so it never blocks selection/drag), with
+     `mix-blend-mode: multiply` so the lines subtly darken whatever's
+     beneath — content and every band tint alike — rather than covering it.
+     Fixed light gray, not a --dd-* token, for the same "always matches a
+     white page" reason as .dd-page's own background above. 20px spacing. */
+  .dd-grid-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    background-image:
+      linear-gradient(to right, #e7eaee 1px, transparent 1px),
+      linear-gradient(to bottom, #e7eaee 1px, transparent 1px);
+    background-size: 20px 20px;
   }
 
   .dd-margins {

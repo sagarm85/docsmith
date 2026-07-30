@@ -93,6 +93,33 @@ describe('FreeElement', () => {
     expect(patch.y).toBe(0);
   });
 
+  it('does not go past the page\'s right edge when dragged or resized past it (memory.md D-057)', async () => {
+    const cb = callbacks();
+    render(FreeElementView, {
+      props: {
+        element: fieldElement({ x: 700, y: 10, w: 100 }),
+        selected: true,
+        bandLabel: 'Report Header',
+        contentWidthPx: 800,
+        ...cb,
+      },
+    });
+    const el = screen.getByRole('button', { name: /Invoice #/ });
+    pointerDown(el, 0, 0);
+    // A huge rightward delta would put x well past 800 unclamped; x+w must
+    // never exceed contentWidthPx (800), so x maxes out at 700 (800 - w:100).
+    pointerMove(500, 0);
+    const movePatch = cb.onChange.mock.calls.at(-1)?.[0];
+    expect(movePatch.x).toBe(700);
+    pointerUp();
+
+    const handle = screen.getByRole('button', { name: 'Resize (e)' });
+    pointerDown(handle, 0, 0);
+    pointerMove(500, 0);
+    const resizePatch = cb.onChange.mock.calls.at(-1)?.[0];
+    expect(resizePatch.w).toBe(100); // 800 (contentWidthPx) - 700 (x)
+  });
+
   it('alignment guides (memory.md D-038): snaps the dragged element\'s left edge to a sibling\'s left edge within tolerance, and reports the guide position', async () => {
     const cb = callbacks();
     const onGuides = vi.fn();
@@ -250,7 +277,9 @@ describe('FreeElement', () => {
     const cb = callbacks();
     render(FreeElementView, {
       props: {
-        element: fieldElement({ x: 10, y: 10 }),
+        // w:20 (not fieldElement()'s px-oriented default of 200, i.e. "200%")
+        // — a realistic width so the D-057 right-edge clamp doesn't interfere.
+        element: fieldElement({ x: 10, y: 10, w: 20 }),
         selected: false,
         bandLabel: 'Report Header',
         unit: '%',
@@ -288,7 +317,8 @@ describe('FreeElement', () => {
     const cb = callbacks();
     render(FreeElementView, {
       props: {
-        element: fieldElement({ x: 10, y: 10 }),
+        // w:20 — see the drag test above for why (D-057 right-edge clamp).
+        element: fieldElement({ x: 10, y: 10, w: 20 }),
         selected: false,
         bandLabel: 'Report Header',
         unit: '%',

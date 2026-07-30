@@ -34,7 +34,17 @@
   — still offered, not yet confirmed: right-align the Purchase Order
   (Blue/Peach) totals to match the invoice. Known, not-yet-fixed follow-up
   (D-052): a repeating pageHeader overlaps page 2+'s content (outside the
-  official pagination gate's scope — see D-052 for why). The rest of this
+  official pagination gate's scope — see D-052 for why).
+  Pass 3, same live-editing session (D-057, D-058): dragging/resizing a
+  free-form element had no right-edge clamp at all (only left/top ever
+  clamped to 0) — fixed, and covered by a new test. Added a light 20px
+  reference grid to the Design canvas (a blend-mode overlay, since a
+  plain background sits behind every band's own tinted background and
+  was invisible almost everywhere). Also verified, live, that "sum a
+  detail column into a footer row" already exists and works end-to-end
+  (each column's Properties panel → "Aggregate (footer)" → Sum/Count/
+  Average) — not a new feature, just confirmed and pointed out, since the
+  user asked for it not realizing it was already there. The rest of this
   section (below) is historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
@@ -810,6 +820,33 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Free-form drag/resize right-edge clamp + Design canvas
+  reference grid (D-057, D-058).** Same live-editing session as the entry
+  below, continued: user reported dragging a totals field pushed it
+  outside the page — `FreeElement.svelte` clamped `x`/`y` to `>= 0` (left/
+  top) but had no upper bound at all for the move handler, the `w`/`e`
+  resize handles, or the `ArrowRight` keyboard nudge. Fixed all three
+  against `maxXBasis` (the real content width from D-054, with `||
+  Infinity` so callers/tests that don't pass a real width aren't frozen
+  at `x:0`). Added a new test; fixed two pre-existing `'%'`-mode tests
+  whose shared fixture's `w:200` default (a `'px'`-oriented placeholder,
+  literally "200%" once reused under `'%'` mode) is now correctly caught
+  by the clamp. Separately, added a light 20px reference grid to the
+  canvas per direct request ("light colored grid... so we can check and
+  adjust vertical/horizontal") — a plain CSS background on `.dd-page`
+  turned out to sit behind every band's own tinted background
+  (`--dd-hero-weak` etc.) and was invisible almost everywhere it would've
+  been useful, confirmed by cropping a real screenshot; switched to a
+  full-page overlay with `mix-blend-mode: multiply` so the lines darken
+  through any band tint instead of being covered by it. Also verified
+  live (Puppeteer clicking through the actual UI, not just reading code)
+  that "add a total for a column like Qty" already exists — each detail
+  column's Properties panel has an "Aggregate (footer)" dropdown
+  (Sum/Count/Average/None) — and confirmed end-to-end that setting it
+  actually shows the summed value in Preview; this was a discoverability
+  gap, not a missing feature, so no code changed for it. Verified: 192
+  designer tests (was 191), `pnpm -r typecheck`, designer `pnpm lint` all
+  green.
 - **2026-07-30 — Design canvas WYSIWYG gaps found and fixed from live
   editing feedback (D-054, D-055, D-056).** Direct follow-up to the
   2026-07-29 render fixes below: user hit the exact gap D-053 had

@@ -93,6 +93,17 @@
   }
   const minW = $derived(fromPx(MIN_SIZE, contentWidthPx));
   const minH = $derived(fromPx(MIN_SIZE, bandHeightPx));
+  // The right edge of the free-form coordinate space (memory.md D-054: this
+  // IS the real printable width in 'px' mode, 100% in '%' mode) — dragging
+  // or resizing must not be able to push an element's x+w past it. Only X
+  // is clamped this way, not Y: bands stack/flow vertically and several
+  // (reportHeader with height:0, e.g.) auto-grow to fit their content, so
+  // there's no single fixed "bottom" the way the page's real width is a
+  // single fixed right edge. `contentWidthPx || Infinity`: it defaults to 0
+  // (an "unset/unknown" sentinel, not "the page is 0px wide") whenever a
+  // caller doesn't pass a real page width — a real 0 would otherwise clamp
+  // every element to x:0, unable to move at all.
+  const maxXBasis = $derived(unit === '%' ? 100 : contentWidthPx || Infinity);
 
   // Alignment guides while dragging (memory.md D-038): snap-to-sibling on
   // left/center/right (x) and top/center/bottom (y) edges independently —
@@ -201,13 +212,15 @@
     const dx = fromPx(dxRaw, contentWidthPx);
     const dy = fromPx(dyRaw, bandHeightPx);
 
+    const maxX = Math.max(0, maxXBasis - element.w);
+
     if (drag.kind === 'move') {
-      const rawX = Math.max(0, drag.ox + dx);
+      const rawX = Math.min(maxX, Math.max(0, drag.ox + dx));
       const rawY = Math.max(0, drag.oy + dy);
       const align = computeAlignSnap(rawX, rawY, element.w, element.h);
       onGuides?.({ x: align.x, y: align.y });
       onChange({
-        x: Math.max(0, align.x !== null ? align.snappedX : snapX(rawX)),
+        x: Math.min(maxX, Math.max(0, align.x !== null ? align.snappedX : snapX(rawX))),
         y: Math.max(0, align.y !== null ? align.snappedY : snapY(rawY)),
       });
       return;
@@ -221,12 +234,14 @@
 
     const lockAspect = e.shiftKey && element.kind === 'image';
 
+    // Neither handle can push x (west) below 0 or x+w (east) past
+    // maxXBasis — the real page's right edge (memory.md D-054/D-057).
     if (handle.includes('w')) {
-      w = Math.max(minW, ow - dx);
-      x = ox + (ow - w);
+      w = Math.min(Math.max(minW, ow - dx), ox + ow);
+      x = Math.max(0, ox + (ow - w));
     }
     if (handle.includes('e')) {
-      w = Math.max(minW, ow + dx);
+      w = Math.max(minW, Math.min(ow + dx, maxXBasis - ox));
     }
     if (handle.includes('n')) {
       h = Math.max(minH, oh - dy);
@@ -297,7 +312,7 @@
         break;
       case 'ArrowRight':
         e.preventDefault();
-        nudge({ x: element.x + stepX });
+        nudge({ x: Math.min(Math.max(0, maxXBasis - element.w), element.x + stepX) });
         break;
       case 'Delete':
       case 'Backspace':

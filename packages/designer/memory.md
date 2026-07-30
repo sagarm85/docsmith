@@ -1850,6 +1850,66 @@ rule above it, visually distinct from the totals row directly above.
 
 ---
 
+### D-057 — Free-form drag/resize can no longer push an element past the page's real right edge
+**Decision:** User reported dragging a totals field (`total_amount`)
+visibly outside the page. `FreeElement.svelte` clamped `x`/`y` to `>= 0`
+(left/top edge) in both pointer-drag and keyboard-nudge, but had NO
+upper bound at all — nothing stopped `x + w` from exceeding
+`contentWidthPx` (D-054's now-correct, real printable width). Added
+`maxXBasis` (`unit === '%' ? 100 : contentWidthPx || Infinity` — the
+`|| Infinity` matters: `contentWidthPx` defaults to `0` as an
+"unset/unknown" sentinel for callers that don't pass a real page width,
+not literally "the page is 0px wide"; without it every unclamped test
+caller would have frozen every element at `x:0`) and clamped: the move
+handler's `x`, the `w`/`n`/`e` resize handles' `x`/`w`, and the
+`ArrowRight` keyboard nudge. Deliberately Y/height-UNbounded (only X):
+bands stack/flow vertically and several (`reportHeader` with
+`height:0`, e.g.) auto-grow to fit their content, so there's no single
+fixed "bottom" the way the page's real width is one fixed right edge.
+**Why:** Direct, concrete report — "dragging should not be allowed after
+page border" — immediately following the D-054 fix that made the
+canvas's coordinate space accurate; accuracy alone doesn't stop you from
+dragging past it, just makes the overflow visible/predictable.
+**Verified:** added a new test ("does not go past the page's right edge
+when dragged or resized past it") exercising both the move and east-
+resize-handle paths against an explicit `contentWidthPx`. Two PRE-
+EXISTING `'%'`-mode tests started failing and were fixed, not reverted:
+`fieldElement()`'s shared test-fixture default (`w: 200`) is a `'px'`-
+oriented placeholder that means "200%" once reused under `unit:'%'`
+(already wider than the whole page) — those two tests now pass an
+explicit, realistic `w: 20` override. 18 designer FreeElement tests (was
+17), 192 designer tests total, `pnpm -r typecheck` and designer `pnpm
+lint` green.
+`[status: locked]`
+
+---
+
+### D-058 — Design canvas gets a light reference grid (20px, blend-mode overlay) for judging alignment
+**Decision:** User asked for a light background grid to help "check and
+adjust vertical/horizontal" while editing. A plain `background-image` on
+`.dd-page` sits BEHIND band content — and every band type already paints
+its own translucent-but-opaque tint over its full area (`.dd-band-body`'s
+`--dd-hero-weak`/`--dd-run-weak`/`--dd-totals-weak`, `Band.svelte`),
+which hid a page-level grid almost everywhere it would have actually
+been useful (confirmed by cropping a real Puppeteer screenshot: the grid
+was only visible in the thin non-band gaps). Used a full-page overlay
+div instead (`.dd-grid-overlay`, last child of `.dd-page` so it paints on
+top, `pointer-events:none` so it never blocks selection/drag) with
+`mix-blend-mode: multiply` — the grid lines subtly darken whatever's
+beneath (content, every band tint, the white page background) rather
+than covering any of it. Fixed light gray (`#e7eaee`), not a `--dd-*`
+token — same established reason as `.dd-page`'s own `#fff`/the margin
+guide's `#c6cbd2`: the page is a literal sheet of paper, always white,
+independent of the app's light/dark theme. 20px spacing.
+**Verified:** cropped a real Puppeteer screenshot of an empty page region
+before/after — grid lines now run continuously through it instead of
+fading into a solid band-tint color a few pixels in. `pnpm -r typecheck`
+and designer `pnpm lint` green (pure CSS/markup change, no test file
+covers canvas background rendering).
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs
