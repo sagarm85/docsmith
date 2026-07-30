@@ -8,28 +8,34 @@
 
 ## Now / Next / Notes
 
-- **Current status (2026-07-29):** Phases 0–3 are done (see the historical
+- **Current status (2026-07-30):** Phases 0–3 are done (see the historical
   entries below), followed by two post-Phase-3 rounds not tracked in this
   journal — see the dedicated "Post-Phase-3 (design-review-driven)" and
   "v2 — usability redesign" sections further down for what's shipped since
-  (D-034 through D-053). Work is currently on the `v2` branch (off `main`
+  (D-034 through D-056). Work is currently on the `v2` branch (off `main`
   after D-046); `main` itself is fully caught up through D-046 and pushed.
   Latest: a real-PDF review of the Invoice (Orange) reference template
-  (user-reported: backgrounds/right-alignment inconsistent, wanted a
-  sub-table look for the totals, footer fields rendering above the
-  header, PDF margin not visible in Preview) surfaced two genuine
-  `core/render.ts` bugs — see D-052 (pageHeader/pageFooter silently
-  `position:relative`, never actually fixed) and D-053 (`.page` had no
-  explicit width, so Preview stretched edge-to-edge and Chromium's print
-  auto-fit scale was content-dependent) — both fixed, plus the Invoice
-  totals block and the Purchase Order pageHeader text repositioned to
-  match the real 673px printable width. Next: none queued — offered to
-  also right-align the Purchase Order (Blue/Peach) totals to match the
-  invoice's new look; not yet confirmed by the user. D-052 also flagged a
-  known, not-yet-fixed follow-up: a repeating pageHeader overlaps page
-  2+'s content (outside the official pagination gate's scope — see D-052
-  for why). The rest of this section (below) is historical Phase 0–3
-  journal, kept for reference.
+  surfaced and fixed five real bugs across two passes. Pass 1 (D-052,
+  D-053): pageHeader/pageFooter were silently `position:relative` (never
+  actually fixed — footer rendered above the header), and `.page` had no
+  explicit width (Preview stretched edge-to-edge; print's auto-fit scale
+  was content-dependent) — both fixed, plus the Invoice totals block and
+  Purchase Order pageHeader text repositioned to fit the real 673px
+  printable width. Pass 2, from direct live-editing feedback (D-054,
+  D-055, D-056): the Design canvas's OWN coordinate space still assumed
+  the full, unreduced page width (dragging an element could visibly push
+  it outside the real page) — fixed by making `geometry.ts` match D-053's
+  margin-reduced width; and — the bigger one — the Design canvas never
+  applied `ElementStyle` (background/bold/italic/align/color/fontSize) AT
+  ALL, only position/size, so nothing looked styled until switching to
+  Preview — fixed by exporting core's `styleToCss` and wiring it into
+  `FreeElement`/`GridBand`/`StackBand`. Also gave the `examples/
+  invoice-demo` pageFooter a visual top-rule separator. Next: none queued
+  — still offered, not yet confirmed: right-align the Purchase Order
+  (Blue/Peach) totals to match the invoice. Known, not-yet-fixed follow-up
+  (D-052): a repeating pageHeader overlaps page 2+'s content (outside the
+  official pagination gate's scope — see D-052 for why). The rest of this
+  section (below) is historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
@@ -804,6 +810,36 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Design canvas WYSIWYG gaps found and fixed from live
+  editing feedback (D-054, D-055, D-056).** Direct follow-up to the
+  2026-07-29 render fixes below: user hit the exact gap D-053 had
+  deliberately left unfixed — dragging the totals field in the Design
+  canvas pushed it visibly outside the real page in Preview, because
+  `geometry.ts`'s `pageDimensionsPx` still returned the full, unreduced
+  page width while `core/render.ts`'s real `.page` (D-053) is
+  margin-reduced. Fixed (D-054) by changing `pageDimensionsPx` to match —
+  every consumer (drag/resize clamps, layoutUnit conversion, default
+  block width) derives from this one function, so no other file needed
+  touching; also fixed `Canvas.svelte`'s margin-guide overlay, which would
+  otherwise have doubled the inset now that `.dd-page` itself is the
+  printable width. Separately and more significantly (D-055): the user
+  reported not seeing background color, alignment, or formatting while
+  editing, and being unable to judge a label's real footprint — root
+  cause was that `FreeElement.svelte`, `GridBand.svelte`, and
+  `StackBand.svelte` NEVER applied an element's own `style` at all, only
+  its position/size — every template's real styling was invisible until
+  switching to Preview. Exported core's `styleToCss` (previously private
+  to `render.ts`) and wired it into all three, so the canvas now reuses
+  the SAME style-to-CSS conversion Preview/PDF use, per claude.md's "one
+  renderer" rule. Also (D-056), from a footer screenshot the user flagged
+  as "doesn't look like footer but contents": added a thin top-rule
+  separator to `examples/invoice-demo`'s pageFooter (a fixture-only
+  change — the `line` element and per-element borders already existed,
+  this template just hadn't used them). Verified: 191 designer tests pass
+  unmodified, `pnpm -r typecheck` and designer `pnpm lint` green, and a
+  live Puppeteer screenshot of the Design canvas confirms the Invoice
+  (Orange) template's real dark/orange backgrounds, bold, and
+  right-alignment now render while editing, matching Preview.
 - **2026-07-29 — Two real `core/render.ts` bugs found and fixed via a
   live-PDF review of the Invoice (Orange) template (D-052, D-053).** User
   reported 5 specific complaints on a Preview screenshot: header/summary

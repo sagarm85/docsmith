@@ -1758,6 +1758,98 @@ template regressed.
 
 ---
 
+### D-054 — Design canvas's coordinate space now matches the real printable width (`pageDimensionsPx` is margin-reduced, like D-053)
+**Decision:** User hit the exact gap D-053 flagged and deliberately left
+unfixed: dragging the Invoice (Orange) totals field in the Design canvas
+pushed it visibly outside the page in Preview. `geometry.ts`'s
+`pageDimensionsPx().width` (the canvas's ENTIRE free-form coordinate
+space — every x/y/w/h in `'px'` mode, and the `contentWidthPx` basis for
+`'%'` mode, D-028) was the full, unreduced page width, while
+`core/render.ts`'s real `.page` width (D-053) is margin-reduced — the
+canvas let you position an element anywhere the render engine would
+never actually have room for. Changed `pageDimensionsPx` to subtract
+left+right margins, matching `core/render.ts`'s `pageWidthPx` exactly.
+Every consumer (`Canvas.svelte`, `DocDesigner.svelte`'s layoutUnit/
+arrangement conversions, `FreeElement.svelte`'s drag/resize clamps,
+`template-edits.ts`'s default full-width block) derives from this one
+function, so the fix is single-source and required no changes anywhere
+else. Also fixed `Canvas.svelte`'s `.dd-margins` guide div, which
+previously inset ANOTHER margin's-worth from `.dd-page`'s edges — now
+that `.dd-page` itself IS the printable width, that would have doubled
+the visual inset; the guide's left/right are now `0` (page edge = safe
+boundary), top/bottom unchanged (height wasn't touched, matching D-053's
+width-only scope).
+**Why:** Direct user report — "when I adjust total summary it goes out
+of page" — is exactly the WYSIWYG gap D-053's own writeup named as a
+deliberately-deferred limitation ("`geometry.ts` was deliberately NOT
+changed to match"). Confirmed it's genuinely just this one function by
+grepping every `pageDimensionsPx`/`marginsPx`/`contentWidthPx` call site
+in the designer package before changing anything.
+**Verified:** 191 designer tests still pass unmodified (no test
+hard-codes geometry.ts's actual computed number — `DocDesigner.test.ts`
+derives its expectation from the function itself; `Band.test.ts`/
+`FreeElement.test.ts` pass `contentWidthPx` as a literal test prop,
+independent of geometry.ts). `pnpm -r typecheck` and designer `pnpm
+lint` green. Screenshotted the live Design canvas via Puppeteer: `.dd-page`
+measures 672.75px (A4/16mm margins) with zero left/right margin-guide
+inset, matching Preview's `.page` exactly.
+`[status: locked]`
+
+---
+
+### D-055 — Design canvas never applied `ElementStyle` at all (bg/bold/italic/align/color/fontSize/padding) — only position/size; now reuses core's `styleToCss`
+**Decision:** User reported not seeing background color, alignment, or
+formatting while editing — only in Preview — and being unable to judge
+how much area a label actually covers. Root cause, found by grepping for
+`styleToCss`/`el.style` across the three free-form renderers: NONE of
+`FreeElement.svelte`, `GridBand.svelte`, or `StackBand.svelte` ever
+applied an element's own `style` to anything — only `left/top/width/
+height` (`FreeElement`) or `flex-basis`/grid `colspan` (`GridBand`/
+`StackBand`). A `bg:orange, bold, align:right` field rendered as
+unstyled plain black left-aligned text in the canvas and only looked
+right after switching to Preview — the exact "earlier mock and actual
+didn't match" pattern from D-042/D-051, but for every template's actual
+runtime styling, not just the chrome around the editor.
+Exported `styleToCss` from `packages/core/src/render.ts` (was a private
+function) — per claude.md's "one renderer" rule, the designer must reuse
+core's own style-to-CSS conversion rather than hand-roll a second one
+that could drift. Wired it into: `FreeElement.svelte`'s `.dd-el-body`
+(the content layer, kept separate from `.dd-el` itself so the
+selection/hover outline isn't fought by an element `border` style);
+`GridBand.svelte`'s `.dd-grid-subitem`; `StackBand.svelte`'s
+`.dd-stack-el` (appended after the existing `flex:0 0 {el.w}%` inline
+style).
+**Why:** Confirmed via a live Puppeteer screenshot of the Invoice
+(Orange) template before/after: reportHeader's BRANDNAME/INVOICE blocks
+now show their real dark/orange backgrounds and right-alignment, and the
+totals block's SUB TOTAL/TAX & VAT/DISCOUNT/GRAND TOTAL rows show their
+real orange/dark backgrounds directly in Design view — closely matching
+Preview for the first time.
+**Verified:** 191 designer tests pass unmodified (no test asserted the
+ABSENCE of inline styling, so adding it wasn't a breaking change to any
+existing assertion). `pnpm -r typecheck` and designer `pnpm lint` green.
+`[status: locked]`
+
+---
+
+### D-056 — `examples/invoice-demo` pageFooter got a visual separator (thin top rule)
+**Decision:** User reported the demo invoice's pageFooter ("Northwind
+Trading Co. · invoices@northwind.example · +1 555 0100") "does not look
+like footer but contents" — it was plain small gray centered text with
+no border/background, indistinguishable from a continuation of body
+copy once printed. Added a `kind:'line'` element (already a supported
+element kind — renders as a `border-top` div) directly above the footer
+text. This is a fixture-only change (`examples/invoice-demo/
+fixtures.mjs`, not app code) — the underlying capability (a `line`
+element, arbitrary per-element `style.border`) already existed; this
+template just hadn't used it for its footer.
+**Verified:** re-rendered the demo template to a real 3-page PDF via
+Puppeteer and screenshotted page 1 — the footer now shows a clear thin
+rule above it, visually distinct from the totals row directly above.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

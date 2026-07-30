@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { FreeElement } from '@docsmith/core';
+  import { styleToCss, type FreeElement } from '@docsmith/core';
   import Icon from './ui/Icon.svelte';
 
   const GRID = 4;
@@ -424,8 +424,12 @@
   <!-- Content lives in its own overflow:hidden layer so long text/oversized
        images clip to the element's box without also clipping the toolbar
        (top:-34px, outside the box) or the resize handles (small negative
-       offsets) — both siblings of this, direct children of .dd-el itself. -->
-  <div class="dd-el-body">
+       offsets) — both siblings of this, direct children of .dd-el itself.
+       The element's own style (bg/bold/italic/align/color/fontSize/padding)
+       is applied here via core's styleToCss — the SAME function Preview/PDF
+       use — so background color, alignment, and formatting are visible
+       while editing, not just after switching to Preview. -->
+  <div class="dd-el-body" style={styleToCss(element.style)}>
     {#if element.kind === 'field'}
       <span class="dd-el-token">
         <Icon name="field" size={10} />

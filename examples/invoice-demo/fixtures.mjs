@@ -127,7 +127,11 @@ export function invoiceTemplate() {
         height: 30,
         enabled: true,
         elements: [
-          { id: 'f1', kind: 'text', x: 0, y: 8, w: 560, h: 16, style: { fontSize: 9, color: '#999', align: 'center' }, text: 'Northwind Trading Co.  ·  invoices@northwind.example  ·  +1 555 0100' },
+          // A thin top rule gives the footer a visible boundary from the
+          // content above it — without one, plain centered gray text reads
+          // as just more body copy, not a footer.
+          { id: 'f0', kind: 'line', x: 0, y: 0, w: 560, h: 1, style: { border: '1px solid #e2e5e9' } },
+          { id: 'f1', kind: 'text', x: 0, y: 10, w: 560, h: 16, style: { fontSize: 9, color: '#999', align: 'center' }, text: 'Northwind Trading Co.  ·  invoices@northwind.example  ·  +1 555 0100' },
         ],
       },
     ],

@@ -95,7 +95,14 @@ function alignVal(a: Align | undefined): string {
   return a ?? 'left';
 }
 
-function styleToCss(s: ElementStyle | undefined): string {
+/** Exported so the designer's Design canvas (FreeElement/GridBand/StackBand)
+ * can render the SAME style a `<doc-designer>` Preview/PDF would — the
+ * canvas previously only ever positioned/sized elements, never applied
+ * `ElementStyle` (bg/bold/italic/align/color/fontSize/padding/border) at
+ * all, so background colors, alignment, and formatting were invisible until
+ * switching to Preview (claude.md's "one renderer" rule: reuse this, don't
+ * hand-roll a second style-to-CSS conversion in the designer). */
+export function styleToCss(s: ElementStyle | undefined): string {
   if (!s) return '';
   const out: string[] = [];
   if (s.fontSize) out.push(`font-size:${s.fontSize}px`);

@@ -209,9 +209,9 @@
   // Template.layoutUnit (memory.md D-028): toggling migrates every free-form
   // element's x/y/w/h via core.convertLayoutUnit in the same commit, so undo
   // reverts the whole switch (unit + values) as one step. contentWidthPx is
-  // the page's FULL width (Canvas.svelte's contentWidthPx derivation — bands
-  // span edge-to-edge; printSetup.margins is a print-only @page concept, not
-  // a box-model inset).
+  // the page's PRINTABLE width (page width minus left+right margins —
+  // Canvas.svelte's contentWidthPx derivation, memory.md D-054), matching
+  // core/render.ts's real `.page` width.
   function handleLayoutUnitChange(nextUnit: 'px' | '%') {
     const contentWidthPx = pageDimensionsPx(template.printSetup).width;
     commitTemplate(convertLayoutUnit(template, nextUnit, contentWidthPx));

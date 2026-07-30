@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
+  import { styleToCss, type FreeBand, type FreeElement, type ValueFormat } from '@docsmith/core';
   import {
     createStackBlockElement,
     createStackFieldElement,
@@ -274,7 +274,7 @@
             <div
               class="dd-stack-el"
               class:dd-stack-el--selected={selectedElementId === el.id}
-              style="flex:0 0 {el.w}%;max-width:{el.w}%"
+              style="flex:0 0 {el.w}%;max-width:{el.w}%;{styleToCss(el.style)}"
               role="button"
               tabindex="0"
               aria-label={elementAriaLabel(el)}

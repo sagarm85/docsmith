@@ -144,12 +144,12 @@
   const margins = $derived(marginsPx(template.printSetup));
   const layoutUnit = $derived(template.layoutUnit ?? 'px');
   // The content box every free-form element's x/w is relative to in '%' mode
-  // (memory.md D-028) is the FULL page width, not page width minus margins:
-  // bands are direct children of `.page`/`.dd-page` in both core.renderToHtml
-  // and this canvas, spanning edge-to-edge — `printSetup.margins` is a
-  // print-only `@page` concept (applied by the browser's print/PDF engine),
-  // never a CSS padding/margin on the HTML box model itself. The `.dd-margins`
-  // guide div below is purely a visual overlay, not a real content inset.
+  // (memory.md D-028) is `page.width`, which is now ITSELF the printable
+  // width (memory.md D-054) — `pageDimensionsPx` already subtracts the
+  // left+right margins, matching `core/render.ts`'s `.page` width exactly,
+  // so `.dd-page`'s own right edge below IS the safe boundary (no separate
+  // left/right inset needed — see `.dd-margins`, which only shows top/bottom
+  // guides now).
   const contentWidthPx = $derived(page.width);
 
   // pageHeader/pageFooter are optional (design.md §2) — absent from a fresh
@@ -191,10 +191,11 @@
       style="width:{page.width}px;height:{page.height}px"
       onkeydown={handlePageKeydown}
     >
-      <div
-        class="dd-margins"
-        style="top:{margins.top}px;right:{margins.right}px;bottom:{margins.bottom}px;left:{margins.left}px"
-      ></div>
+      <!-- Top/bottom only: `.dd-page`'s own left/right edges already ARE the
+           safe printable boundary (page.width is margin-reduced, D-054) — an
+           extra left/right inset here would double it. Height is still the
+           full page, so top/bottom margins remain a guide only. -->
+      <div class="dd-margins" style="top:{margins.top}px;right:0;bottom:{margins.bottom}px;left:0"></div>
 
       {#if pageHeader}
         <div class="dd-optional-band" class:dd-optional-band--disabled={pageHeader.enabled === false}>

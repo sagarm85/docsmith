@@ -24,7 +24,16 @@ export function pageDimensionsPx(printSetup: PrintSetup): PagePx {
   const { width, height } = PAGE_SIZES_MM[printSetup.pageSize];
   const [w, h] =
     printSetup.orientation === 'landscape' ? [Math.max(width, height), Math.min(width, height)] : [width, height];
-  return { width: mmToPx(w), height: mmToPx(h) };
+  // Width is the PRINTABLE width (page width minus left+right margins), not
+  // the full physical page — matching `packages/core/src/render.ts`'s
+  // `pageWidthPx` (memory.md D-054). A free-form element could previously be
+  // positioned anywhere up to the full, unreduced page width in the canvas
+  // and look fine there, then render past the page's right edge in Preview/
+  // print, which only ever had the margin-reduced width to work with —
+  // reported directly: dragging a totals field pushed it visibly outside the
+  // page in Preview. Height is left as the full page height (unrelated to
+  // this fix — core/render.ts's own width fix was also width-only).
+  return { width: mmToPx(w - printSetup.margins.left - printSetup.margins.right), height: mmToPx(h) };
 }
 
 export type MarginsPx = { top: number; right: number; bottom: number; left: number };

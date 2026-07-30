@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { DataSourceAdapter, FieldMeta, FreeBand, FreeElement, ValueFormat } from '@docsmith/core';
+  import { styleToCss, type DataSourceAdapter, type FieldMeta, type FreeBand, type FreeElement, type ValueFormat } from '@docsmith/core';
   import {
     createGridBlockElement,
     createGridFieldElement,
@@ -564,6 +564,7 @@
                   <div
                     class="dd-grid-subitem"
                     class:dd-grid-subitem--selected={selectedElementId === el.id}
+                    style={styleToCss(el.style)}
                     role="button"
                     tabindex="0"
                     aria-label={elementAriaLabel(el)}
