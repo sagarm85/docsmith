@@ -195,7 +195,7 @@
         Drag line-item fields here, or use a field's “+” button, to add table columns.
       </p>
     {:else}
-      <table class="dd-detail-table">
+      <table class="dd-detail-table" class:dd-detail-table--striped={band.stripeRows}>
         <thead>
           <tr>
             {#each band.columns as col, i (col.column)}
@@ -405,6 +405,16 @@
     border: 1px solid var(--dd-border);
     padding: 4px 6px;
     color: #222;
+  }
+
+  /* Mirrors core/render.ts's table.detail.detail--striped rule (memory.md
+     D-062) so the Design canvas shows the same alternating tint Preview/PDF
+     will — same #f6f7f9 tint, since that's document content, not app chrome
+     (the row IS a fixed color choice on the page, independent of the
+     designer's own light/dark theme, same reasoning as the color-preset
+     fix above). */
+  .dd-detail-table--striped tbody tr:nth-child(even) td {
+    background: #f6f7f9;
   }
 
   .dd-col-header {

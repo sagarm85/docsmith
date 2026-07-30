@@ -68,7 +68,20 @@
   Aggregate/Carry-forward controls showed for EVERY column format, not
   just numeric ones, which didn't make sense (Sum/Average on a text/date
   column). Now hidden entirely unless the column's format is number or
-  currency. The rest of this section (below) is historical Phase 0–3
+  currency.
+  Pass 7, same session (D-062, D-063, D-064): while answering "how do I
+  set a background color for a text field," found and fixed a real,
+  significant color bug — `ElementProps`'s Color swatch presets saved
+  `var(--dd-*)` token STRINGS into template data, which don't exist in
+  the actually-rendered document (a separate standalone HTML page), so
+  every preset except the raw custom-hex picker silently rendered as
+  near-black in Preview/PDF while looking correct in the Design canvas.
+  Fixed to literal hex values. Added Background-color support for
+  text/field elements (was box-only, despite the data model and the
+  reference templates themselves already relying on text-element
+  backgrounds extensively) and an optional alternating (zebra) row
+  shading toggle for the detail table (`DetailBand.stripeRows`, off by
+  default). The rest of this section (below) is historical Phase 0–3
   journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
@@ -844,6 +857,33 @@ tracks *status*; `memory.md` tracks *why*.
 
 ## Changelog (newest first)
 
+- **2026-07-30 — Fixed a real color-rendering bug; added background
+  color for text/field elements; added optional zebra-striped detail
+  rows (D-062, D-063, D-064).** While answering a user question about
+  setting a text field's background color, found that `ElementProps`'s
+  Color swatch presets (`COLOR_PRESETS`) saved `var(--dd-*)` CSS custom
+  property STRINGS directly into `element.style.color` — real template
+  data, serialized into the template JSON. `core.renderToHtml` renders
+  that into a completely separate, standalone HTML document (the
+  Preview iframe's srcdoc, or the exported PDF) that never defines
+  `--dd-*` anywhere (those only exist inside the designer's own shadow
+  root) — so every preset except the raw custom-hex picker was silently
+  invalid there and fell back to near-black, correct-looking only in the
+  Design canvas. Confirmed directly via `getComputedStyle` in the real
+  Preview iframe before and after. Fixed to literal hex values matching
+  the tokens' own light-mode colors. Also: the Background swatch row was
+  `box`-kind only, despite `bg` being a general property the reference
+  templates already lean on heavily for text elements — extended it to
+  `text`/`field`, with a "No fill" option. And, from an earlier
+  conversation about additional properties worth adding: `DetailBand`
+  gained an optional `stripeRows` toggle ("Alternating row shading" in
+  BandProps, off by default) for zebra-striped line-item tables, wired
+  through core's renderer, the Design canvas's `DetailTable`, and the
+  full designer UI chain. Verified: 2 new core render tests (63 total,
+  was 61), 195 designer tests unchanged, `pnpm -r typecheck` and
+  designer `pnpm lint` green throughout; live Puppeteer checks confirmed
+  each fix against the real Invoice (Orange) template and a real Preview
+  iframe, not just re-reading the code.
 - **2026-07-30 — Column "Aggregate (footer)"/"Carry forward" hidden for
   non-numeric columns (D-061).** User refined the earlier "total row
   should be configurable" request — already confirmed working

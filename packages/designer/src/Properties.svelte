@@ -30,6 +30,7 @@
     onBandChange,
     onBandArrangementChange,
     onDetailCellBorderChange,
+    onDetailStripeRowsChange,
     printSetup,
     onPrintSetupChange,
     keepRowTogether,
@@ -57,6 +58,8 @@
     onBandArrangementChange: (bandId: string, arrangement: 'free' | 'stack' | 'grid') => void;
     /** `DetailBand.cellBorder` — see BandProps.svelte's onCellBorderChange doc. */
     onDetailCellBorderChange: (cellBorder: string | undefined) => void;
+    /** `DetailBand.stripeRows` — see BandProps.svelte's onStripeRowsChange doc. */
+    onDetailStripeRowsChange: (stripeRows: boolean) => void;
     printSetup: PrintSetupType;
     onPrintSetupChange: (next: PrintSetupType) => void;
     keepRowTogether: boolean;
@@ -181,6 +184,7 @@
             ? (arrangement) => onBandArrangementChange(bandId, arrangement)
             : undefined}
           onCellBorderChange={isDetailBand(selectedBand) ? onDetailCellBorderChange : undefined}
+          onStripeRowsChange={isDetailBand(selectedBand) ? onDetailStripeRowsChange : undefined}
         />
       {:else}
         <p class="dd-empty-hint">

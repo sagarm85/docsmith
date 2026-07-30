@@ -2000,6 +2000,91 @@ Description" (text), shown for "Total" (currency).
 
 ---
 
+### D-062 — Fixed a real color bug: `ElementProps`'s color presets used `var(--dd-*)` tokens, which silently don't exist in the rendered document
+**Decision:** While investigating an unrelated question ("how do I set a
+background color for a text field"), found that `ElementProps.svelte`'s
+`COLOR_PRESETS` saved literal strings like `'var(--dd-accent)'` into
+`element.style.color` — real template DATA, serialized into the
+template JSON. `core.renderToHtml` renders that value into a completely
+separate, standalone HTML document (the Preview iframe's `srcdoc`, or
+the exported PDF) which never defines `--dd-*` anywhere (those only
+exist inside the designer custom element's own shadow root). Per CSS
+spec, `color:var(--dd-accent)` with an undefined custom property and no
+fallback is invalid at computed-value time, so it silently fell back to
+the inherited/default color (`#111`, near-black) — **every element
+styled with any preset except the raw hex custom-picker rendered wrong
+in Preview and PDF**, while looking correct in the Design canvas (whose
+shadow root DOES define these tokens). Confirmed directly: injected an
+element with `color:'var(--dd-accent)'` and read Preview's own
+`getComputedStyle` — `rgb(17,17,17)`, not the intended blue. Fixed:
+`COLOR_PRESETS` now uses the tokens' literal light-mode hex values
+(`#14161b`/`#2563eb`/`#1a7f37`/`#b3261e`/`#9a6700`) instead of `var()`
+references. claude.md's "never a hardcoded hex, always a `--dd-*` token"
+rule is about the designer's OWN UI chrome (real component `<style>`
+blocks inside the shadow root) — it was mis-applied to a picker for
+DOCUMENT content the end user chooses, which must be portable, resolved
+CSS the same way the template's own `bg`/`border` values already are.
+**Why:** Not a cosmetic nit — this affected every template using the
+Color swatch row (the primary, most-used way to pick a color in the
+whole redesigned Properties panel from D-051 onward) for anything but
+the custom picker. Confirmed via `getComputedStyle` in the actual
+Preview iframe, not just re-reading the code.
+**Verified:** `pnpm -r typecheck` and designer `pnpm lint` green (no
+dedicated `ElementProps` test file exists yet — same gap noted in
+D-051). Live check: an element styled `color:'#2563eb'` now computes to
+`rgb(37, 99, 235)` in the real Preview iframe.
+`[status: locked]`
+
+---
+
+### D-063 — Background color now settable for text/field elements (was box-only)
+**Decision:** Direct question — "how to set background color for text
+field" — surfaced that `ElementProps.svelte`'s "Background" swatch row
+only ever rendered for `element.kind === 'box'`, even though
+`ElementStyle.bg` is a general property `core.renderToHtml` already
+applies to every element kind, and the reference Invoice (Orange)
+template itself relies on `bg` extensively on `text` elements (the
+orange/dark SUB TOTAL/GRAND TOTAL boxes). Added the same swatch-row
+pattern used for `Color` (reusing `COLOR_PRESETS`, D-062's fixed literal
+hex values) to the `text`/`field` block, plus a "No fill" swatch
+(diagonal line through a blank circle — the standard "transparent/none"
+convention) since, unlike a `box` element which defaults to white,
+plain text usually wants no fill at all.
+**Verified:** live Puppeteer check confirms the Background row renders
+for a `text` element and correctly shows no swatch as "active" for a
+`bg` value (orange) that doesn't match any preset — not a false
+positive. `pnpm -r typecheck`, designer `pnpm lint`, and the full 195
+designer tests all green (no existing test asserted the ABSENCE of this
+control).
+`[status: locked]`
+
+---
+
+### D-064 — Detail band: optional alternating (zebra) row shading
+**Decision:** User-approved addition (of two offered: this and per-side
+borders — this one first). New `DetailBand.stripeRows?: boolean`
+(`core/types.ts`), off by default so it never silently changes an
+existing template's already-reviewed output. `core/render.ts`'s
+`renderDetailBand` adds a `detail--striped` class when set; base CSS
+adds `table.detail.detail--striped tbody tr:nth-child(even) td { background:
+#f6f7f9 }` — `tbody`-scoped only, so the repeating `<thead>`/`<tfoot>`
+are never affected. Fixed, non-configurable tint (not a color picker) to
+keep this a one-toggle decision, matching `cellBorder`'s existing
+precedent. Wired end-to-end: `BandProps.svelte` toggle ("Alternating row
+shading", next to the existing "Row borders" toggle) →
+`DocDesigner.svelte`'s `handleDetailStripeRowsChange` (same dedicated-
+handler precedent as `cellBorder`) → `Properties.svelte` forwarding.
+`DetailTable.svelte` (Design canvas) mirrors the identical CSS rule so
+the canvas shows the same tint Preview/PDF will.
+**Verified:** two new `render.test.ts` cases (class/CSS absent when
+unset, present when set — 63 core tests, was 61). Live Puppeteer
+check: toggled the checkbox, confirmed `DetailBand.stripeRows` flips to
+`true` in the live template, and Preview visibly shows alternating row
+tint (row 2 of 3 tinted, rows 1/3 white).
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

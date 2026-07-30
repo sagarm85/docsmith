@@ -250,6 +250,14 @@
     });
   }
 
+  // DetailBand.stripeRows — same dedicated-handler precedent as cellBorder above.
+  function handleDetailStripeRowsChange(stripeRows: boolean) {
+    commitTemplate({
+      ...template,
+      bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, stripeRows } : b)),
+    });
+  }
+
   const keepRowTogether = $derived(
     (template.bands.find((b) => isDetailBand(b)) as { keepRowTogether?: boolean } | undefined)
       ?.keepRowTogether ?? false,
@@ -903,6 +911,7 @@
               onBandChange={handleBandChange}
               onBandArrangementChange={handleBandArrangementChange}
               onDetailCellBorderChange={handleDetailCellBorderChange}
+              onDetailStripeRowsChange={handleDetailStripeRowsChange}
               printSetup={template.printSetup}
               onPrintSetupChange={handlePrintSetupChange}
               {keepRowTogether}

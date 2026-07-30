@@ -287,6 +287,12 @@ export type DetailBand = {
    * governed separately (header border is intentionally always kept — a
    * borderless body still needs a visible column-header edge). */
   cellBorder?: string;
+  /** Alternating (zebra) row background — off by default, since turning it
+   * on for an EXISTING template would be an unrequested visual change to
+   * output someone already reviewed. A fixed, subtle tint (not a
+   * user-chosen color, to keep this a one-toggle decision rather than
+   * another color picker) applied via `tbody tr:nth-child(even)`. */
+  stripeRows?: boolean;
 };
 
 export type Band = FreeBand | DetailBand;

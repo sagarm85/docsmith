@@ -562,6 +562,21 @@ describe('renderToHtml — DetailBand.cellBorder', () => {
   });
 });
 
+describe('renderToHtml — DetailBand.stripeRows', () => {
+  it('does not add the striped class or CSS rule when unset', () => {
+    const out = renderToHtml(invoiceTemplate(), fatDocument(1));
+    expect(out.html).not.toContain('detail--striped');
+  });
+
+  it('adds the striped class to the table and a matching CSS rule when set', () => {
+    const t = invoiceTemplate();
+    t.bands = t.bands.map((b) => (b.type === 'detail' ? { ...(b as DetailBand), stripeRows: true } : b));
+    const out = renderToHtml(t, fatDocument(1));
+    expect(out.html).toContain('<table class="detail detail--striped"');
+    expect(out.css).toContain('table.detail.detail--striped tbody tr:nth-child(even) td');
+  });
+});
+
 describe('renderToHtml — DetailColumn.format:"image" (memory.md D-039)', () => {
   function imageTemplate(): Template {
     const t = invoiceTemplate();

@@ -11,6 +11,7 @@
     onChange,
     onArrangementChange,
     onCellBorderChange,
+    onStripeRowsChange,
   }: {
     band: Band;
     onChange: (patch: Partial<FreeBand>) => void;
@@ -28,6 +29,10 @@
      * precedent as `keepRowTogether`). undefined = row borders on
      * (today's default); 'none' = borderless. */
     onCellBorderChange?: (cellBorder: string | undefined) => void;
+    /** detail-band-only (`DetailBand.stripeRows`, memory.md D-062) — same
+     * dedicated-handler precedent as `onCellBorderChange` above. Off by
+     * default (undefined/false); toggling on adds the alternating-row tint. */
+    onStripeRowsChange?: (stripeRows: boolean) => void;
   } = $props();
 
   const ARRANGEMENT_OPTIONS = [
@@ -105,6 +110,16 @@
             onCellBorderChange?.((e.currentTarget as HTMLInputElement).checked ? undefined : 'none')}
         />
         Row borders
+      </label>
+    {/if}
+    {#if onStripeRowsChange}
+      <label class="dd-toggle">
+        <input
+          type="checkbox"
+          checked={detail.stripeRows ?? false}
+          onchange={(e) => onStripeRowsChange?.((e.currentTarget as HTMLInputElement).checked)}
+        />
+        Alternating row shading
       </label>
     {/if}
   {:else}

@@ -494,7 +494,8 @@ function renderDetailBand(
   // absent leaves today's default untouched; the header's own border stays
   // fixed regardless (table.detail thead th's separate, more specific rule).
   const tableStyle = band.cellBorder != null ? ` style="--dd-cell-border:${band.cellBorder}"` : '';
-  return `<table class="detail" data-band="detail"${tableStyle}>${thead}${tfoot}${tbody}</table>`;
+  const stripeClass = band.stripeRows ? ' detail--striped' : '';
+  return `<table class="detail${stripeClass}" data-band="detail"${tableStyle}>${thead}${tfoot}${tbody}</table>`;
 }
 
 function renderBand(
@@ -551,6 +552,9 @@ table.grid-table + table.grid-table { margin-top: 2px; }
 table.detail { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.detail th, table.detail td { padding: 6px 8px; border-bottom: var(--dd-cell-border, 1px solid #e2e5e9); vertical-align: top; word-wrap: break-word; }
 table.detail thead th { border-bottom: 1.5px solid #333; font-weight: 700; background: #f6f7f9; }
+/* Alternating row tint (DetailBand.stripeRows) — tbody only, so the
+   repeating thead/tfoot are never affected. */
+table.detail.detail--striped tbody tr:nth-child(even) td { background: #f6f7f9; }
 /* thead repeats on each printed page; keep the default group display. */
 table.detail thead { display: table-header-group; }
 table.detail tfoot { display: table-footer-group; }

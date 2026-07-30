@@ -67,15 +67,32 @@
     { value: 'right', icon: 'alignRight', label: 'Align right' },
   ];
 
-  // Theme-token swatches (never a hardcoded hex — claude.md §2) so presets
-  // stay correct in dark mode automatically; "Custom" opens the native
-  // color picker for anything else.
+  // Fixed hex values, NOT `var(--dd-*)` tokens (memory.md D-062): these are
+  // saved into `element.style.color` — real template DATA, serialized into
+  // the template JSON and rendered by core.renderToHtml into a completely
+  // separate, standalone HTML document (the Preview iframe's srcdoc, or the
+  // exported PDF). That document never defines `--dd-*` (those only exist
+  // inside the designer custom element's own shadow root), so
+  // color:var(--dd-accent) was silently invalid there and fell back to
+  // inherited/default black — the swatch looked right in the Design canvas
+  // and wrong everywhere it actually mattered. claude.md's "never a
+  // hardcoded hex" rule is about the designer's OWN UI chrome (buttons,
+  // panels — real component style blocks that live inside the shadow
+  // root); it was mis-applied here to document CONTENT the end user is
+  // choosing, which must be portable, resolved, literal CSS the same way
+  // the template's own bg/border values already are (see e.g. the
+  // reference Invoice (Orange) template's bg: '#f5a13c'). Values match
+  // ui/tokens.css's light-mode --dd-text/--dd-accent/--dd-ok/--dd-danger/
+  // --dd-warn — chosen once as sensible content-color defaults, not meant
+  // to track the designer app's own theme going forward (document color is
+  // the author's choice, independent of what theme they happen to be
+  // editing in).
   const COLOR_PRESETS: Array<{ value: string; label: string }> = [
-    { value: 'var(--dd-text)', label: 'Default text' },
-    { value: 'var(--dd-accent)', label: 'Accent' },
-    { value: 'var(--dd-ok)', label: 'Green' },
-    { value: 'var(--dd-danger)', label: 'Red' },
-    { value: 'var(--dd-warn)', label: 'Amber' },
+    { value: '#14161b', label: 'Default text' },
+    { value: '#2563eb', label: 'Accent' },
+    { value: '#1a7f37', label: 'Green' },
+    { value: '#b3261e', label: 'Red' },
+    { value: '#9a6700', label: 'Amber' },
   ];
 
   function patchStyle(patch: Partial<NonNullable<FreeElement['style']>>) {
@@ -197,10 +214,10 @@
         <button
           type="button"
           class="dd-swatch"
-          class:active={(element.style?.color ?? 'var(--dd-text)') === preset.value}
+          class:active={(element.style?.color ?? '#14161b') === preset.value}
           style="background:{preset.value}"
           aria-label={preset.label}
-          aria-pressed={(element.style?.color ?? 'var(--dd-text)') === preset.value}
+          aria-pressed={(element.style?.color ?? '#14161b') === preset.value}
           title={preset.label}
           onclick={() => patchStyle({ color: preset.value })}
         ></button>
@@ -212,6 +229,40 @@
           aria-label="Custom color"
           value={element.style?.color?.startsWith('#') ? element.style.color : '#111111'}
           oninput={(e) => patchStyle({ color: (e.currentTarget as HTMLInputElement).value })}
+        />
+      </label>
+    </div>
+
+    <div class="dd-group-label">Background</div>
+    <div class="dd-swatch-row" role="group" aria-label="Background color">
+      <button
+        type="button"
+        class="dd-swatch dd-swatch--none"
+        class:active={!element.style?.bg}
+        aria-label="No fill"
+        aria-pressed={!element.style?.bg}
+        title="No fill"
+        onclick={() => patchStyle({ bg: undefined })}
+      ></button>
+      {#each COLOR_PRESETS as preset (preset.value)}
+        <button
+          type="button"
+          class="dd-swatch"
+          class:active={element.style?.bg === preset.value}
+          style="background:{preset.value}"
+          aria-label={`${preset.label} background`}
+          aria-pressed={element.style?.bg === preset.value}
+          title={`${preset.label} background`}
+          onclick={() => patchStyle({ bg: preset.value })}
+        ></button>
+      {/each}
+      <label class="dd-swatch dd-swatch--custom" title="Custom background color">
+        <Icon name="plus" size={12} />
+        <input
+          type="color"
+          aria-label="Custom background color"
+          value={element.style?.bg?.startsWith('#') ? element.style.bg : '#ffffff'}
+          oninput={(e) => patchStyle({ bg: (e.currentTarget as HTMLInputElement).value })}
         />
       </label>
     </div>
@@ -487,6 +538,18 @@
     color: var(--dd-muted);
     border: 1.5px dashed var(--dd-border);
     box-shadow: none;
+  }
+
+  /* "No fill" — a diagonal line through an otherwise blank swatch, the
+     standard convention for "transparent/none" in design tools. */
+  .dd-swatch--none {
+    background: var(--dd-panel);
+    background-image: linear-gradient(
+      to top right,
+      transparent calc(50% - 1px),
+      var(--dd-danger),
+      transparent calc(50% + 1px)
+    );
   }
 
   .dd-swatch--custom:hover {
