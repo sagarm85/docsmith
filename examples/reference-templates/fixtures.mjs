@@ -888,6 +888,366 @@ export function invoiceOrangeTemplate() {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// 6. Purchase Order (Elegant) — cream rounded info-boxes, free-form title +
+//    floating Order Ref box, matches a user-supplied reference document.
+//
+// Two real ElementStyle limits (not addressed by this template, since core's
+// element model doesn't support them — see memory.md D-079 for the fuller
+// writeup): no per-element font-family (the reference's script "P" and serif
+// body text both render in the fixed system sans-serif stack instead), and
+// no letter-spacing (the reference's tracked small-caps labels are
+// approximated with literal spaces between characters via `spaced()` below,
+// not real CSS letter-spacing). The detail table's own column-header row is
+// ALSO a fixed light gray (`#f6f7f9`) in every template — core/render.ts's
+// `table.detail thead th` rule has no per-template override — so it can't be
+// cream here despite the rest of the palette matching.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Approximates letter-spaced tracking (not a real CSS property here) by
+ * inserting a literal space between every character. */
+function spaced(str) {
+  return str.split('').join(' ');
+}
+
+export function purchaseOrderElegantEntity() {
+  return {
+    meta: { name: 'purchaseOrderElegant', label: 'Purchase Order (Elegant)' },
+    headerFields: [
+      { name: 'order_number', label: 'Order Number', type: 'text', kind: 'system' },
+      { name: 'order_date', label: 'Order Date', type: 'date', kind: 'system' },
+      { name: 'vendor_ref', label: 'Vendor Ref', type: 'text', kind: 'system' },
+      { name: 'vendor_company', label: 'Vendor Company', type: 'text', kind: 'system' },
+      { name: 'vendor_street', label: 'Vendor Street', type: 'text', kind: 'system' },
+      { name: 'vendor_postcode', label: 'Vendor Postcode', type: 'text', kind: 'system' },
+      { name: 'vendor_attn', label: 'Vendor Attn', type: 'text', kind: 'system' },
+      { name: 'shipping_address', label: 'Shipping Address', type: 'text', kind: 'system' },
+      { name: 'shipping_method', label: 'Shipping Method', type: 'text', kind: 'system' },
+      { name: 'shipping_attn', label: 'Shipping Attn', type: 'text', kind: 'system' },
+      { name: 'notes', label: 'Notes', type: 'text', kind: 'custom' },
+      { name: 'approved_by', label: 'Approved By', type: 'text', kind: 'system' },
+      { name: 'subtotal', label: 'Subtotal', type: 'currency', kind: 'system' },
+      { name: 'discount', label: 'Discount', type: 'currency', kind: 'system' },
+      { name: 'tax', label: 'Tax', type: 'currency', kind: 'system' },
+      { name: 'shipping_cost', label: 'Shipping', type: 'currency', kind: 'system' },
+      { name: 'total', label: 'Total', type: 'currency', kind: 'system' },
+    ],
+    datasets: [
+      {
+        meta: { id: 'po_line_items', label: 'PO line items' },
+        fields: [
+          { name: 'item_code', label: 'Item', type: 'text', kind: 'system' },
+          { name: 'description', label: 'Description', type: 'text', kind: 'system' },
+          { name: 'quantity', label: 'Quantity', type: 'int', kind: 'system' },
+          { name: 'price', label: 'Price', type: 'currency', kind: 'system' },
+          { name: 'amount', label: 'Amount', type: 'currency', kind: 'system' },
+        ],
+      },
+    ],
+    documents: {
+      '1': {
+        header: {
+          order_number: '#100',
+          order_date: '2024-01-10',
+          vendor_ref: 'SU123',
+          vendor_company: 'White Paper Inc',
+          vendor_street: '1 Fairfax Blvd',
+          vendor_postcode: '123222',
+          vendor_attn: 'Mr W Paper',
+          shipping_address: '(As above)',
+          shipping_method: 'Courier',
+          shipping_attn: 'Warehouse Manager',
+          notes: '',
+          approved_by: '',
+          subtotal: 1000,
+          discount: 0,
+          tax: 100,
+          shipping_cost: 50,
+          total: 1150,
+        },
+        datasets: {
+          po_line_items: [
+            { item_code: 'HQ1234', description: 'High quality white paper A4', quantity: 1000, price: 1.0, amount: 1000 },
+          ],
+        },
+      },
+    },
+  };
+}
+
+export function purchaseOrderElegantTemplate() {
+  const cream = '#efe9e0';
+  const logoPlaceholder = '#c9a97e';
+  return {
+    version: 1,
+    id: 'ref-po-elegant',
+    name: 'Reference — Purchase Order (Elegant)',
+    docType: 'purchaseOrderElegant',
+    printSetup: A4_PORTRAIT,
+    dataSource: { entity: 'purchaseOrderElegant', key: 'id', datasets: [{ id: 'po_line_items', label: 'PO line items', kind: 'fk', ref: { table: 'po_line_items', fkColumn: 'order_id' }, orderBy: 'id' }] },
+    bands: [
+      // Repeats every printed page (memory.md D-070): the issuer's own
+      // letterhead — static text, not data-bound, since it's the same on
+      // every PO this company sends, matching invoice-demo's pageFooter
+      // convention for the issuer's own contact line.
+      {
+        id: 'pageHeader',
+        type: 'pageHeader',
+        height: 90,
+        enabled: true,
+        elements: [
+          el('box', 260, 4, 150, 70, { style: { bg: logoPlaceholder, borderRadius: 8 } }),
+          el('text', 260, 30, 150, 20, { text: 'LOGO', style: { align: 'center', color: '#fff', fontSize: 11, bold: true } }),
+          el('text', 423, 0, 250, 16, { text: 'Intelli Print', style: { align: 'right', fontSize: 11, bold: true } }),
+          el('text', 423, 17, 250, 68, { text: "1 O'Connell St\nWestport\nCo Mayo\nIreland", style: { align: 'right', fontSize: 10, color: '#444' } }),
+        ],
+      },
+      {
+        id: 'reportHeader',
+        type: 'reportHeader',
+        height: 400,
+        elements: [
+          el('text', 0, 10, 300, 90, { text: 'PURCHASE\nORDER', style: { fontSize: 34, bold: true, lineHeight: 1.05 } }),
+
+          el('box', 400, 10, 273, 130, { style: { bg: cream, borderRadius: 12 } }),
+          el('text', 400, 22, 273, 16, { text: spaced('ORDER REF'), style: { align: 'center', fontSize: 10, bold: true, color: '#555' } }),
+          el('text', 420, 52, 130, 18, { text: 'Order number:', style: { fontSize: 10 } }),
+          el('field', 560, 52, 95, 18, { binding: { source: 'header', column: 'order_number', format: 'text' }, style: { fontSize: 10, bold: true } }),
+          el('text', 420, 80, 130, 18, { text: 'Order date:', style: { fontSize: 10 } }),
+          el('field', 560, 80, 95, 18, { binding: { source: 'header', column: 'order_date', format: 'date' }, style: { fontSize: 10 } }),
+          el('text', 420, 108, 130, 18, { text: 'Vendor ref:', style: { fontSize: 10 } }),
+          el('field', 560, 108, 95, 18, { binding: { source: 'header', column: 'vendor_ref', format: 'text' }, style: { fontSize: 10 } }),
+
+          el('box', 0, 170, 330, 180, { style: { bg: cream, borderRadius: 12 } }),
+          el('text', 0, 182, 330, 16, { text: spaced('VENDOR'), style: { align: 'center', fontSize: 10, bold: true, color: '#555' } }),
+          el('text', 20, 212, 90, 16, { text: 'Address:', style: { fontSize: 10 } }),
+          el('field', 120, 212, 190, 16, { binding: { source: 'header', column: 'vendor_company', format: 'text' }, style: { fontSize: 10 } }),
+          el('field', 120, 230, 190, 16, { binding: { source: 'header', column: 'vendor_street', format: 'text' }, style: { fontSize: 10 } }),
+          el('field', 120, 248, 190, 16, { binding: { source: 'header', column: 'vendor_postcode', format: 'text' }, style: { fontSize: 10 } }),
+          el('text', 20, 292, 90, 16, { text: 'Attn:', style: { fontSize: 10 } }),
+          el('field', 120, 292, 190, 16, { binding: { source: 'header', column: 'vendor_attn', format: 'text' }, style: { fontSize: 10 } }),
+
+          el('box', 343, 170, 330, 180, { style: { bg: cream, borderRadius: 12 } }),
+          el('text', 343, 182, 330, 16, { text: spaced('SHIPPING'), style: { align: 'center', fontSize: 10, bold: true, color: '#555' } }),
+          el('text', 363, 212, 90, 16, { text: 'Address:', style: { fontSize: 10 } }),
+          el('field', 463, 212, 190, 16, { binding: { source: 'header', column: 'shipping_address', format: 'text' }, style: { fontSize: 10 } }),
+          el('text', 363, 240, 90, 16, { text: 'Method:', style: { fontSize: 10 } }),
+          el('field', 463, 240, 190, 16, { binding: { source: 'header', column: 'shipping_method', format: 'text' }, style: { fontSize: 10 } }),
+          el('text', 363, 292, 90, 16, { text: 'Attn:', style: { fontSize: 10 } }),
+          el('field', 463, 292, 190, 16, { binding: { source: 'header', column: 'shipping_attn', format: 'text' }, style: { fontSize: 10 } }),
+
+          el('text', 0, 370, 300, 20, { text: spaced('ORDER DETAILS:'), style: { fontSize: 11, bold: true } }),
+        ],
+      },
+      {
+        id: 'detail',
+        type: 'detail',
+        datasetId: 'po_line_items',
+        keepRowTogether: true,
+        columns: [
+          { column: 'item_code', header: 'Item', width: 90, align: 'left', format: 'text' },
+          { column: 'description', header: 'Description', width: 253, align: 'left', format: 'text' },
+          { column: 'quantity', header: 'Quantity', width: 90, align: 'right', format: 'number' },
+          { column: 'price', header: 'Price', width: 90, align: 'right', format: 'currency' },
+          { column: 'amount', header: 'Amount', width: 90, align: 'right', format: 'currency' },
+        ],
+      },
+      {
+        id: 'totals',
+        type: 'totals',
+        height: 200,
+        elements: [
+          el('text', 0, 20, 150, 16, { text: 'Notes:', style: { fontSize: 10 } }),
+          el('field', 0, 40, 320, 16, { binding: { source: 'header', column: 'notes', format: 'text' }, style: { fontSize: 10 } }),
+          el('line', 0, 58, 320, 1, { style: { border: '1px solid #999' } }),
+          el('line', 0, 90, 320, 1, { style: { border: '1px solid #999' } }),
+          el('text', 0, 100, 150, 16, { text: 'Approved by:', style: { fontSize: 10 } }),
+          el('field', 130, 96, 190, 20, { binding: { source: 'header', column: 'approved_by', format: 'text' }, style: { fontSize: 12, italic: true } }),
+          el('line', 0, 122, 320, 1, { style: { border: '1px solid #999' } }),
+
+          el('box', 400, 0, 273, 150, { style: { border: '1px solid #ddd' } }),
+          el('text', 410, 8, 150, 20, { text: 'SUBTOTAL', style: { fontSize: 10, align: 'right' } }),
+          el('field', 563, 8, 100, 20, { binding: { source: 'header', column: 'subtotal', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 410, 34, 150, 20, { text: 'DISCOUNT', style: { fontSize: 10, align: 'right' } }),
+          el('field', 563, 34, 100, 20, { binding: { source: 'header', column: 'discount', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 410, 60, 150, 20, { text: 'TAX', style: { fontSize: 10, align: 'right' } }),
+          el('field', 563, 60, 100, 20, { binding: { source: 'header', column: 'tax', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 410, 86, 150, 20, { text: 'SHIPPING', style: { fontSize: 10, align: 'right' } }),
+          el('field', 563, 86, 100, 20, { binding: { source: 'header', column: 'shipping_cost', format: 'currency' }, style: { fontSize: 10, align: 'right' } }),
+          el('text', 400, 116, 173, 30, { text: 'TOTAL', style: { fontSize: 15, bold: true, align: 'right', bg: cream, padding: 8 } }),
+          el('field', 573, 116, 100, 30, { binding: { source: 'header', column: 'total', format: 'currency' }, style: { fontSize: 15, bold: true, align: 'right', bg: cream, padding: 8 } }),
+
+          el('text', 0, 172, 673, 20, { text: spaced('PAYMENT TERMS NET 30 DAYS'), style: { align: 'center', fontSize: 11 } }),
+        ],
+      },
+      {
+        id: 'pageFooter',
+        type: 'pageFooter',
+        height: 30,
+        enabled: true,
+        elements: [
+          el('box', 0, 0, 673, 30, { style: { bg: cream } }),
+          el('text', 0, 8, 673, 16, { text: spaced('PLEASURE DOING BUSINESS WITH YOU'), style: { align: 'center', fontSize: 10 } }),
+        ],
+      },
+    ],
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 7. Invoice (Teal) — black header bar, teal callout box, "fills the page"
+//    so Total sits flush at the bottom (memory.md D-040) even on a light
+//    detail table, matching a user-supplied reference document.
+// ─────────────────────────────────────────────────────────────────────────
+
+export function invoiceTealEntity() {
+  return {
+    meta: { name: 'invoiceTeal', label: 'Invoice (Teal)' },
+    headerFields: [
+      { name: 'invoice_date', label: 'Invoice Date', type: 'date', kind: 'system' },
+      { name: 'invoice_number', label: 'Invoice #', type: 'text', kind: 'system' },
+      { name: 'bill_to_name', label: 'Bill To Name', type: 'text', kind: 'system' },
+      { name: 'bill_to_street', label: 'Bill To Street', type: 'text', kind: 'system' },
+      { name: 'bill_to_city_state_zip', label: 'Bill To City/State/Zip', type: 'text', kind: 'system' },
+      { name: 'bill_to_country', label: 'Bill To Country', type: 'text', kind: 'system' },
+      { name: 'total', label: 'Total', type: 'currency', kind: 'system' },
+    ],
+    datasets: [
+      {
+        meta: { id: 'invoice_line_items', label: 'Invoice line items' },
+        fields: [
+          { name: 'quantity', label: 'Quantity', type: 'int', kind: 'system' },
+          { name: 'item_code', label: 'Item Code', type: 'text', kind: 'system' },
+          { name: 'description', label: 'Description', type: 'text', kind: 'system' },
+          { name: 'unit_of_measure', label: 'U/M', type: 'text', kind: 'system' },
+          { name: 'price_each', label: 'Price Each', type: 'currency', kind: 'system' },
+          // Pre-formatted with the reference document's own "Tax" suffix
+          // convention (a real per-line taxable indicator some invoicing
+          // systems print this way) — text format, not currency, so the
+          // literal " Tax" suffix isn't stripped by number formatting.
+          { name: 'amount_display', label: 'Amount', type: 'text', kind: 'system' },
+        ],
+      },
+    ],
+    documents: {
+      '1': {
+        header: {
+          invoice_date: '2021-02-09',
+          invoice_number: '1005',
+          bill_to_name: 'Crenshaw Construction',
+          bill_to_street: '28 Wolfert Ave',
+          bill_to_city_state_zip: 'Menands, NY 12204',
+          bill_to_country: 'USA',
+          total: 18050.0,
+        },
+        datasets: {
+          invoice_line_items: [
+            { quantity: 16, item_code: 'Service Hours', description: '4 Employees for 4 hours', unit_of_measure: '', price_each: 100.0, amount_display: '$1,600.00 Tax' },
+            { quantity: 50, item_code: 'Rink liner', description: '10 mil 4 layered, reinforced rink liner (10 ft)', unit_of_measure: '', price_each: 22.0, amount_display: '$1,100.00 Tax' },
+            { quantity: 50, item_code: 'Rink floor piping', description: 'Rink floor piping and header system (10 ft)', unit_of_measure: '', price_each: 160.0, amount_display: '$8,000.00 Tax' },
+            { quantity: 50, item_code: 'Dasher Boards - Aluminum', description: 'Boards for college and municipal competitive hockey', unit_of_measure: '', price_each: 145.0, amount_display: '$7,250.00 Tax' },
+            { quantity: 50, item_code: 'Connectors', description: 'Board connectors curved / straight', unit_of_measure: '', price_each: 2.0, amount_display: '$100.00 Tax' },
+          ],
+        },
+      },
+    },
+  };
+}
+
+export function invoiceTealTemplate() {
+  const black = '#111111';
+  const teal = '#12a48a';
+  return {
+    version: 1,
+    id: 'ref-invoice-teal',
+    name: 'Reference — Invoice (Teal)',
+    docType: 'invoiceTeal',
+    printSetup: { ...A4_PORTRAIT, fillPage: true },
+    dataSource: { entity: 'invoiceTeal', key: 'id', datasets: [{ id: 'invoice_line_items', label: 'Invoice line items', kind: 'fk', ref: { table: 'invoice_line_items', fkColumn: 'invoice_id' }, orderBy: 'id' }] },
+    bands: [
+      // Repeats every printed page (memory.md D-070).
+      {
+        id: 'pageHeader',
+        type: 'pageHeader',
+        height: 60,
+        enabled: true,
+        elements: [
+          el('box', 0, 0, 673, 60, { style: { bg: black } }),
+          el('box', 20, 15, 34, 30, { style: { bg: teal, borderRadius: 4 } }),
+          el('text', 66, 16, 300, 30, { text: 'POP & SKATE', style: { fontSize: 20, bold: true, color: '#fff' } }),
+        ],
+      },
+      {
+        id: 'reportHeader',
+        type: 'reportHeader',
+        height: 190,
+        elements: [
+          el('text', 0, 10, 260, 16, { text: 'Pop & Skate', style: { fontSize: 10, bold: true } }),
+          el('text', 0, 26, 260, 32, { text: '4072 Packard Street,\nMenands, NY, 48108, US', style: { fontSize: 9, color: '#555' } }),
+
+          el('text', 260, 4, 200, 30, { text: 'Invoice', style: { fontSize: 22, bold: true } }),
+
+          el('box', 470, 4, 203, 44, { style: { border: '1px solid #333' } }),
+          el('box', 573, 4, 1, 44, { style: { bg: '#333' } }),
+          el('line', 470, 26, 203, 1, { style: { border: '1px solid #333' } }),
+          el('text', 478, 8, 90, 18, { text: 'Date', style: { fontSize: 9, bold: true } }),
+          el('text', 581, 8, 85, 18, { text: 'Invoice #', style: { fontSize: 9, bold: true } }),
+          el('field', 478, 28, 90, 18, { binding: { source: 'header', column: 'invoice_date', format: 'date' }, style: { fontSize: 10 } }),
+          el('field', 581, 28, 85, 18, { binding: { source: 'header', column: 'invoice_number', format: 'text' }, style: { fontSize: 10 } }),
+
+          el('box', 0, 66, 300, 70, { style: { bg: teal } }),
+          el('text', 12, 78, 276, 48, { text: 'Thank you for being a\nPop & Skate customer\nsince 1989!', style: { fontSize: 11, bold: true, color: '#fff', lineHeight: 1.3 } }),
+
+          el('box', 340, 66, 333, 100, { style: { border: '1px solid #333' } }),
+          el('text', 352, 74, 100, 16, { text: 'Bill To', style: { fontSize: 10, bold: true } }),
+          el('line', 340, 94, 333, 1, { style: { border: '1px solid #333' } }),
+          el('field', 352, 102, 300, 16, { binding: { source: 'header', column: 'bill_to_name', format: 'text' }, style: { fontSize: 10 } }),
+          el('field', 352, 120, 300, 16, { binding: { source: 'header', column: 'bill_to_street', format: 'text' }, style: { fontSize: 10 } }),
+          el('field', 352, 138, 300, 16, { binding: { source: 'header', column: 'bill_to_city_state_zip', format: 'text' }, style: { fontSize: 10 } }),
+        ],
+      },
+      {
+        id: 'detail',
+        type: 'detail',
+        datasetId: 'invoice_line_items',
+        keepRowTogether: true,
+        columns: [
+          { column: 'quantity', header: 'Quantity', width: 70, align: 'left', format: 'number' },
+          { column: 'item_code', header: 'Item Code', width: 130, align: 'left', format: 'text' },
+          { column: 'description', header: 'Description', width: 260, align: 'left', format: 'text' },
+          { column: 'unit_of_measure', header: 'U/M', width: 50, align: 'left', format: 'text' },
+          { column: 'price_each', header: 'Price Each', width: 90, align: 'right', format: 'currency' },
+          { column: 'amount_display', header: 'Amount', width: 100, align: 'right', format: 'text' },
+        ],
+      },
+      {
+        id: 'totals',
+        type: 'totals',
+        height: 34,
+        elements: [
+          el('line', 0, 0, 673, 1, { style: { border: '1px solid #333' } }),
+          el('text', 400, 6, 173, 24, { text: 'Total', style: { fontSize: 13, bold: true, align: 'right' } }),
+          el('box', 573, 4, 100, 26, { style: { border: '1px solid #333' } }),
+          el('field', 573, 8, 100, 20, { binding: { source: 'header', column: 'total', format: 'currency' }, style: { fontSize: 12, bold: true, align: 'right' } }),
+        ],
+      },
+      {
+        id: 'pageFooter',
+        type: 'pageFooter',
+        height: 40,
+        enabled: true,
+        elements: [
+          el('text', 0, 6, 673, 16, { text: 'Follow us:', style: { align: 'center', fontSize: 10, bold: true } }),
+          el('box', 306, 26, 20, 20, { style: { bg: teal, borderRadius: 999 } }),
+          el('box', 336, 26, 20, 20, { style: { bg: teal, borderRadius: 999 } }),
+          el('box', 366, 26, 20, 20, { style: { bg: teal, borderRadius: 999 } }),
+          el('box', 396, 26, 20, 20, { style: { bg: teal, borderRadius: 999 } }),
+        ],
+      },
+    ],
+  };
+}
+
 export function allReferenceTemplates() {
   return [
     { entity: salesContractEntity(), template: salesContractTemplate() },
@@ -895,5 +1255,7 @@ export function allReferenceTemplates() {
     { entity: purchaseOrderBlueEntity(), template: purchaseOrderBlueTemplate() },
     { entity: purchaseOrderPeachEntity(), template: purchaseOrderPeachTemplate() },
     { entity: invoiceOrangeEntity(), template: invoiceOrangeTemplate() },
+    { entity: purchaseOrderElegantEntity(), template: purchaseOrderElegantTemplate() },
+    { entity: invoiceTealEntity(), template: invoiceTealTemplate() },
   ];
 }

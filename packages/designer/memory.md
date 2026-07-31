@@ -2656,6 +2656,87 @@ lint/typecheck/build green.
 
 ---
 
+### D-079/D-080/D-081 — two new reference templates (Purchase Order Elegant, Invoice Teal) matching user-supplied documents; found and fixed a real fillPage bug along the way
+**Decision (D-079):** User supplied two real business documents (a
+cream/elegant Purchase Order for "Intelli Print", a black-and-teal Invoice
+for "Pop & Skate") and asked for matching DocSmith templates, bound to real
+data, correct with extended line items, looking "exactly the same." Two
+real, load-bearing constraints surfaced during design, surfaced to the user
+before building rather than silently under-delivering: (1) `ElementStyle`
+(`core/src/types.ts`) has no `fontFamily` or letter-spacing property — every
+template renders in the fixed system sans-serif stack (`baseCss`'s
+`body{font-family:...}`), so the reference's script "P," serif body text,
+and letter-spaced small-caps labels can only be approximated (bold/size for
+hierarchy; literal spaces between characters via a new `spaced()` fixture
+helper for the tracking effect — not real CSS `letter-spacing`). (2)
+`table.detail thead th`'s background (`#f6f7f9`) is hardcoded in
+`core/render.ts`'s base stylesheet with no per-template override — the
+detail table's own column-header row can't be recolored to match either
+reference's palette. Per this file's own header comment and
+`examples/reference-templates/fixtures.mjs`'s existing convention ("Logos
+are plain colored placeholders, never a redrawn trademark"), both new
+templates use colored placeholder boxes for the two company logos (real
+image URLs can be swapped in later via each `image`-kind element's `src`
+— no template restructuring needed).
+New `purchaseOrderElegantEntity()`/`Template()` (`ref-po-elegant`): cream
+rounded info-boxes (Order Ref / Vendor / Shipping) in a free-arrangement
+reportHeader (not grid — the reference's asymmetric title + floating box
+layout doesn't fit one grid row), item/description/quantity/price/amount
+detail columns, notes+signature-line+SUBTOTAL/DISCOUNT/TAX/SHIPPING/TOTAL
+totals, a repeating cream pageFooter tagline bar. New
+`invoiceTealEntity()`/`Template()` (`ref-invoice-teal`): black pageHeader
+bar, teal "thank you" callout + bordered Bill To box, a
+quantity/item-code/description/U-M/price/amount detail table (amount
+pre-formatted with the reference's own literal " Tax" suffix per row —
+`format:'text'`, not `'currency'`, so the suffix isn't stripped), and
+`printSetup.fillPage: true` (D-040) so Total sits flush at the page bottom
+like the reference, with placeholder circles standing in for social icons.
+**Decision (D-080), found while verifying D-079 end to end:** the Invoice
+Teal template rendered as an unwanted 2 PAGES for its own 5-row sample data
+(should be 1, matching the reference) — `fillPage`'s `min-height` (D-040)
+forces `.doc-flow` to the FULL printable page height, but D-040 predates
+D-070's page-table restructuring and never accounted for pageHeader/
+pageFooter now occupying REAL space on that SAME physical page (a
+`<thead>`/`<tfoot>` sharing it, not a `position:fixed` overlay outside the
+page-height budget) — the combined height of pageHeader + the
+full-page-forced `.doc-flow` + pageFooter exceeded one page's actual
+budget, spilling onto a genuinely unwanted page 2. Fixed: subtract
+`runningTop`/`runningBottom` (pageHeader/pageFooter's own heights, already
+computed) from `fillPageMinHeight`. Zero-impact when neither band exists
+(both default 0, unchanged behavior) — pre-existing `fillPage` tests still
+pass. New `render.test.ts` case asserts the min-height shrinks by exactly
+pageHeader+pageFooter's combined height.
+**Decision (D-081), also found while verifying D-079:** a text element
+(`invoiceTealTemplate`'s "Thank you for being a Pop & Skate customer since
+1989!" — 3 wrapped lines) was clipped to 2 visible lines because its own
+declared height (32px) was shorter than 3 lines actually need at that font
+size — a plain authoring mistake in the new fixture, not a `core` bug;
+fixed by sizing the element (and its containing box) generously enough for
+the real wrapped line count.
+**Verified:** both templates validated with `core.validateTemplate()`
+(zero issues) and rendered through the REAL `@docsmith/render-service` PDF
+pipeline (not just `renderToHtml`'s HTML string) — single-page renders
+compared directly against the two reference images via Puppeteer
+screenshots (iterating twice on the fillPage/clipping bugs above until
+they matched structurally). Extended-line-item pagination gate
+(claude.md §8) run against BOTH with 45 synthetic rows each, not just the
+small reference-matching sample: Purchase Order Elegant → 4 pages,
+pageHeader/column-header/pageFooter all correctly repeat on every page,
+reportHeader prints once (page 1 only), totals prints once (page 4 only,
+after the last row) — every row HQ1000–HQ1044 read directly off the
+rendered screenshots, sequential, no gaps or duplicates across any page.
+Invoice Teal → 2 pages (crossing the fillPage single/multi-page boundary
+deliberately, the exact case D-080 fixed), pageHeader/column-header repeat
+correctly on page 2, Total still correctly pins to the bottom of the
+actual LAST page (not orphaned) — ITEM-1000–ITEM-1044 read directly off
+both pages' screenshots, sequential, no gaps or duplicates. 72 core tests
+pass (was 71; +1 for D-080); 211 designer tests unaffected (no designer
+source touched — fixture-data + core-only change); lint/typecheck/build
+green across every touched package.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

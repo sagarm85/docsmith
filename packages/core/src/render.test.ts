@@ -786,6 +786,43 @@ describe('renderToHtml — printSetup.fillPage (memory.md D-040)', () => {
     // Content height = (210 - 20 - 20) * 96/25.4 ≈ 641.9px.
     expect(out.css).toMatch(/min-height: 6\d\d\.\d+px/);
   });
+
+  it('subtracts pageHeader/pageFooter height from the min-height (memory.md D-080)', () => {
+    // Reproduced directly: fillPage's min-height forces .doc-flow to the FULL
+    // printable page height, but when pageHeader/pageFooter also exist they
+    // occupy REAL space on that same physical page (a <thead>/<tfoot> sharing
+    // it, per D-070) — not accounting for that pushed a genuinely one-page
+    // document (5 short detail rows) onto an unwanted page 2, since the
+    // combined height of pageHeader + the full-page-forced .doc-flow +
+    // pageFooter exceeded one page's actual printable height.
+    const t = invoiceTemplate();
+    t.printSetup = { ...t.printSetup, fillPage: true };
+    t.bands.unshift({
+      id: 'pageHeader',
+      type: 'pageHeader',
+      height: 60,
+      enabled: true,
+      elements: [{ id: 'ph1', kind: 'text', x: 0, y: 4, w: 100, h: 20, text: 'Header' }],
+    });
+    t.bands.push({
+      id: 'pageFooter',
+      type: 'pageFooter',
+      height: 40,
+      enabled: true,
+      elements: [{ id: 'pf1', kind: 'text', x: 0, y: 2, w: 100, h: 16, text: 'Footer' }],
+    });
+    const withRunning = renderToHtml(t, fatDocument(1));
+
+    const tNoRunning = invoiceTemplate();
+    tNoRunning.printSetup = { ...tNoRunning.printSetup, fillPage: true };
+    const withoutRunning = renderToHtml(tNoRunning, fatDocument(1));
+
+    const minHeightOf = (css: string) => Number(css.match(/min-height: ([\d.]+)px/)![1]);
+    // Same page, same printSetup — the ONLY difference is pageHeader (60) +
+    // pageFooter (40) now also sharing that page's height budget, so the
+    // min-height must shrink by exactly that much (100px).
+    expect(minHeightOf(withoutRunning.css) - minHeightOf(withRunning.css)).toBeCloseTo(100, 5);
+  });
 });
 
 describe('matchesConditionalRule / resolveConditionalStyle (memory.md D-031)', () => {

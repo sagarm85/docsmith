@@ -687,8 +687,18 @@ export function renderToHtml(template: Template, data: DocumentData): RenderResu
       ? `<table class="page-table">${pageHeader ? `<thead><tr><td>${pageHeaderHtml}</td></tr></thead>` : ''}<tbody><tr><td>${docFlowHtml}</td></tr></tbody>${pageFooter ? `<tfoot><tr><td>${pageFooterHtml}</td></tr></tfoot>` : ''}</table>`
       : docFlowHtml;
 
+  // memory.md D-080: subtract pageHeader/pageFooter's own height — D-040
+  // predates D-070's page-table restructuring, and never accounted for
+  // pageHeader/pageFooter occupying REAL space on the same physical page as
+  // fillPage's forced-tall .doc-flow (they're a <thead>/<tfoot> sharing that
+  // page now, not a position:fixed overlay outside the page-height budget).
+  // Without this, forcing .doc-flow to the FULL printable height while
+  // pageHeader/pageFooter also consume space on that same page pushes the
+  // total past one page, spilling fillPage's own content onto a genuinely
+  // unwanted page 2 — reproduced directly with a real render (a 5-row detail
+  // table that should fit on one page instead became two).
   const fillPageMinHeight = template.printSetup.fillPage
-    ? printableContentHeightPx(template.printSetup)
+    ? printableContentHeightPx(template.printSetup) - runningTop - runningBottom
     : undefined;
   const css = `${pageCss(template.printSetup)}\n${baseCss(template.printSetup, runningTop, runningBottom, fillPageMinHeight)}`;
   const html = `<div class="page">${pageInner}</div>`;

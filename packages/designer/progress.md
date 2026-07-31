@@ -264,8 +264,45 @@
   errors. 211 designer tests pass (was 208); 71 core tests unaffected;
   `packages/adapters` build green (no test suite exists for that package
   yet — pre-existing gap, not introduced here); lint/typecheck/build green
-  across every touched package. The rest of this section (below) is
-  historical Phase 0–3 journal, kept for reference.
+  across every touched package.
+  Pass 19, same session (D-079/D-080/D-081): user supplied two real
+  business documents (cream Purchase Order for "Intelli Print", black/teal
+  Invoice for "Pop & Skate") and asked for matching templates, working with
+  extended line items, looking "exactly the same." Flagged two real,
+  load-bearing constraints upfront rather than silently under-delivering:
+  `ElementStyle` has no font-family/letter-spacing (fixed system sans-serif
+  stack; tracking approximated with literal spaces via a new `spaced()`
+  fixture helper), and `table.detail thead th`'s background is hardcoded
+  per-template, not overridable. Logos are colored placeholder boxes,
+  matching this file's own existing convention ("never a redrawn
+  trademark") — real image URLs can be swapped into each `image` element's
+  `src` later with no restructuring. Built `ref-po-elegant`
+  (`purchaseOrderElegantEntity/Template` — free-arrangement reportHeader
+  with cream rounded Order-Ref/Vendor/Shipping boxes) and `ref-invoice-teal`
+  (`invoiceTealEntity/Template` — black pageHeader bar, teal callout,
+  `fillPage:true` so Total sits flush at the bottom like the reference,
+  amount pre-formatted with the reference's own literal " Tax" suffix per
+  row). Found and fixed two real bugs while verifying end to end, not
+  guessed: (D-080) `fillPage`'s min-height calc never accounted for
+  pageHeader/pageFooter now sharing the SAME physical page's height budget
+  (D-070's page-table restructuring postdates D-040) — a genuinely
+  one-page invoice was spilling onto an unwanted page 2; fixed by
+  subtracting their combined height. (D-081) a 3-line text element was
+  clipped to 2 lines — an authoring-height mistake in the new fixture, not
+  a core bug; fixed by sizing it correctly. Verified both templates
+  end-to-end: `core.validateTemplate()` clean, rendered through the REAL
+  render-service PDF pipeline and compared visually against the reference
+  images (iterating on the two bugs above until they matched
+  structurally), then the extended-line-item pagination gate (claude.md
+  §8) run against BOTH with 45 synthetic rows: Purchase Order Elegant → 4
+  pages, Invoice Teal → 2 pages (deliberately crossing the fillPage
+  single/multi-page boundary D-080 just fixed) — pageHeader/column-header
+  repeat correctly on every page in both, reportHeader/totals print
+  exactly once each in the right place, every row read directly off the
+  rendered screenshots sequential with no gaps or duplicates. 72 core
+  tests pass (was 71; new D-080 regression case); 211 designer tests
+  unaffected; lint/typecheck/build green. The rest of this section (below)
+  is historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
