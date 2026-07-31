@@ -19,17 +19,22 @@ import { newTemplate, type DataSourceAdapter } from '@docsmith/core';
 import { StaticAdapter, UnidbAdapter } from '@docsmith/adapters';
 import { invoiceEntity, invoiceTemplate } from '../../../examples/invoice-demo/fixtures.mjs';
 import { allReferenceTemplates } from '../../../examples/reference-templates/fixtures.mjs';
+import { livePurchaseOrderElegantTemplate, liveInvoiceTealTemplate } from './unidb-templates.mjs';
 
 let adapter: DataSourceAdapter;
 let startingTemplate: ReturnType<typeof newTemplate>;
 
 if (import.meta.env.VITE_ADAPTER === 'unidb') {
-  // Real engine (memory.md D-076) — no fixture entities to seed (they're
-  // StaticAdapter-shaped and don't exist in a real unidb database), so the
-  // designer starts from a genuinely blank template. Pick your own entity
-  // via the Source panel once mounted; new tables/related datasets show up
-  // automatically (UnidbAdapter queries information_schema live — no
-  // restart, no config edit needed when your schema changes).
+  // Real engine (memory.md D-076). The two "Live —" templates below are
+  // seeded into Saved Templates (same once-only, Save-wins-after pattern
+  // as the StaticAdapter reference templates further down) — they need
+  // the schema dev/unidb-seed.mjs creates (run it once against your
+  // instance: see that file's own header comment). The STARTING template
+  // stays blank either way — pick your own entity via the Source panel,
+  // or pick one of the seeded "Live —" ones from the template dropdown.
+  // New tables/related datasets show up automatically regardless
+  // (UnidbAdapter queries information_schema live — no restart, no config
+  // edit needed when your schema changes).
   const baseUrl = import.meta.env.VITE_UNIDB_URL as string | undefined;
   if (!baseUrl) {
     throw new Error(
@@ -39,6 +44,10 @@ if (import.meta.env.VITE_ADAPTER === 'unidb') {
   }
   const token = import.meta.env.VITE_UNIDB_TOKEN as string | undefined;
   adapter = new UnidbAdapter({ baseUrl, token });
+  for (const template of [livePurchaseOrderElegantTemplate(), liveInvoiceTealTemplate()]) {
+    const key = `erpdoc.templates.${template.id}`;
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(template));
+  }
   startingTemplate = newTemplate();
 } else {
   const staticAdapter = new StaticAdapter({

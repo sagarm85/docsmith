@@ -996,8 +996,12 @@ export function purchaseOrderElegantTemplate() {
         height: 90,
         enabled: true,
         elements: [
-          el('box', 260, 4, 150, 70, { style: { bg: logoPlaceholder, borderRadius: 8 } }),
-          el('text', 260, 30, 150, 20, { text: 'LOGO', style: { align: 'center', color: '#fff', fontSize: 11, bold: true } }),
+          // A real image element (not a colored box) — swap in the actual
+          // logo by setting src.value to a hosted URL; no template
+          // restructuring needed. Empty src renders an honest placeholder
+          // (core/render.ts's el-image-empty), never a fabricated
+          // trademark redraw (memory.md D-079/D-083).
+          el('image', 260, 4, 150, 70, { src: { kind: 'url', value: '' }, style: { bg: logoPlaceholder, borderRadius: 8 } }),
           el('text', 423, 0, 250, 16, { text: 'Intelli Print', style: { align: 'right', fontSize: 11, bold: true } }),
           el('text', 423, 17, 250, 68, { text: "1 O'Connell St\nWestport\nCo Mayo\nIreland", style: { align: 'right', fontSize: 10, color: '#444' } }),
         ],
@@ -1173,8 +1177,13 @@ export function invoiceTealTemplate() {
         enabled: true,
         elements: [
           el('box', 0, 0, 673, 60, { style: { bg: black } }),
-          el('box', 20, 15, 34, 30, { style: { bg: teal, borderRadius: 4 } }),
-          el('text', 66, 16, 300, 30, { text: 'POP & SKATE', style: { fontSize: 20, bold: true, color: '#fff' } }),
+          // A real image element (not a colored box + text) — swap in the
+          // actual logo (icon + wordmark together, matching how the
+          // reference shows them as one lockup) by setting src.value to a
+          // hosted URL; no template restructuring needed. Empty src
+          // renders an honest placeholder, never a fabricated trademark
+          // redraw (memory.md D-079/D-083).
+          el('image', 20, 12, 300, 36, { src: { kind: 'url', value: '' }, style: { bg: teal, borderRadius: 4 } }),
         ],
       },
       {

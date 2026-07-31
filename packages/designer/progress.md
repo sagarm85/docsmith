@@ -301,8 +301,40 @@
   exactly once each in the right place, every row read directly off the
   rendered screenshots sequential with no gaps or duplicates. 72 core
   tests pass (was 71; new D-080 regression case); 211 designer tests
-  unaffected; lint/typecheck/build green. The rest of this section (below)
-  is historical Phase 0–3 journal, kept for reference.
+  unaffected; lint/typecheck/build green.
+  Pass 20 (D-082): user asked to connect to the live unidb instance, then
+  to make the two live-bound templates from Pass 19 permanent. Found they
+  only ever existed in an ephemeral Puppeteer session's `localStorage`
+  (each `puppeteer.launch()` gets a fresh, unpersisted profile) — the
+  user's real browser correctly showed "No saved templates yet," exactly
+  as expected once traced through, not a mystery. Made them genuinely
+  permanent: new `dev/unidb-templates.mjs` (real checked-in code, not a
+  scratch script's output), new `dev/unidb-seed.mjs` (one-command,
+  re-runnable schema+data setup — drops/recreates its 4 tables, safe to
+  re-run) and companion `dev/unidb-schema.sql`, and `dev/main.ts`'s
+  `unidb` branch now seeds both templates into `localStorage` the same
+  once-only way the StaticAdapter reference templates already do.
+  Verified in a genuinely fresh Puppeteer session (matching the user's
+  "never visited before" condition): both templates now appear
+  automatically, zero errors, Preview still renders real data correctly.
+  Pass 21 (D-083): user asked for a generated Pop & Skate logo + URL, and
+  flagged the extended (#2) documents' Total showing "$0.00" as
+  broken-looking. No image-generation tool is available, and redrawing a
+  real company's actual trademark isn't something to do regardless
+  (matches this file's own long-standing "never a redrawn trademark"
+  convention) — explained clearly, and made the practical path trivial
+  instead: both logo placeholders are now real `kind:'image'` elements
+  with an empty `src.value` (honest placeholder via the existing
+  `el-image-empty` CSS path), so a real hosted URL is a one-line edit away
+  once the user has one. The $0.00 Total, though, was a real bug — bad
+  seed-data authoring (`unidb-seed.mjs` had it hardcoded to 0 instead of
+  computed from the actual 45 rows being inserted) — fixed by summing the
+  real row data before inserting the header; Invoice #2 now correctly
+  shows $4,410.00, PO #2 shows $520.00. Re-ran the seed script against the
+  live engine and verified via a real Preview render that both fixes took
+  effect. 211 designer / 72 core tests unaffected; lint/typecheck/build
+  green. The rest of this section (below) is historical Phase 0–3
+  journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic

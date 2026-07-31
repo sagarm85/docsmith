@@ -2737,6 +2737,108 @@ green across every touched package.
 
 ---
 
+### D-082 — the two "Live —" unidb-bound templates are now real, checked-in, auto-seeded code, not one-off localStorage injected into a throwaway Puppeteer session
+**Decision:** After D-079's two live-bound template variants were built and
+verified (real data confirmed rendering correctly end to end), they were
+only ever injected into an ephemeral, automated Puppeteer browser's
+`localStorage` — a session that closes at the end of each verification
+script. User's actual browser at `localhost:5996` never received them
+("No saved templates yet" — exactly the expected symptom, confirmed
+directly against a screenshot rather than guessed). Made genuinely
+permanent, matching the exact pattern the StaticAdapter reference
+templates already use:
+- New `packages/designer/dev/unidb-templates.mjs` — `livePurchaseOrder
+  ElegantTemplate()`/`liveInvoiceTealTemplate()`, built by importing and
+  patching `examples/reference-templates/fixtures.mjs`'s own D-079
+  templates (same visual design, only `dataSource.entity`/dataset
+  table/fkColumn changed — real, checked-in code, not a scratch script's
+  output).
+- New `packages/designer/dev/unidb-seed.mjs` — a standalone, re-runnable
+  Node script (`UNIDB_URL`/`UNIDB_TOKEN` env vars) that creates the real
+  schema (column names deliberately matching the templates' own field
+  bindings exactly, so no rebinding is needed) and seeds both a `#1`
+  document matching each template's own reference image and a `#2`
+  document with 45 line items each, for testing extended/paginated line
+  items against real data — the exact same setup this session already
+  built ad hoc and verified, now reproducible by anyone with one command
+  instead of by hand. Drops-then-recreates its four tables, so it's safe
+  to re-run. Companion `dev/unidb-schema.sql` documents the same DDL/seed
+  as plain SQL for anyone who'd rather run it through their own client.
+- `dev/main.ts`'s `unidb` branch now seeds both templates into
+  `localStorage` the same once-only, Save-wins-after way the StaticAdapter
+  reference templates already do — they simply appear in the template
+  dropdown the next time `dev:unidb` loads, no manual step.
+**Why:** each `puppeteer.launch()` call gets a fresh, unpersisted browser
+profile — nothing written to one script's `localStorage` is visible to
+any other script, let alone the user's actual browser. This was already
+known from earlier sessions (the exact reason the "seed once" `dev/
+main.ts` pattern exists at all for StaticAdapter's reference templates)
+but got missed when D-079's live templates were first built, since the
+verification scripts injected-then-immediately-verified within one
+script's own session, which looked complete without actually persisting
+anywhere real.
+**Verified:** killed and restarted `dev:unidb`, opened it in a completely
+FRESH Puppeteer session (no prior localStorage at all — the same
+"never-visited-before" condition the user's own report matched), and
+confirmed both "Live — Purchase Order (Elegant)" and "Live — Invoice
+(Teal)" appear in the template dropdown automatically, with zero page
+errors; re-verified Preview still renders real live data correctly
+afterward (no regression from moving the seeding call site). 211 designer
+tests / 72 core tests unaffected (dev-harness-only change, no `src/`
+files touched); lint/typecheck/build green.
+`[status: locked]`
+
+---
+
+### D-083 — logo placeholders converted to real `image` elements; fixed a genuine $0.00-total bug in the extended-test seed data
+**Decision:** User asked directly for a generated logo image + URL for
+"Pop & Skate," and flagged the extended (#2) documents' Total row showing
+"$0.00" as looking broken. Two different kinds of request, handled
+differently:
+- **Logo generation: declined, explained why, gave the actionable
+  alternative.** No image-generation tool is available in this
+  environment, and even if one were, redrawing this specific company's
+  actual trademarked logo (the swoosh-book icon + stylized "POP & SKATE"
+  wordmark shown in their real invoice) isn't something to do — this
+  repo's own stated convention (`examples/reference-templates/fixtures.mjs`'s
+  header comment) is explicit: "Logos are plain colored placeholders,
+  never a redrawn trademark." What DOES help: both templates' logo
+  placeholders (`purchaseOrderElegantTemplate`'s LOGO box, `invoiceTeal
+  Template`'s teal-square-plus-text) are now real `kind:'image'` elements
+  with an empty `src.value` — `core/render.ts`'s existing
+  `el-image-empty` path renders an honest, still-styled (bg/borderRadius
+  kept) placeholder. Once the user has an actual hosted URL for their real
+  logo (their own upload, any image host), it's a one-line `src.value`
+  edit — no template restructuring. Dropped the "LOGO" text label that
+  used to sit on the old box (no way to show it only-when-empty without a
+  template-authoring feature that doesn't exist; an honest empty state
+  reads better than a label that would linger, unremoved, once a real
+  image is later set).
+- **The $0.00 Total: a real, fixable bug — fixed.** `dev/unidb-seed.mjs`'s
+  #2 (extended, 45-row) documents had their header row's `total`/
+  `subtotal` hardcoded to `0` — a document with 45 real-looking line items
+  next to "$0.00" reads as broken, and correctly so; this was bad seed
+  data authoring, not a template or rendering defect. Fixed by computing
+  the real sums from the SAME row data actually being inserted (build the
+  45-row arrays first, `reduce` to a total, THEN insert the header with
+  that real value) — Invoice #2 now shows $4,410.00, PO #2 shows $520.00
+  (subtotal + 10% tax + $25 shipping), both matching their own real line
+  items. Also fixed the companion `dev/unidb-schema.sql`'s misleading
+  `total: 0` placeholder rows for the same #2 documents — removed them
+  entirely (correctly computing 45 rows' worth of sums by hand in plain
+  SQL isn't worth doing; the file now points at `unidb-seed.mjs` instead,
+  which does it correctly in one command).
+**Verified:** re-ran `unidb-seed.mjs` against the live engine (fresh JWT —
+the previous one had expired, a real but unrelated hiccup, not a code
+issue) and confirmed via a real Preview render: Invoice #2's Total row now
+reads "$4,410.00" (was "$0.00"); the logo element's real DOM class is
+`el el-image el-image-empty` (confirmed it's genuinely an image element
+now, not a box). 211 designer / 72 core tests unaffected (fixture-data +
+dev-harness-only change); lint/typecheck/build green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs
