@@ -39,7 +39,14 @@ function sqlStr(s: string): string {
 export class UnidbAdapter implements DataSourceAdapter {
   private f: typeof fetch;
   constructor(private cfg: UnidbConfig) {
-    this.f = cfg.fetchImpl ?? fetch;
+    // Bind to globalThis: a bare `fetch` reference invoked later as
+    // `this.f(...)` runs with `this` set to the UnidbAdapter instance, not
+    // the window/global object fetch's native implementation requires —
+    // browsers throw "Failed to execute 'fetch' on 'Window': Illegal
+    // invocation" the first time this adapter makes a real request. Only
+    // surfaced by actually running this adapter against a live server in a
+    // real browser (memory.md D-076) — it was never exercised there before.
+    this.f = cfg.fetchImpl ?? fetch.bind(globalThis);
   }
 
   private async headers(): Promise<Record<string, string>> {

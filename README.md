@@ -80,7 +80,7 @@ RENDER_URL=http://localhost:8090 pnpm demo         # also writes out.pdf with "P
 
 Docker: `docker build -f packages/render-service/Dockerfile -t erpdoc-render .`
 
-## Quick start (frontend designer, in progress)
+## Quick start (frontend designer)
 
 ```bash
 pnpm install
@@ -90,9 +90,8 @@ pnpm --filter @docsmith/designer dev
 Opens a local Vite dev server (`packages/designer/dev`) that mounts the real
 `<doc-designer>` custom element against the same `StaticAdapter` 60-line invoice
 fixture the backend demo uses (`examples/invoice-demo/fixtures.mjs`) — no ERP or
-render service needed. Toolbar, Palette (entity/dataset picker, field groups) are
-built; Canvas/Preview/Export PDF are still landing (see
-`packages/designer/progress.md` for exact status).
+render service needed. See `packages/designer/progress.md` for exact
+phase/feature status (it supersedes anything stated here).
 
 ```bash
 pnpm --filter @docsmith/designer lint        # eslint
@@ -100,6 +99,32 @@ pnpm --filter @docsmith/designer typecheck   # svelte-check
 pnpm --filter @docsmith/designer test        # vitest
 pnpm --filter @docsmith/designer build       # → packages/designer/dist/doc-designer.js
 ```
+
+### Running against a real unidb engine (memory.md D-076)
+
+`pnpm dev` above only ever uses `StaticAdapter` fixture data. To point the same
+dev harness at a real, running unidb engine instead (a separate project, not
+part of this monorepo) — picking up your actual tables, columns, and
+foreign-key relationships live:
+
+```bash
+# 1. In the unidb repo: start the engine and mint a token.
+UNIDB_JWT_SECRET=dev-secret UNIDB_BIND_ADDR=127.0.0.1:8080 \
+  cargo run --bin unidb-server --features server
+TOKEN=$(UNIDB_JWT_SECRET=dev-secret ./scripts/gen_jwt.sh)
+
+# 2. In docsmith: configure and run.
+cp packages/designer/dev/.env.local.example packages/designer/dev/.env.local
+# fill in VITE_UNIDB_URL / VITE_UNIDB_TOKEN in that file, then:
+pnpm --filter @docsmith/designer dev:unidb
+```
+
+The designer starts from a genuinely blank template (no fixture entities to
+seed — they're `StaticAdapter`-shaped and don't exist in your real database).
+Pick your entity from the Source panel; new tables and FK-related datasets
+show up automatically the next time you (re)select an entity, since
+`UnidbAdapter` queries `information_schema` live — no adapter code changes,
+no restart needed when your schema changes.
 
 ## Integrating with your ERP
 

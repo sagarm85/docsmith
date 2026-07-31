@@ -2520,6 +2520,142 @@ lint/typecheck green.
 
 ---
 
+### D-075 — click-to-add "+" on a dataset field now validates it matches the Detail band's dataset, same as drag-drop
+**Decision:** User asked for a full explanation of how related/"joiner" tables
+work end-to-end. Researching that surfaced a real, previously-unflagged gap:
+`DetailTable.svelte`'s native drag-drop already rejects a field whose
+`datasetId` doesn't match the Detail band's own bound dataset ("That field
+belongs to a different dataset than this table."), and the keyboard
+drag-alternative (`Canvas.svelte`'s `handlePageKeydown`) already mirrors that
+same check — but the palette's click-to-add "+" (`DocDesigner.handlePaletteAddField`)
+never checked it at all. In a template with more than one line-item dataset,
+clicking "+" on a field from the WRONG dataset silently added it as a column
+that would render blank for every row (the field name simply doesn't exist
+on the bound dataset's rows) — no error, no warning, anywhere.
+**Fix:** added the same check to `handlePaletteAddField`, surfaced via a new
+`paletteAddError` toast state (mirroring the existing `exportToast`/
+`saveToast` pattern) — Canvas.svelte owns its own local invalid-drop toast,
+but that's private to Canvas, unreachable from DocDesigner, which is why this
+needed its own toast slot rather than reusing Canvas's.
+**Verified:** new `DocDesigner.test.ts` integration test — a template with
+two datasets, Detail bound to one; clicking "+" on the OTHER dataset's field
+is rejected with the exact same message the drag path uses, columns stay
+empty; the matching-dataset field still adds normally. Test count reported
+together with D-077 below (landed in the same change).
+`[status: locked]`
+
+---
+
+### D-076 — wired a real `dev:unidb` entry point; found and fixed a real bug in UnidbAdapter that only surfaces in a live browser
+**Decision:** User asked for detailed steps to run the unidb engine and use
+real/related tables in template design, end to end — then asked to actually
+build it. Research first established: the unidb engine is a wholly separate
+project (not in this repo); nothing in `docsmith` had ever wired
+`UnidbAdapter` up to a running instance in code, only in prose
+(`claude.md §7/§8`, "verify against `UnidbAdapter` against the demo
+engine"). Built it for real rather than just describing it:
+- `packages/designer/dev/main.ts` now branches on `import.meta.env.VITE_ADAPTER
+  === 'unidb'` — same custom-element mount either way, only the adapter
+  construction differs. Unidb mode starts from a genuinely blank
+  `core.newTemplate()` (StaticAdapter's seeded reference templates are
+  StaticAdapter-shaped fixture entities that don't exist in a real database
+  — seeding them against a real engine would be actively wrong).
+- New `packages/designer/dev/.env.local.example` (`VITE_ADAPTER`,
+  `VITE_UNIDB_URL`, `VITE_UNIDB_TOKEN`) — copy to `.env.local` (already
+  gitignored). New `dev:unidb` script also force-sets `VITE_ADAPTER=unidb`
+  inline, so it works even without a `.env.local`.
+- **Actually built and ran the real unidb engine** (`cargo build --bin
+  unidb-server --features server` in the sibling `unidb` repo, a real Rust
+  binary — this exists locally, not simulated), created real tables via its
+  `/sql` endpoint (`invoices`, and `invoice_items` with a `FOREIGN KEY …
+  REFERENCES invoices(id)`), inserted real rows, and pointed
+  `pnpm --filter @docsmith/designer dev:unidb` at it.
+- **Found a genuine, previously-undiscovered bug this way — the exact kind
+  only a real browser run catches, not reading code**: `UnidbAdapter`'s
+  constructor did `this.f = cfg.fetchImpl ?? fetch;` — capturing the bare
+  global `fetch` reference without binding it. Called later as `this.f(...)`,
+  `this` resolves to the `UnidbAdapter` instance, not `window`/`globalThis`,
+  which `fetch`'s native implementation requires — every real request threw
+  `"Failed to execute 'fetch' on 'Window': Illegal invocation"` in Chromium.
+  `UnidbAdapter` had evidently never been exercised in an actual browser
+  before this. Fixed: `fetch.bind(globalThis)`.
+**Verified, end to end, against the real running engine** (not mocked, not
+assumed): after the fix, the Entity dropdown correctly listed the real
+tables (`invoices`, `invoice_items`) pulled live from
+`information_schema.tables`; selecting `invoices` populated real header
+fields (`id`, `invoice_number`, `customer_name`) from
+`information_schema.columns`; the related-dataset button correctly read "Add
+invoice_items (via invoice_id) dataset" (the live FK-graph query correctly
+found the real foreign key); its fields populated
+(`id`,`invoice_id`,`description`,`qty`,`unit_price`); Preview mode listed the
+real sample document ("invoices #1") and rendered REAL row data pulled live
+via `fetchDocument` — "INV-1001" / "Acme Corp" header, "Widget A"/3 and
+"Widget B"/1 line items — with zero console errors throughout. Screenshot
+captured. `packages/adapters` has no test suite at all yet (pre-existing gap,
+confirmed, not introduced here) — this fix is verified by the strongest
+available evidence (a real, working end-to-end run against a real engine)
+rather than a unit test, deliberately, rather than writing a new test harness
+for a single package that's never had one.
+`[status: locked]`
+
+---
+
+### D-077 — a brand-new template's Detail band could NEVER accept a single line-item column, from any entry point — found while verifying D-076 end to end
+**Decision:** Found live, not by reading code: after fixing D-076's fetch
+bug, adding the first field to the Detail band on the fresh unidb-backed
+template above STILL failed — click, drag, and keyboard-drop all reject with
+"That field belongs to a different dataset than this table." Root cause:
+`core.newTemplate()`'s Detail band starts with `datasetId: ''` (genuinely
+unbound — not "bound to an empty-string dataset"), and **nothing anywhere in
+the designer ever sets it afterward**: `SourceConfig.svelte`'s "add dataset"
+flow is a pure passthrough (`handleDataSourceChange`); `BandProps.svelte`
+only *displays* `Dataset: {detail.datasetId || '(none)'}` read-only, no
+control to set it. Every existing validation check (`DetailTable.svelte`'s
+drop handler, `Canvas.svelte`'s keyboard-drop handler) does a raw `!==`
+comparison against `band.datasetId`, and `'' !== anyRealDatasetId` is always
+true — REJECTED. This means: through the actual UI, starting a template from
+scratch and adding line items has apparently never worked, for as long as
+this validation has existed (predates this whole session) — every shipped
+template's `datasetId` was hand-baked directly into fixture JSON, bypassing
+the UI entirely, which is exactly why this was never caught before.
+**Fix:** new `detailAcceptsDataset(detailDatasetId, fieldDatasetId)` +
+`bindDetailDatasetId(currentDatasetId, fieldDatasetId)` pure helpers in
+`template-edits.ts` — an unbound band (`''`) accepts (and, via the second
+helper, binds to) whichever dataset's field is added first; once bound, only
+that dataset's fields are accepted (the existing D-018 rule, unchanged).
+Wired into all three validation sites (`DetailTable.svelte`,
+`Canvas.svelte`'s keyboard path, `DocDesigner.svelte`'s click path) and into
+`DocDesigner.handleAddColumn`, which now takes the field's `datasetId` and
+binds the band as part of the SAME commit that adds the column —
+`onAddColumn`'s signature grew a second parameter everywhere it's threaded
+(`Canvas.svelte`, `DetailTable.svelte`).
+**Why this wasn't caught by D-075 immediately above:** D-075's fix made the
+click-to-add path check dataset match for the FIRST time — which correctly
+surfaced this pre-existing, deeper bug (previously the click path had NO
+check at all, so it "worked" for a fresh template purely by accident, with
+no validation whatsoever). Fixing D-075 without D-077 would have been a
+regression for exactly the scenario this session's own live verification was
+built to test.
+**Verified:** (1) `packages/render-service`-style live re-run against the
+real unidb engine (same session as D-076) — adding "description" then "qty"
+to a brand-new template's Detail band now succeeds, `datasetId` correctly
+becomes `"invoice_items"` after the first add; Preview renders the real
+joined row data end to end (see D-076's own verification — same run).
+(2) New `DetailTable.test.ts` case: an unbound band accepts a drop and
+`onAddColumn` is called with the field's dataset id. (3) New
+`DocDesigner.test.ts` integration test: a genuinely unbound Detail band
+(matching `newTemplate()`'s real default) accepts and binds on the first
+click-to-add, then accepts a second same-dataset field normally.
+`DetailTable.test.ts`'s pre-existing drop-acceptance test updated for
+`onAddColumn`'s new second argument (was asserting only the column object).
+211 designer tests pass (was 208 after D-074; +3 across D-075/D-077's new
+cases — 1 in `DetailTable.test.ts`, 2 in `DocDesigner.test.ts` — plus the
+one updated assertion in `DetailTable.test.ts`); 71 core tests unaffected;
+lint/typecheck/build green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

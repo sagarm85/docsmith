@@ -47,6 +47,8 @@
     createGridBlockElement,
     nextGridCell,
     createSectionRow,
+    detailAcceptsDataset,
+    bindDetailDatasetId,
     type BlockKind,
   } from './template-edits.js';
   import { pageDimensionsPx } from './geometry.js';
@@ -87,6 +89,14 @@
   let docId = $state('');
   let exporting = $state(false);
   let exportToast = $state<{ variant: 'success' | 'error'; message: string } | null>(null);
+
+  // Surfaces handlePaletteAddField's cross-dataset rejection below (memory.md
+  // D-075) — Canvas.svelte owns its OWN local invalid-drop toast for native
+  // drag-and-drop (DetailTable.svelte/Band.svelte's onInvalidDrop), but that
+  // state is private to Canvas, not reachable from here (a sibling, not a
+  // child, of Canvas in the tree) — this is the same Toast pattern, just a
+  // separate instance for the one rejection path Canvas can't see.
+  let paletteAddError = $state<string | null>(null);
 
   // design.md §13: onChange(template) fires (debounced) on every edit — distinct
   // from onSave, which only fires on an explicit Save click. 800ms is long enough
@@ -205,14 +215,25 @@
   // so the very first "+" click (or drag) on any of them hit this. A no-op
   // on an exact duplicate is the correct behavior here, not a silent crash:
   // there's nothing meaningful to add when the field is already a column.
-  function handleAddColumn(column: DetailColumn) {
+  //
+  // `datasetId` (memory.md D-077) binds an unbound Detail band
+  // (`datasetId: ''`, `newTemplate()`'s default, never set anywhere else)
+  // to the FIRST dataset a field is added from — see
+  // `bindDetailDatasetId`'s doc comment for why this exists at all: without
+  // it, a brand-new template's Detail band could never accept a single
+  // column, from any entry point. A no-op once already bound.
+  function handleAddColumn(column: DetailColumn, datasetId: string) {
     const alreadyPresent = template.bands.some(
       (b) => isDetailBand(b) && b.columns.some((c) => c.column === column.column),
     );
     if (alreadyPresent) return;
     commitTemplate({
       ...template,
-      bands: template.bands.map((b) => (isDetailBand(b) ? { ...b, columns: [...b.columns, column] } : b)),
+      bands: template.bands.map((b) =>
+        isDetailBand(b)
+          ? { ...b, datasetId: bindDetailDatasetId(b.datasetId, datasetId), columns: [...b.columns, column] }
+          : b,
+      ),
     });
   }
 
@@ -320,7 +341,24 @@
   // gives the other placement.
   function handlePaletteAddField(field: FieldMeta, cls: 'header' | 'dataset', datasetId?: string) {
     if (cls === 'dataset') {
-      handleAddColumn(createDetailColumn(field));
+      // memory.md D-075: DetailTable.svelte's native drag-drop already
+      // rejects a field whose dataset doesn't match the Detail band's own
+      // `datasetId` — "That field belongs to a different dataset than this
+      // table." — but this click-to-add path never checked it at all, so a
+      // template with more than one line-item dataset could silently add a
+      // column bound to the WRONG dataset, which then renders blank for
+      // every row (the field name just doesn't exist on the bound
+      // dataset's rows) with no error anywhere. Same rejection message as
+      // the drag path, for one consistent story regardless of how the
+      // column was added. `detailAcceptsDataset` (D-077) treats an unbound
+      // Detail band (`datasetId: ''`) as accepting any dataset's first
+      // field — handleAddColumn does the actual binding.
+      const detail = template.bands.find(isDetailBand);
+      if (detail && datasetId !== undefined && !detailAcceptsDataset(detail.datasetId, datasetId)) {
+        paletteAddError = 'That field belongs to a different dataset than this table.';
+        return;
+      }
+      handleAddColumn(createDetailColumn(field), datasetId ?? '');
       return;
     }
     const reportHeader = template.bands.find((b) => b.id === 'reportHeader') as FreeBand | undefined;
@@ -492,7 +530,10 @@
     const picked = pickedUp;
     switch (picked.cls) {
       case 'dataset':
-        handleAddColumn(createDetailColumn({ name: picked.column, label: picked.label, type: picked.type }));
+        handleAddColumn(
+          createDetailColumn({ name: picked.column, label: picked.label, type: picked.type }),
+          picked.datasetId ?? '',
+        );
         break;
       case 'header': {
         const band = template.bands.find((b) => b.id === bandId) as FreeBand | undefined;
@@ -871,6 +912,11 @@
             message={exportToast.message}
             onDismiss={() => (exportToast = null)}
           />
+        </div>
+      {/if}
+      {#if paletteAddError}
+        <div class="dd-toast-slot">
+          <Toast variant="error" message={paletteAddError} onDismiss={() => (paletteAddError = null)} />
         </div>
       {/if}
       <div class="dd-workspace">

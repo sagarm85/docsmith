@@ -638,6 +638,117 @@ describe('<doc-designer>', () => {
     el.remove();
   });
 
+  it('click-to-add "+" on a dataset field rejects a cross-dataset field the same way drag-drop already does (memory.md D-075)', async () => {
+    const adapter = new StaticAdapter({
+      entities: [
+        {
+          meta: { name: 'invoice', label: 'Invoice' },
+          headerFields: [],
+          datasets: [
+            {
+              meta: { id: 'invoice_items', label: 'Line items' },
+              fields: [{ name: 'description', label: 'Description', type: 'text', kind: 'system' }],
+            },
+            {
+              meta: { id: 'shipments', label: 'Shipments' },
+              fields: [{ name: 'carrier', label: 'Carrier', type: 'text', kind: 'system' }],
+            },
+          ],
+          documents: {},
+        },
+      ],
+    });
+    const el = document.createElement('doc-designer') as DocDesignerEl;
+    el.config = { adapter };
+    document.body.appendChild(el);
+    await nextTick();
+
+    const t = el.getTemplate!();
+    el.setTemplate!({
+      ...t,
+      dataSource: {
+        ...t.dataSource,
+        entity: 'invoice',
+        datasets: [
+          { id: 'invoice_items', label: 'Line items', kind: 'fk', ref: { table: 'invoice_items', fkColumn: 'invoice_id' } },
+          { id: 'shipments', label: 'Shipments', kind: 'fk', ref: { table: 'shipments', fkColumn: 'invoice_id' } },
+        ],
+      },
+      // Detail is bound to invoice_items only — "Carrier" belongs to the OTHER dataset.
+      bands: t.bands.map((b) => (b.id === 'detail' ? { ...b, datasetId: 'invoice_items' } : b)),
+    });
+    for (let i = 0; i < 5; i++) await nextTick();
+
+    // Clicking + on the wrong-dataset field is rejected, not silently added.
+    const carrierAddBtn = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Add Carrier column"]');
+    expect(carrierAddBtn).toBeTruthy();
+    carrierAddBtn!.click();
+    await nextTick();
+
+    expect(el.shadowRoot?.textContent).toContain('That field belongs to a different dataset than this table.');
+    const detailAfterReject = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      columns: Array<{ column: string }>;
+    };
+    expect(detailAfterReject.columns).toHaveLength(0);
+
+    // The matching-dataset field still works normally (not over-corrected into rejecting everything).
+    const descriptionAddBtn = el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '[aria-label="Add Description column"]',
+    );
+    descriptionAddBtn!.click();
+    await nextTick();
+    const detailAfterAccept = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      columns: Array<{ column: string }>;
+    };
+    expect(detailAfterAccept.columns).toHaveLength(1);
+    expect(detailAfterAccept.columns[0]?.column).toBe('description');
+
+    el.remove();
+  });
+
+  it('a brand-new template\'s unbound Detail band (datasetId: "") accepts and binds to the first field added, from any entry point (memory.md D-077)', async () => {
+    // newTemplate()'s real default — a genuinely fresh template, not
+    // hand-authored with datasetId already set the way every fixture in
+    // this repo is. Before D-077, this could NEVER accept a single
+    // line-item column: '' !== any real dataset id, so the very first add
+    // was rejected as a "different dataset" mismatch, from every entry
+    // point (click, drag, keyboard) — confirmed live against a real
+    // engine while building the dev:unidb harness.
+    const el = await mountWithEntityAndDataset();
+    const detailBefore = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as { datasetId: string };
+    expect(detailBefore.datasetId).toBe('invoice_items'); // mountWithEntityAndDataset's own setup
+
+    // Re-point it back to unbound to exercise the real newTemplate() case.
+    const t = el.getTemplate!();
+    el.setTemplate!({ ...t, bands: t.bands.map((b) => (b.id === 'detail' ? { ...b, datasetId: '' } : b)) });
+    for (let i = 0; i < 5; i++) await nextTick();
+
+    const addBtn = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Add Description column"]');
+    expect(addBtn).toBeTruthy();
+    addBtn!.click();
+    await nextTick();
+
+    // No rejection toast, real bind + add.
+    expect(el.shadowRoot?.textContent).not.toContain('That field belongs to a different dataset than this table.');
+    const detailAfterFirst = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      datasetId: string;
+      columns: Array<{ column: string }>;
+    };
+    expect(detailAfterFirst.datasetId).toBe('invoice_items');
+    expect(detailAfterFirst.columns).toHaveLength(1);
+
+    // A second field from the now-bound dataset still works normally.
+    const secondBtn = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Add Amount column"]');
+    secondBtn!.click();
+    await nextTick();
+    const detailAfterSecond = el.getTemplate?.()?.bands.find((b) => b.id === 'detail') as {
+      columns: Array<{ column: string }>;
+    };
+    expect(detailAfterSecond.columns).toHaveLength(2);
+
+    el.remove();
+  });
+
   it('setting a column aggregate writes DetailBand.aggregates keyed by column (design.md §8.5 Phase 3)', async () => {
     const el = await mountWithEntityAndDataset();
 

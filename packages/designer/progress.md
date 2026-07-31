@@ -227,7 +227,44 @@
   `w:673` immediately with no other change needed. Verified via direct
   canvas measurement: "SALES CONTRACT"'s right edge now matches the
   page's own right edge to within 0.25px. Fixture-data-only — 71 core, 208
-  designer tests unaffected. The rest of this section (below) is
+  designer tests unaffected.
+  Pass 18, same session (D-075, D-076, D-077): user asked for a full,
+  detailed walkthrough of the unidb-engine + related-dataset workflow, then
+  asked to actually build it, not just document it. Research first (D-075):
+  the palette's click-to-add "+" never validated a dataset field against
+  the Detail band's bound dataset the way drag-drop and keyboard-drop
+  already did — fixed, with a new `paletteAddError` toast (Canvas.svelte's
+  own invalid-drop toast is private to Canvas, unreachable from
+  DocDesigner). Then actually built and ran the real thing (D-076): new
+  `dev:unidb` script + `.env.local.example`
+  (`VITE_ADAPTER`/`VITE_UNIDB_URL`/`VITE_UNIDB_TOKEN`) wiring
+  `packages/designer/dev/main.ts` to mount `UnidbAdapter` instead of
+  `StaticAdapter`; actually compiled and ran the real unidb-server binary
+  (sibling repo), created real tables with a real `FOREIGN KEY …
+  REFERENCES`, and pointed the dev harness at it. Found a genuine,
+  previously-undiscovered bug this way — `UnidbAdapter` had apparently
+  never been exercised in a real browser before: its constructor captured
+  a bare `fetch` reference without binding it, throwing "Illegal
+  invocation" on every real request; fixed with `fetch.bind(globalThis)`.
+  Verifying THAT fix immediately surfaced a second, deeper bug (D-077): a
+  brand-new template's Detail band (`datasetId: ''`, `newTemplate()`'s
+  real default) could never accept a single line-item column, from ANY
+  entry point — nothing anywhere ever binds it, and every existing
+  validation treated `''` as a real (mismatching) dataset id rather than
+  "unbound." Every shipped template works around this by having
+  `datasetId` hand-baked into its fixture JSON, which is exactly why this
+  was never caught before. Fixed with new `detailAcceptsDataset`/
+  `bindDetailDatasetId` helpers — an unbound band accepts and binds to
+  whichever dataset's field is added first, wired into all three
+  validation sites plus `handleAddColumn` itself. Verified completely
+  end-to-end against the real running engine: added "description"/"qty"
+  columns to a from-scratch template, switched to Preview, and it rendered
+  REAL joined data — "INV-1001"/"Acme Corp" header, "Widget A"/3 and
+  "Widget B"/1 line items — pulled live via `fetchDocument`, zero console
+  errors. 211 designer tests pass (was 208); 71 core tests unaffected;
+  `packages/adapters` build green (no test suite exists for that package
+  yet — pre-existing gap, not introduced here); lint/typecheck/build green
+  across every touched package. The rest of this section (below) is
   historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired

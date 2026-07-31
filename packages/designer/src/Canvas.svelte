@@ -1,6 +1,7 @@
 <script lang="ts">
   import { isDetailBand, type DataSourceAdapter, type DetailBand, type DetailColumn, type FreeBand, type FreeElement, type Template } from '@docsmith/core';
   import type { PickedUp, Selection } from './types.js';
+  import { detailAcceptsDataset } from './template-edits.js';
   import Band from './Band.svelte';
   import StackBand from './StackBand.svelte';
   import GridBand from './GridBand.svelte';
@@ -61,7 +62,7 @@
     /** Stack-arrangement bands replace their whole `elements` array per edit
      * (memory.md D-029), same "whole collection" pattern as `onUpdateColumns`. */
     onUpdateElements: (bandId: string, elements: FreeElement[]) => void;
-    onAddColumn: (column: DetailColumn) => void;
+    onAddColumn: (column: DetailColumn, datasetId: string) => void;
     onUpdateColumns: (columns: DetailColumn[]) => void;
     onSelectElement: (bandId: string, elementId: string) => void;
     onSelectBand: (bandId: string) => void;
@@ -122,7 +123,7 @@
         handleInvalidDrop('Line-item fields can only go in the items table.');
         return;
       }
-      if (pickedUp.datasetId !== detail?.datasetId) {
+      if (!detail || !detailAcceptsDataset(detail.datasetId, pickedUp.datasetId ?? '')) {
         handleInvalidDrop('That field belongs to a different dataset than this table.');
         return;
       }

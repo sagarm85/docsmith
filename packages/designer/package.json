@@ -15,6 +15,7 @@
   "files": ["dist", "src"],
   "scripts": {
     "dev": "vite",
+    "dev:unidb": "VITE_ADAPTER=unidb vite",
     "build": "vite build && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",

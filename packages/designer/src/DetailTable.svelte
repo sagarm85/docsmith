@@ -1,6 +1,6 @@
 <script lang="ts">
   import { aggregate, formatValue, type Align, type DataSourceAdapter, type DetailBand, type DetailColumn, type ValueFormat } from '@docsmith/core';
-  import { createDetailColumn } from './template-edits.js';
+  import { createDetailColumn, detailAcceptsDataset } from './template-edits.js';
   import Select from './ui/Select.svelte';
   import NumberInput from './ui/NumberInput.svelte';
   import Skeleton from './ui/Skeleton.svelte';
@@ -33,7 +33,7 @@
     entity: string;
     selectedColumnIndex?: number;
     bandSelected?: boolean;
-    onAddColumn: (column: DetailColumn) => void;
+    onAddColumn: (column: DetailColumn, datasetId: string) => void;
     onUpdateColumns: (columns: DetailColumn[]) => void;
     onInvalidDrop: (reason: string) => void;
     onSelectColumn: (index: number) => void;
@@ -74,11 +74,14 @@
       onInvalidDrop('Header fields can’t become table columns — drop them on a header or totals band instead.');
       return;
     }
-    if (payload.datasetId !== band.datasetId) {
+    if (!detailAcceptsDataset(band.datasetId, payload.datasetId ?? '')) {
       onInvalidDrop('That field belongs to a different dataset than this table.');
       return;
     }
-    onAddColumn(createDetailColumn({ name: payload.column, label: payload.label, type: payload.type }));
+    onAddColumn(
+      createDetailColumn({ name: payload.column, label: payload.label, type: payload.type }),
+      payload.datasetId ?? '',
+    );
   }
 
   function removeColumn(index: number) {

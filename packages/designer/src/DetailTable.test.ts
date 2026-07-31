@@ -97,13 +97,16 @@ describe('DetailTable', () => {
       }),
     });
 
-    expect(onAddColumn).toHaveBeenCalledWith({
-      column: 'qty',
-      header: 'Qty',
-      width: 100,
-      align: 'right',
-      format: 'number',
-    });
+    expect(onAddColumn).toHaveBeenCalledWith(
+      {
+        column: 'qty',
+        header: 'Qty',
+        width: 100,
+        align: 'right',
+        format: 'number',
+      },
+      'invoice_items',
+    );
   });
 
   it('rejects a header-field drop and a wrong-dataset drop', async () => {
@@ -150,6 +153,42 @@ describe('DetailTable', () => {
     });
     expect(onInvalidDrop).toHaveBeenCalledWith('That field belongs to a different dataset than this table.');
     expect(onAddColumn).not.toHaveBeenCalled();
+  });
+
+  it('an unbound band (datasetId: "" — newTemplate()\'s real default) accepts a dataset-field drop and binds to it (memory.md D-077)', async () => {
+    const adapter = new StaticAdapter({ entities: [] });
+    const onAddColumn = vi.fn();
+    const onInvalidDrop = vi.fn();
+    render(DetailTable, {
+      props: {
+        band: { ...emptyDetailBand(), datasetId: '' },
+        adapter,
+        entity: 'invoice',
+        onAddColumn,
+        onUpdateColumns: vi.fn(),
+        onInvalidDrop,
+        onSelectColumn: vi.fn(),
+        onSelectBand: vi.fn(),
+      },
+    });
+    const dropzone = screen.getByRole('group', { name: 'Detail band' });
+
+    await fireEvent.drop(dropzone, {
+      dataTransfer: fakeDataTransfer('application/x-doc-field', {
+        cls: 'dataset',
+        datasetId: 'invoice_items',
+        column: 'qty',
+        type: 'int',
+        label: 'Qty',
+        format: 'number',
+      }),
+    });
+
+    expect(onInvalidDrop).not.toHaveBeenCalled();
+    expect(onAddColumn).toHaveBeenCalledWith(
+      { column: 'qty', header: 'Qty', width: 100, align: 'right', format: 'number' },
+      'invoice_items',
+    );
   });
 
   it('rejects a block drop — blocks are free-form-only, never table columns', async () => {

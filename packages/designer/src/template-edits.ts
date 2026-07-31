@@ -214,3 +214,27 @@ export function createDetailColumn(field: Pick<FieldMeta, 'name' | 'label' | 'ty
     format,
   };
 }
+
+/**
+ * Whether a dataset field is a valid add/drop target for a Detail band
+ * (memory.md D-077). `newTemplate()` gives every Detail band `datasetId: ''`
+ * — genuinely unbound, not "bound to an empty-string dataset" — and nothing
+ * anywhere in the designer ever sets it afterward (no rebind control exists
+ * yet, per BandProps.svelte's read-only display). Without this, the FIRST
+ * field ever added to a brand-new template's Detail band was rejected as a
+ * "different dataset" mismatch ('' !== the real dataset id) via every entry
+ * point (drag-drop, keyboard drop, click-to-add) — a genuinely new template
+ * could never get a single line-item column, full stop. An unbound band
+ * accepts (and, via `bindDetailDatasetId` below, binds to) whichever
+ * dataset's field is added first; only once bound does a real mismatch
+ * apply.
+ */
+export function detailAcceptsDataset(detailDatasetId: string, fieldDatasetId: string): boolean {
+  return detailDatasetId === '' || detailDatasetId === fieldDatasetId;
+}
+
+/** Companion to `detailAcceptsDataset` — binds an unbound Detail band's
+ * `datasetId` on its first accepted field; a no-op once already bound. */
+export function bindDetailDatasetId(currentDatasetId: string, fieldDatasetId: string): string {
+  return currentDatasetId === '' ? fieldDatasetId : currentDatasetId;
+}
