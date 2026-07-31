@@ -2896,6 +2896,23 @@ updated to match this new state exactly, so the "permanent"/reproducible
 setup from D-082 still reproduces correctly from scratch, not just the
 live-patched database. 211 designer / 72 core tests unaffected
 (fixture-data + dev-harness-only changes); lint/typecheck/build green.
+
+**Follow-up (same day):** the unidb engine bug above is now fixed
+upstream — the user pointed at `origin/main`'s items 53
+(`c075db0`, "skip FK child-side re-check when FK col not in SET") and,
+more directly, 119 (`6b5ccb0`/#220, "parent UPDATE wrongly blocked by FK
+RESTRICT on unchanged key" — an exact description of what was hit here).
+Pulled the unidb repo's `main` (fast-forward, 3 commits), rebuilt
+`unidb-server`, and confirmed directly: the exact `UPDATE purchase_orders
+SET vendor_ref=... WHERE id=1` that previously threw the false
+`FOREIGN KEY constraint violated` error now succeeds, with `po_line_items`
+children left untouched. The delete-children/update-parent/reinsert
+workaround was never actually in the checked-in `dev/unidb-seed.mjs` (it
+always computed totals before a single `INSERT`, never an `UPDATE`) — the
+workaround only ever lived in this session's own throwaway scratch
+scripts (not part of the repo), so there was no code to simplify back.
+Noted here purely so a future session doesn't waste time rediscovering or
+re-working around a bug that's already fixed in a newer engine build.
 `[status: locked]`
 
 ---
