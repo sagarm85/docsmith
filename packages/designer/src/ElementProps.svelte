@@ -21,6 +21,7 @@
     element,
     unit = 'px',
     arrangement = 'free',
+    contentWidthPx = 0,
     onChange,
     onDelete,
     onDuplicate,
@@ -41,6 +42,14 @@
      * always a row percentage in 'stack'; in 'grid', width comes from the
      * band's `gridColumns` + this element's `colSpan`, never set directly. */
     arrangement?: 'free' | 'stack' | 'grid';
+    /** The real printable page width in px (memory.md D-073) — clamps the
+     * typed X/Width fields to the page's actual right edge, the same
+     * boundary FreeElement.svelte's drag/resize already respects (D-057).
+     * Only X/Width are bounded this way, never Y/Height: a band's height is
+     * a minimum that auto-grows to fit content (D-066), so there's no fixed
+     * bottom edge to clamp against, same asymmetry FreeElement.svelte's own
+     * drag clamp already has. */
+    contentWidthPx?: number;
     onChange: (patch: Partial<FreeElement>) => void;
     onDelete: () => void;
     onDuplicate: () => void;
@@ -50,6 +59,17 @@
 
   const posMax = $derived(unit === '%' ? 100 : undefined);
   const posStep = $derived(unit === '%' ? 0.5 : 1);
+
+  // Same basis as FreeElement.svelte's maxXBasis (D-057): 100 in '%' mode,
+  // the real page content width in 'px' mode. `|| Infinity` only matters if
+  // a caller ever fails to pass a real contentWidthPx — never clamps to 0.
+  const maxXBasis = $derived(unit === '%' ? 100 : contentWidthPx || Infinity);
+  const maxXInput = $derived(
+    maxXBasis === Infinity ? undefined : Math.max(0, maxXBasis - element.w),
+  );
+  const maxWInput = $derived(
+    maxXBasis === Infinity ? undefined : Math.max(unit === '%' ? 0.5 : 1, maxXBasis - element.x),
+  );
 
   const FORMAT_OPTIONS = [
     { value: 'text', label: 'Text' },
@@ -132,13 +152,13 @@
     <fieldset class="dd-props-grid">
       <legend>Position ({unit})</legend>
       <Field label="X" fieldId="dd-el-x">
-        <NumberInput id="dd-el-x" ariaLabel="X position" min={0} max={posMax} step={posStep} value={element.x} onchange={(v) => onChange({ x: v })} />
+        <NumberInput id="dd-el-x" ariaLabel="X position" min={0} max={maxXInput} step={posStep} value={element.x} onchange={(v) => onChange({ x: v })} />
       </Field>
       <Field label="Y" fieldId="dd-el-y">
         <NumberInput id="dd-el-y" ariaLabel="Y position" min={0} max={posMax} step={posStep} value={element.y} onchange={(v) => onChange({ y: v })} />
       </Field>
       <Field label="Width" fieldId="dd-el-w">
-        <NumberInput id="dd-el-w" ariaLabel="Width" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.w} onchange={(v) => onChange({ w: v })} />
+        <NumberInput id="dd-el-w" ariaLabel="Width" min={unit === '%' ? 0.5 : 1} max={maxWInput} step={posStep} value={element.w} onchange={(v) => onChange({ w: v })} />
       </Field>
       <Field label="Height" fieldId="dd-el-h">
         <NumberInput id="dd-el-h" ariaLabel="Height" min={unit === '%' ? 0.5 : 1} max={posMax} step={posStep} value={element.h} onchange={(v) => onChange({ h: v })} />

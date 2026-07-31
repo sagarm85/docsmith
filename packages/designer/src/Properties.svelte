@@ -15,6 +15,7 @@
   import BandProps from './BandProps.svelte';
   import PrintSetup from './PrintSetup.svelte';
   import Icon from './ui/Icon.svelte';
+  import { pageDimensionsPx } from './geometry.js';
 
   let {
     template,
@@ -81,6 +82,15 @@
   $effect(() => {
     if (selection) activeTab = 'selection';
   });
+
+  // The real printable page width in px, passed to ElementProps so its typed
+  // X/Width fields can clamp to the page's actual right edge (memory.md
+  // D-073) — same basis Canvas.svelte passes to FreeElement.svelte for
+  // drag/resize (D-057). Without this, ElementProps had no page-width
+  // concept at all in 'px' mode, so typing a Width (or X) directly had no
+  // upper bound whatsoever, unlike dragging — reported directly as an
+  // element rendering visibly past the page's edge.
+  const contentWidthPx = $derived(pageDimensionsPx(template.printSetup).width);
 
   const selectedElement = $derived.by(() => {
     if (selection?.kind !== 'element') return null;
@@ -159,6 +169,7 @@
           element={selectedElement}
           unit={template.layoutUnit ?? 'px'}
           arrangement={selectedElementArrangement}
+          {contentWidthPx}
           onChange={(patch) => onElementChange(bandId, elementId, patch)}
           onDelete={() => onElementDelete(bandId, elementId)}
           onDuplicate={() => onElementDuplicate(bandId, elementId)}

@@ -186,9 +186,29 @@
   again. Re-measured after the fix: header top now exactly equals `.page`
   top, header bottom exactly equals reportHeader top, zero gap — also
   confirmed visually via screenshot, matching the Design canvas exactly.
-  71 core tests pass (was 70); 201 designer tests unaffected. The rest of
-  this section (below) is historical Phase 0–3 journal, kept for
-  reference.
+  71 core tests pass (was 70); 201 designer tests unaffected.
+  Pass 16, same session (D-073): screenshot of the Purchase Order (Blue)
+  pageHeader's "PURCHASE ORDER" label rendering visibly outside the page in
+  the Design canvas. Measured the CURRENT live template data first — flush
+  with the page's own right edge to within 0.25px, matching what D-072
+  already confirmed renders correctly — so the data wasn't broken; some
+  live edit must have pushed it out. Root-caused to a real, separate gap
+  from D-057 (which only clamped drag/resize): `ElementProps.svelte`'s
+  typed X/Y/Width/Height fields all shared one `px` mode: `undefined`
+  max — typing literally any Width (say 600) for an element already
+  positioned near the page's edge committed with zero validation, unlike
+  dragging the same resize handle, which D-057 already bounds. Fixed by
+  threading the real page content width into `ElementProps.svelte`
+  (`Properties.svelte` → `geometry.ts`'s existing `pageDimensionsPx`, no
+  new prop needed from `DocDesigner.svelte`) and computing X/Width's max
+  the same way `FreeElement.svelte`'s drag clamp already does — Y/Height
+  deliberately stay unbounded (a band's height auto-grows, D-066, no fixed
+  bottom edge to clamp against). Verified live: before the fix, Width's
+  `max` attribute was absent; after, typing 600 clamps to 412.76 and the
+  element's rendered right edge exactly matches the page's. New
+  `ElementProps.test.ts` (7 tests, new file). 208 designer tests pass (was
+  201); lint/typecheck/build green. The rest of this section (below) is
+  historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic

@@ -2426,6 +2426,60 @@ change, no designer source touched); lint/typecheck green.
 
 ---
 
+### D-073 — Fixed a real gap: typed X/Width in the Properties panel had NO upper bound in 'px' mode, unlike drag/resize
+**Decision:** Reported directly with a screenshot: the Purchase Order
+(Blue) template's "PURCHASE ORDER" pageHeader label rendering visibly
+outside the page in the Design canvas. Investigated by direct measurement
+first (not guessed): the CURRENT live template data (x:260, w:413) was
+confirmed flush with the page's own right edge to within 0.25px — the
+SAME numbers this session already verified render correctly in Preview
+(D-072's own measurements) and in a real PDF. So the pristine data isn't
+broken; something must have PUSHED an element's box past the boundary via
+a live edit. Root-caused to a real, separate gap from D-057 (which only
+clamped DRAG/RESIZE): `ElementProps.svelte`'s typed X/Y/Width/Height
+`NumberInput`s all shared one `posMax = unit === '%' ? 100 : undefined` —
+meaning in 'px' mode (the default, used by every reference template),
+`max` was `undefined` for all four fields, so typing ANY value — including
+one that pushes the element's right edge well past the actual page — was
+accepted with zero validation. Confirmed the gap is real and exploitable:
+selecting the "PURCHASE ORDER" element and typing `600` into its Width
+field (an easy, plausible thing to try) committed unclamped before this
+fix.
+**Fix:** `ElementProps.svelte` now receives `contentWidthPx` (threaded
+from `Properties.svelte`, computed once via `geometry.ts`'s existing
+`pageDimensionsPx` — no new prop needed from `DocDesigner.svelte`) and
+computes `maxXInput`/`maxWInput` using the SAME `maxXBasis` formula
+`FreeElement.svelte`'s drag clamp already uses (D-057): `unit === '%' ?
+100 : contentWidthPx || Infinity`, minus whichever of x/w is currently
+fixed. Only X and Width are bounded this way — Y and Height are
+deliberately left alone, mirroring `FreeElement.svelte`'s own documented
+asymmetry: a band's height is a MINIMUM that auto-grows to fit content
+(D-066), so there's no fixed bottom edge to clamp against, only a fixed
+right edge (the page's own margin). `NumberInput.svelte` already clamps
+to `min`/`max` before calling `onchange` (pre-existing, not new), so
+passing a real `max` is a complete fix, not just an HTML5 hint.
+**Why:** two independent editing paths (drag/resize vs. typing into
+Properties) had inconsistent validation — the more discoverable, more
+"precise-feeling" path (typing an exact number) was actually the
+UNPROTECTED one. Anyone widening a header label by typing a Width instead
+of dragging a resize handle would hit this.
+**Verified:** live against the dev harness — selected "PURCHASE ORDER",
+confirmed the Width field's `max` attribute (412.76, matching
+`contentWidthPx - x`) BEFORE the fix would have been absent entirely;
+after the fix, typing `600` into Width visibly clamps to `412.76` and the
+element's rendered right edge exactly matches the page's own right edge
+(measured via `getBoundingClientRect()`, not assumed). Same check for X
+(typing `900` clamps to `259.76`). New `ElementProps.test.ts` (7 tests):
+Width/X max attribute values in 'px' mode, that a typed oversized value
+is actually clamped (not just visually flagged), that Y/Height are
+unaffected, that omitting `contentWidthPx` safely falls back to unbounded
+(no regression for any caller that doesn't pass it), and that '%' mode is
+unaffected (already had real bounds). 208 designer tests pass (was 201);
+lint/typecheck/build green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs
