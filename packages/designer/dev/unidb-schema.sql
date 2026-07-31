@@ -21,8 +21,17 @@ CREATE TABLE po_line_items (id INT PRIMARY KEY, order_id INT REFERENCES purchase
 CREATE TABLE invoices (id INT PRIMARY KEY, invoice_date DATE, invoice_number TEXT, bill_to_name TEXT, bill_to_street TEXT, bill_to_city_state_zip TEXT, bill_to_country TEXT, total NUMERIC(10,2))
 CREATE TABLE invoice_items (id INT PRIMARY KEY, invoice_id INT REFERENCES invoices(id), quantity INT, item_code TEXT, description TEXT, unit_of_measure TEXT, price_each NUMERIC(10,2), amount_display TEXT)
 
-INSERT INTO purchase_orders (id, order_number, order_date, vendor_ref, vendor_company, vendor_street, vendor_postcode, vendor_attn, shipping_address, shipping_method, shipping_attn, notes, approved_by, subtotal, discount, tax, shipping_cost, total) VALUES (1, '#100', '2024-01-10', 'SU123', 'White Paper Inc', '1 Fairfax Blvd', '123222', 'Mr W Paper', '(As above)', 'Courier', 'Warehouse Manager', '', '', 1000.00, 0.00, 100.00, 50.00, 1150.00)
+-- PO #1 goes a bit beyond the reference image (3 extra items, requested
+-- directly) — subtotal/tax/total below are the real sum of all 4 rows.
+-- NOTE: these header-level total columns are NOT derived by DocSmith at
+-- render time — it only displays whatever's stored here, same as any
+-- other bound field. Get this sum wrong and the template will faithfully
+-- render the wrong total right alongside correct-looking line items.
+INSERT INTO purchase_orders (id, order_number, order_date, vendor_ref, vendor_company, vendor_street, vendor_postcode, vendor_attn, shipping_address, shipping_method, shipping_attn, notes, approved_by, subtotal, discount, tax, shipping_cost, total) VALUES (1, '#100', '2024-01-10', 'SU123', 'White Paper Inc', '1 Fairfax Blvd', '123222', 'Mr W Paper', '(As above)', 'Courier', 'Warehouse Manager', '', '', 3312.50, 0.00, 331.25, 50.00, 3693.75)
 INSERT INTO po_line_items (id, order_id, item_code, description, quantity, price, amount) VALUES (1, 1, 'HQ1234', 'High quality white paper A4', 1000, 1.00, 1000.00)
+INSERT INTO po_line_items (id, order_id, item_code, description, quantity, price, amount) VALUES (2, 1, 'HQ1235', 'High quality white paper A3', 500, 1.75, 875.00)
+INSERT INTO po_line_items (id, order_id, item_code, description, quantity, price, amount) VALUES (3, 1, 'HQ1236', 'Recycled printer paper A4', 750, 0.85, 637.50)
+INSERT INTO po_line_items (id, order_id, item_code, description, quantity, price, amount) VALUES (4, 1, 'HQ1237', 'Premium cardstock 250gsm A4', 250, 3.20, 800.00)
 
 INSERT INTO invoices (id, invoice_date, invoice_number, bill_to_name, bill_to_street, bill_to_city_state_zip, bill_to_country, total) VALUES (1, '2021-02-09', '1005', 'Crenshaw Construction', '28 Wolfert Ave', 'Menands, NY 12204', 'USA', 18050.00)
 INSERT INTO invoice_items (id, invoice_id, quantity, item_code, description, unit_of_measure, price_each, amount_display) VALUES (1, 1, 16, 'Service Hours', '4 Employees for 4 hours', '', 100.00, '$1,600.00 Tax')
@@ -31,8 +40,9 @@ INSERT INTO invoice_items (id, invoice_id, quantity, item_code, description, uni
 INSERT INTO invoice_items (id, invoice_id, quantity, item_code, description, unit_of_measure, price_each, amount_display) VALUES (4, 1, 50, 'Dasher Boards - Aluminum', 'Boards for college and municipal competitive hockey', '', 145.00, '$7,250.00 Tax')
 INSERT INTO invoice_items (id, invoice_id, quantity, item_code, description, unit_of_measure, price_each, amount_display) VALUES (5, 1, 50, 'Connectors', 'Board connectors curved / straight', '', 2.00, '$100.00 Tax')
 
--- A second document on each (id=2) with 45 line items, for testing
--- extended/paginated line items against real data, is deliberately NOT
+-- A second document on each (id=2) — 45 invoice line items, 95 PO line
+-- items — for testing extended/paginated line items against real data, is
+-- deliberately NOT
 -- included here: its header row's own total/subtotal need the REAL sum of
 -- those 45 rows, not a 0 placeholder — a document with $0.00 next to 45
 -- real-looking line items reads as broken (reported directly, memory.md

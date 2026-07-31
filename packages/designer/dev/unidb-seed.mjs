@@ -63,13 +63,25 @@ await sql(
   'CREATE TABLE invoice_items (id INT PRIMARY KEY, invoice_id INT REFERENCES invoices(id), quantity INT, item_code TEXT, description TEXT, unit_of_measure TEXT, price_each NUMERIC(10,2), amount_display TEXT)',
 );
 
-console.log('Seeding #1 documents (match each template\'s own reference image)...');
+console.log('Seeding #1 documents...');
+// PO #1's line items intentionally go a bit beyond the reference image (3
+// items added, requested directly) — subtotal/tax/total are the real sum
+// of all 4, not the reference's original single-item total.
 await sql(
-  "INSERT INTO purchase_orders (id, order_number, order_date, vendor_ref, vendor_company, vendor_street, vendor_postcode, vendor_attn, shipping_address, shipping_method, shipping_attn, notes, approved_by, subtotal, discount, tax, shipping_cost, total) VALUES (1, '#100', '2024-01-10', 'SU123', 'White Paper Inc', '1 Fairfax Blvd', '123222', 'Mr W Paper', '(As above)', 'Courier', 'Warehouse Manager', '', '', 1000.00, 0.00, 100.00, 50.00, 1150.00)",
+  "INSERT INTO purchase_orders (id, order_number, order_date, vendor_ref, vendor_company, vendor_street, vendor_postcode, vendor_attn, shipping_address, shipping_method, shipping_attn, notes, approved_by, subtotal, discount, tax, shipping_cost, total) VALUES (1, '#100', '2024-01-10', 'SU123', 'White Paper Inc', '1 Fairfax Blvd', '123222', 'Mr W Paper', '(As above)', 'Courier', 'Warehouse Manager', '', '', 3312.50, 0.00, 331.25, 50.00, 3693.75)",
 );
-await sql(
-  "INSERT INTO po_line_items (id, order_id, item_code, description, quantity, price, amount) VALUES (1, 1, 'HQ1234', 'High quality white paper A4', 1000, 1.00, 1000.00)",
-);
+const poRows1 = [
+  ['HQ1234', 'High quality white paper A4', 1000, 1.0],
+  ['HQ1235', 'High quality white paper A3', 500, 1.75],
+  ['HQ1236', 'Recycled printer paper A4', 750, 0.85],
+  ['HQ1237', 'Premium cardstock 250gsm A4', 250, 3.2],
+];
+for (let i = 0; i < poRows1.length; i++) {
+  const [code, desc, qty, price] = poRows1[i];
+  await sql(
+    `INSERT INTO po_line_items (id, order_id, item_code, description, quantity, price, amount) VALUES (${i + 1}, 1, '${code}', '${desc}', ${qty}, ${price}, ${(qty * price).toFixed(2)})`,
+  );
+}
 await sql(
   "INSERT INTO invoices (id, invoice_date, invoice_number, bill_to_name, bill_to_street, bill_to_city_state_zip, bill_to_country, total) VALUES (1, '2021-02-09', '1005', 'Crenshaw Construction', '28 Wolfert Ave', 'Menands, NY 12204', 'USA', 18050.00)",
 );
@@ -86,11 +98,15 @@ for (const [id, qty, code, desc, price, amount] of invoiceRows1) {
   );
 }
 
-console.log('Seeding #2 documents (45 extended line items each)...');
+console.log('Seeding #2 documents (45 extended invoice line items, 95 extended PO line items)...');
 
 // Build the row data FIRST so the header's own total is the real computed
 // sum, not a placeholder — a document with $0.00 next to 45 real-looking
 // line items reads as broken, not as "just test data" (reported directly).
+// (Also: these header-level subtotal/tax/total columns are NOT derived by
+// DocSmith at render time — it only displays whatever's actually stored
+// here, same as any other bound field. Summing them correctly is this
+// script's job, same as it would be any real ERP's.)
 const invoiceRows2 = Array.from({ length: 45 }, (_, i) => {
   const qty = (i % 5) + 1;
   const price = 10 + i;
@@ -98,7 +114,8 @@ const invoiceRows2 = Array.from({ length: 45 }, (_, i) => {
 });
 const invoiceTotal2 = invoiceRows2.reduce((s, r) => s + r.amount, 0);
 
-const poRows2 = Array.from({ length: 45 }, (_, i) => {
+// 95 rows (requested directly, extending the original 45) — id 100-194.
+const poRows2 = Array.from({ length: 95 }, (_, i) => {
   const qty = (i % 9) + 1;
   const price = Number((1.0 + (i % 5) * 0.5).toFixed(2));
   const amount = Number((qty * price).toFixed(2));

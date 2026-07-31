@@ -2839,6 +2839,67 @@ dev-harness-only change); lint/typecheck/build green.
 
 ---
 
+### D-084 — real Pop & Skate logo wired in (user-supplied, not fabricated); a real unidb engine bug found and worked around; extended PO test data grown and a real seed-script bug fixed
+**Decision:** User supplied their own Pop & Skate logo as a rendered
+design page (a `claudeusercontent.com` HTML page, `<img src="blob:...">`)
+and asked why it wouldn't attach. Root cause: DocSmith's `image` element
+needs an actual image resource for `<img src>` — an HTML *document* URL,
+and a page-local `blob:` URL that only resolves inside that page's own
+JS context, are both fundamentally the wrong shape. This is the user's
+own asset, not a case of fabricating a trademark (unlike the earlier,
+correctly-declined "generate one yourself" request) — screenshotted the
+rendered `<img>` element directly (Puppeteer element `.screenshot()`,
+auto-clips to its real bounding box), producing a real PNG, base64-encoded
+into a `data:image/png;base64,...` URI and set as the Invoice Teal
+template's logo `src.value` — self-contained, no external hosting
+dependency (`memory.md` O-1, asset storage, is still genuinely
+undecided). Verified via a real PDF render + screenshot: the actual logo
+now appears correctly inside the template's existing black header bar.
+User also asked why "Tax" appears after every Amount value — that's not
+a bug, it's a literal detail copied from THEIR OWN reference invoice
+image (every line's Amount there reads e.g. "$1,600.00Tax"), stored as
+pre-formatted text (`amount_display`, `format:'text'`) specifically so
+that suffix survives — explained directly rather than silently changing
+it.
+User then asked to add 2-3 more items to PO #1 and extend PO #2 by 50
+more (45→95). Doing so surfaced a REAL unidb engine bug: `UPDATE` on any
+row that has FK children falsely fails constraint validation, even for a
+column change with zero relation to the FK — reproduced deterministically
+(a plain `UPDATE purchase_orders SET vendor_ref=... WHERE id=1` failed
+with "FOREIGN KEY constraint violated on table 'po_line_items'" despite
+the referenced row unambiguously existing). Not something to fix here
+(separate project) — worked around by snapshotting the children, deleting
+them, updating the parent, then reinserting the children. Own follow-up
+bug caught directly by the user from a screenshot (subtotal still showing
+the OLD 1-item total after a NEW 4th item had already inserted
+successfully): the first fix attempt died mid-way through this exact
+workaround (before recomputing), leaving stale header totals — visible,
+reported, and fixed. A SECOND self-caught bug followed immediately after
+partially fixing it: the totals-recompute code summed the wrong array
+column (`r[4]`, price, instead of `r[5]`, amount) — PO #1's subtotal came
+out as "$6.80" (literally the sum of unit prices) instead of $3,312.50;
+caught by sanity-checking the very numbers the fix was supposed to
+produce, not assumed correct. User asked directly whether these
+SUBTOTAL/TAX/TOTAL values come straight from the database — confirmed
+yes: DocSmith never derives them at render time, it only displays
+whatever's actually stored in those header columns (same as any other
+bound field) — which is exactly why a wrong stored value renders as a
+wrong total with no error anywhere, and why getting the seed data's math
+right matters as much as it would for a real ERP.
+**Verified:** re-ran the FULL fresh reseed (`unidb-seed.mjs`, drop +
+recreate) end-to-end after fixing both bugs, confirmed via direct SQL
+queries (row counts, no duplicate ids, correct subtotal/tax/total) AND a
+real Preview render through the actual UI: PO #1 shows 4 items,
+$3,312.50 subtotal; PO #2 shows 95 items, $935.00 subtotal; zero console
+errors. `dev/unidb-seed.mjs` and its companion `dev/unidb-schema.sql`
+updated to match this new state exactly, so the "permanent"/reproducible
+setup from D-082 still reproduces correctly from scratch, not just the
+live-patched database. 211 designer / 72 core tests unaffected
+(fixture-data + dev-harness-only changes); lint/typecheck/build green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

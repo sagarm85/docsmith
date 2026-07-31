@@ -333,8 +333,30 @@
   shows $4,410.00, PO #2 shows $520.00. Re-ran the seed script against the
   live engine and verified via a real Preview render that both fixes took
   effect. 211 designer / 72 core tests unaffected; lint/typecheck/build
-  green. The rest of this section (below) is historical Phase 0–3
-  journal, kept for reference.
+  green.
+  Pass 22 (D-084): user supplied their own real Pop & Skate logo (a
+  rendered design page, `<img src="blob:...">`) — the blob URL couldn't
+  attach directly since `<img src>` needs an actual image resource, not
+  an HTML document or a page-local blob URL. Screenshotted the rendered
+  logo element directly and embedded it as a base64 data URI — real logo
+  now renders correctly, no external hosting needed. Explained the "Tax"
+  suffix on Amount values isn't a bug — it's literally in the user's own
+  reference image, stored as pre-formatted text on purpose. Extending PO
+  #1 (+3 items) and PO #2 (+50, to 95) surfaced a real unidb engine bug
+  (`UPDATE` on an FK-parent row with children falsely fails constraint
+  validation, even for unrelated columns) — worked around via
+  delete-children/update-parent/reinsert-children. Two of my own bugs
+  along the way, both caught by direct verification rather than assumed
+  fixed: a stale subtotal (user spotted it from a screenshot — the fix
+  had died mid-workaround) and a wrong-column sum bug (summed price
+  instead of amount, giving PO #1 a "$6.80" subtotal instead of
+  $3,312.50). Confirmed for the user that these totals are real database
+  values DocSmith just displays, never derives. Re-ran a full fresh
+  reseed end-to-end after both fixes, verified via SQL + a real Preview
+  render: PO #1 → 4 items/$3,312.50, PO #2 → 95 items/$935.00, zero
+  errors. `unidb-seed.mjs`/`unidb-schema.sql` updated to match, so the
+  reproducible setup still works from scratch. The rest of this section
+  (below) is historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
   together. `core/history.ts` is a new, generic, framework-agnostic
