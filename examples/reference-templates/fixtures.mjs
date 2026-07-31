@@ -166,7 +166,15 @@ export function salesContractTemplate() {
         height: 30,
         enabled: true,
         elements: [
-          el('text', 0, 4, 750, 26, { text: 'SALES CONTRACT', style: { fontSize: 19, bold: true, align: 'center' } }),
+          // Width 673 matches this A4/16mm-margin template's real print
+          // content width (page width minus left+right margins — see
+          // core/render.ts's pageWidthPx doc comment; the same convention
+          // the Invoice/Purchase Order templates' own pageHeader elements
+          // already follow). It was previously 750, wider than the actual
+          // page, which pushed the centered text visibly past the page's
+          // right edge in both the Design canvas and print (reported
+          // directly as "out of page alignment").
+          el('text', 0, 4, 673, 26, { text: 'SALES CONTRACT', style: { fontSize: 19, bold: true, align: 'center' } }),
         ],
       },
       {
@@ -384,7 +392,9 @@ export function shippingInstructionTemplate() {
         height: 30,
         enabled: true,
         elements: [
-          el('text', 0, 4, 750, 26, { text: 'SHIPPING INSTRUCTION', style: { fontSize: 19, bold: true, align: 'center' } }),
+          // See salesContractTemplate()'s identical pageHeader element for
+          // why this is 673, not the original (too-wide) 750.
+          el('text', 0, 4, 673, 26, { text: 'SHIPPING INSTRUCTION', style: { fontSize: 19, bold: true, align: 'center' } }),
         ],
       },
       {

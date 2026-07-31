@@ -2480,6 +2480,46 @@ lint/typecheck/build green.
 
 ---
 
+### D-074 — Fixed a real, separate overflow bug: Sales Contract / Shipping Instruction pageHeader titles were 750px wide against a 673px page
+**Decision:** Reported directly: "I again see the same out of page
+alignment" — after D-073's fix (which clamps typed edits, not existing
+data), so this had to be a genuinely different instance, not the same
+report recurring. Checked the LIVE data first rather than assuming: the
+Purchase Order (Blue/Peach) "PURCHASE ORDER" elements D-073 was built
+around were still correctly `x:260,w:413` (flush, unchanged). The actual
+offender was two OTHER reference templates — `salesContractTemplate()`
+and `shippingInstructionTemplate()` — whose pageHeader title text
+(`SALES CONTRACT`/`SHIPPING INSTRUCTION`, both `align:'center'`) was
+authored at `w:750` in `examples/reference-templates/fixtures.mjs`, while
+both use the same `A4_PORTRAIT` printSetup (16mm margins) as every other
+reference template, giving a real print content width of ~673px — 77px
+narrower than the element's own box. This was baked into the FIXTURE
+SOURCE from the start (not a live edit gone wrong, and not something
+D-073's clamp could have caught — that only guards NEW edits through
+ElementProps, not pre-existing authored data).
+**Fix:** both changed to `w:673`, matching the exact content-width
+convention every other reference template's pageHeader elements already
+follow (documented in the Invoice/Purchase Order templates' own
+comments).
+**Also noted, not a code bug:** the dev harness (`dev/main.ts`) seeds each
+reference template into `localStorage` only once — `if
+(!localStorage.getItem(key))` — so a long-lived browser session that
+loaded the OLD `w:750` value before this fix will keep showing it until
+that one template's `localStorage` entry is cleared (or "+ New template"/
+re-add) to force a fresh reseed from the corrected fixture. Verified this
+is a browser-state artifact, not a residual code issue, by confirming a
+FRESH session (a new, unpersisted profile — same effect as clearing that
+one entry) picks up `w:673` immediately with no other change needed.
+**Verified:** measured directly in the Design canvas — "SALES CONTRACT"'s
+rendered right edge (1126.625) now matches `.dd-page`'s own right edge
+(1126.375) to within 0.25px (the same negligible rounding D-072/D-073
+already established as "flush"), confirmed visually via screenshot.
+Fixture-data-only change — 71 core tests, 208 designer tests unaffected;
+lint/typecheck green.
+`[status: locked]`
+
+---
+
 ## Open items (decide, then move to a D-entry)
 
 - **O-1 — Asset/logo storage (P2):** where uploaded logos live (host callback vs

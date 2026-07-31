@@ -207,7 +207,27 @@
   `max` attribute was absent; after, typing 600 clamps to 412.76 and the
   element's rendered right edge exactly matches the page's. New
   `ElementProps.test.ts` (7 tests, new file). 208 designer tests pass (was
-  201); lint/typecheck/build green. The rest of this section (below) is
+  201); lint/typecheck/build green.
+  Pass 17, same session (D-074): "I again see the same out of page
+  alignment" — checked live data first rather than assuming a repeat
+  report: Purchase Order's own elements were still correctly flush
+  (D-073's fix only guards new edits, doesn't retroactively touch existing
+  data, and there was nothing to retroactively fix there anyway). The real
+  offender was a genuinely different, pre-existing bug: `salesContract
+  Template()`/`shippingInstructionTemplate()`'s pageHeader titles
+  ("SALES CONTRACT"/"SHIPPING INSTRUCTION") were authored at `w:750` in
+  the fixture source, against the same 673px real content width every
+  other reference template uses — 77px too wide, baked in from the start,
+  unrelated to any live edit. Fixed both to `w:673`, matching the
+  established convention. Also noted (not a code bug): the dev harness
+  only seeds each reference template into `localStorage` ONCE, so a
+  browser session that loaded the old `w:750` before this fix needs that
+  one template's `localStorage` entry cleared (or re-added) to pick up the
+  fix — confirmed by testing a fresh, unpersisted session, which picked up
+  `w:673` immediately with no other change needed. Verified via direct
+  canvas measurement: "SALES CONTRACT"'s right edge now matches the
+  page's own right edge to within 0.25px. Fixture-data-only — 71 core, 208
+  designer tests unaffected. The rest of this section (below) is
   historical Phase 0–3 journal, kept for reference.
 - **Now:** Phase 2's core WYSIWYG loop landed: free-form select/move/resize,
   the full `Properties` panel, and the undo/redo command stack, all wired
